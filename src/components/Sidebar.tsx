@@ -4,7 +4,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
   LayoutDashboard, FileCode2, FolderOpen, Globe, ShieldCheck,
-  Database, Settings, Server, LogOut, ChevronRight, Boxes, SlidersHorizontal
+  Database, Server, LogOut, ChevronRight, Boxes, SlidersHorizontal
 } from 'lucide-react';
 
 const USER_NAV_ITEMS = [
@@ -20,7 +20,7 @@ const ADMIN_NAV_ITEMS = [
   { href: '/dashboard/domains',   icon: Globe,           label: 'Domains',      color: '#06b6d4' },
   { href: '/dashboard/php',       icon: FileCode2,       label: 'PHP Manager',  color: '#a855f7' },
   { href: '/dashboard/services',  icon: Server,          label: 'Services',     color: '#22c55e' },
-  { href: '/dashboard/settings',  icon: Settings,        label: 'Settings',     color: '#8b949e' },
+  { href: '/dashboard/settings',  icon: ShieldCheck,     label: 'Security',     color: '#16a34a' },
 ];
 
 export default function Sidebar() {

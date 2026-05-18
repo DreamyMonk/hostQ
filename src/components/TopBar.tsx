@@ -1,6 +1,7 @@
 'use client';
 import { usePathname } from 'next/navigation';
-import { Bell } from 'lucide-react';
+import { Bell, ShieldCheck } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 const PAGE_TITLES: Record<string, { title: string; subtitle: string }> = {
   '/dashboard':            { title: 'Dashboard',      subtitle: 'Server overview & resource usage' },
@@ -12,13 +13,18 @@ const PAGE_TITLES: Record<string, { title: string; subtitle: string }> = {
   '/dashboard/wordpress':  { title: 'WordPress',       subtitle: 'Install and manage WordPress sites' },
   '/dashboard/ssl':        { title: 'SSL Manager',     subtitle: "Manage Let's Encrypt SSL certificates" },
   '/dashboard/databases':  { title: 'Databases',       subtitle: 'Create and manage MySQL databases' },
-  '/dashboard/settings':   { title: 'Settings',        subtitle: 'Panel configuration & preferences' },
+  '/dashboard/settings':   { title: 'Security',        subtitle: 'Production readiness, audit logs and sessions' },
 };
 
 export default function TopBar() {
   const pathname = usePathname();
   const info = PAGE_TITLES[pathname] || { title: 'hostQ', subtitle: '' };
   const now = new Date().toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' });
+  const [me, setMe] = useState<{ username: string; role: string } | null>(null);
+
+  useEffect(() => {
+    void fetch('/api/me').then(response => response.ok ? response.json() : null).then(data => data && setMe(data)).catch(() => {});
+  }, []);
 
   return (
     <div className="topbar">
@@ -28,6 +34,9 @@ export default function TopBar() {
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
         <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{now}</span>
+        <div className="badge badge-green" style={{ height: 28 }}>
+          <ShieldCheck size={13} /> Secure
+        </div>
         <div style={{
           width: 34, height: 34, background: 'var(--bg-card)',
           border: '1px solid var(--border-default)', borderRadius: 8,
@@ -44,8 +53,9 @@ export default function TopBar() {
             width: 22, height: 22, background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
             borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 11, fontWeight: 700, color: 'white'
-          }}>A</div>
-          <span style={{ fontSize: 13, fontWeight: 500 }}>admin</span>
+          }}>{(me?.username || 'A').slice(0, 1).toUpperCase()}</div>
+          <span style={{ fontSize: 13, fontWeight: 500 }}>{me?.username || 'admin'}</span>
+          <span className="badge badge-blue">{me?.role || 'admin'}</span>
         </div>
       </div>
     </div>
