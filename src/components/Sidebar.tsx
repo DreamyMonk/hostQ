@@ -1,26 +1,46 @@
 'use client';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import {
   LayoutDashboard, FileCode2, FolderOpen, Globe, ShieldCheck,
-  Database, Settings, Server, LogOut, ChevronRight, Boxes
+  Database, Settings, Server, LogOut, ChevronRight, Boxes, SlidersHorizontal
 } from 'lucide-react';
 
-const NAV_ITEMS = [
-  { href: '/dashboard',           icon: LayoutDashboard, label: 'Dashboard',    color: '#3b82f6' },
+const USER_NAV_ITEMS = [
+  { href: '/dashboard/sites',     icon: Globe,           label: 'Sites',        color: '#06b6d4' },
+  { href: '/dashboard/files',     icon: FolderOpen,      label: 'Files',        color: '#f59e0b' },
+  { href: '/dashboard/wordpress', icon: Boxes,           label: 'WordPress',    color: '#3b82f6' },
+  { href: '/dashboard/ssl',       icon: ShieldCheck,     label: 'SSL',          color: '#f97316' },
+  { href: '/dashboard/databases', icon: Database,        label: 'Databases',    color: '#8b5cf6' },
+];
+
+const ADMIN_NAV_ITEMS = [
+  { href: '/dashboard',           icon: LayoutDashboard, label: 'Overview',     color: '#3b82f6' },
   { href: '/dashboard/domains',   icon: Globe,           label: 'Domains',      color: '#06b6d4' },
   { href: '/dashboard/php',       icon: FileCode2,       label: 'PHP Manager',  color: '#a855f7' },
   { href: '/dashboard/services',  icon: Server,          label: 'Services',     color: '#22c55e' },
-  { href: '/dashboard/files',     icon: FolderOpen,      label: 'File Manager', color: '#f59e0b' },
-  { href: '/dashboard/wordpress', icon: Boxes,           label: 'WordPress',    color: '#3b82f6' },
-  { href: '/dashboard/ssl',       icon: ShieldCheck,     label: 'SSL Manager',  color: '#f97316' },
-  { href: '/dashboard/databases', icon: Database,        label: 'Databases',    color: '#8b5cf6' },
   { href: '/dashboard/settings',  icon: Settings,        label: 'Settings',     color: '#8b949e' },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
   const router   = useRouter();
+  const [mode, setMode] = useState<'user' | 'admin'>('user');
+
+  useEffect(() => {
+    const id = setTimeout(() => {
+      const savedMode = window.localStorage.getItem('hostpanel-mode');
+      if (savedMode === 'admin' || savedMode === 'user') setMode(savedMode);
+    }, 0);
+    return () => clearTimeout(id);
+  }, []);
+
+  const switchMode = (nextMode: 'user' | 'admin') => {
+    setMode(nextMode);
+    window.localStorage.setItem('hostpanel-mode', nextMode);
+    router.push(nextMode === 'user' ? '/dashboard/sites' : '/dashboard');
+  };
 
   const handleLogout = async () => {
     await fetch('/api/auth', { method: 'DELETE' });
@@ -48,14 +68,31 @@ export default function Sidebar() {
         </div>
       </div>
 
+      <div style={{ padding: '12px 10px 4px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, background: 'var(--bg-base)', border: '1px solid var(--border-subtle)', borderRadius: 8, padding: 4 }}>
+          <button onClick={() => switchMode('user')} style={{
+            border: 'none', borderRadius: 6, padding: '7px 8px', cursor: 'pointer',
+            background: mode === 'user' ? 'var(--bg-card)' : 'transparent',
+            color: mode === 'user' ? 'var(--text-primary)' : 'var(--text-muted)',
+            fontSize: 12, fontWeight: 700,
+          }}>User</button>
+          <button onClick={() => switchMode('admin')} style={{
+            border: 'none', borderRadius: 6, padding: '7px 8px', cursor: 'pointer',
+            background: mode === 'admin' ? 'var(--bg-card)' : 'transparent',
+            color: mode === 'admin' ? 'var(--text-primary)' : 'var(--text-muted)',
+            fontSize: 12, fontWeight: 700,
+          }}>Admin</button>
+        </div>
+      </div>
+
       {/* Nav items */}
       <div style={{ flex: 1, padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: 2 }}>
         <div style={{
           fontSize: 10, fontWeight: 600, letterSpacing: '0.8px', textTransform: 'uppercase',
           color: 'var(--text-muted)', padding: '8px 10px 6px'
-        }}>Main Menu</div>
+        }}>{mode === 'user' ? 'User Mode' : 'Admin Mode'}</div>
 
-        {NAV_ITEMS.map(({ href, icon: Icon, label, color }) => {
+        {(mode === 'user' ? USER_NAV_ITEMS : ADMIN_NAV_ITEMS).map(({ href, icon: Icon, label, color }) => {
           const isActive = href === '/dashboard'
             ? pathname === '/dashboard'
             : pathname.startsWith(href);
@@ -84,6 +121,18 @@ export default function Sidebar() {
             </Link>
           );
         })}
+
+        {mode === 'user' && (
+          <button onClick={() => switchMode('admin')} style={{
+            marginTop: 10, display: 'flex', alignItems: 'center', gap: 10,
+            padding: '9px 10px', borderRadius: 8, cursor: 'pointer',
+            background: 'transparent', border: '1px dashed var(--border-default)',
+            color: 'var(--text-muted)', fontSize: 13,
+          }}>
+            <SlidersHorizontal size={16} />
+            Server Admin
+          </button>
+        )}
       </div>
 
       {/* Logout */}

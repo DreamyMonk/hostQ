@@ -4,6 +4,7 @@ import { Bell } from 'lucide-react';
 
 const PAGE_TITLES: Record<string, { title: string; subtitle: string }> = {
   '/dashboard':            { title: 'Dashboard',      subtitle: 'Server overview & resource usage' },
+  '/dashboard/sites':      { title: 'Sites',          subtitle: 'User mode site workspace' },
   '/dashboard/domains':    { title: 'Domain Manager',  subtitle: 'Add domains, subdomains & vhost configs' },
   '/dashboard/php':        { title: 'PHP Manager',     subtitle: 'Switch PHP versions & manage extensions' },
   '/dashboard/services':   { title: 'Services',         subtitle: 'Manage Nginx, Apache, MySQL & auto-install' },

@@ -31,6 +31,7 @@ Local development works on Windows, macOS, and Linux, but real hosting actions s
 | Auth | Single-admin JWT login with a cookie session |
 | Dashboard | CPU, RAM, disk, uptime, service status |
 | Sites | Add, disable, delete, and manage domain/subdomain sites |
+| User/Admin UI Modes | User mode for site operations, admin mode for server and stack controls |
 | Site types | HTML/CSS static sites, PHP sites, and WordPress-ready folders |
 | WordPress | One-click install with WP-CLI plus admin, files, and delete actions |
 | PHP Manager | Manage currently supported PHP 8.2, 8.3, 8.4, and 8.5 FPM branches |
@@ -92,6 +93,13 @@ Installed stack:
 7. Add a site from Domain Manager, choosing HTML/CSS, PHP, or WordPress-ready.
 8. Use SSL Manager for Let&apos;s Encrypt or manual PEM certificate upload.
 9. Use File Manager or FTP to upload site files.
+
+## UI Modes
+
+HostPanel has two navigation modes:
+
+- User mode: add sites and manage each site from one minimal workspace. Site management includes open site, files, SSL, WordPress, database, PHP shortcut, enable/disable, permission repair, backup, and delete.
+- Admin mode: manage server-level tools such as services, PHP-FPM versions, domain/vhost configuration, and panel settings.
 
 ## Configuration
 

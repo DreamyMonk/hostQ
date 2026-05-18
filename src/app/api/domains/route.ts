@@ -279,6 +279,14 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ success: true, message: `${domain} ${action}d (demo)` });
   }
 
+  if (action === 'permissions') {
+    const domainRoot = `${WEB_ROOT}/${domain}`;
+    await runCommand(`chown -R www-data:www-data ${shellQuote(domainRoot)} 2>/dev/null || true`);
+    await runCommand(`find ${shellQuote(domainRoot)} -type d -exec chmod 755 {} \\; 2>/dev/null || true`);
+    await runCommand(`find ${shellQuote(domainRoot)} -type f -exec chmod 644 {} \\; 2>/dev/null || true`);
+    return NextResponse.json({ success: true, message: `${domain} permissions repaired` });
+  }
+
   if (server === 'nginx') {
     if (action === 'enable') {
       await runCommand(`ln -sf ${shellQuote(path.join(NGINX_AVAILABLE, domain))} ${shellQuote(path.join(NGINX_ENABLED, domain))}`);
@@ -297,6 +305,39 @@ export async function PATCH(request: NextRequest) {
   }
 
   return NextResponse.json({ success: true, message: `${domain} ${action}d` });
+}
+
+export async function PUT(request: NextRequest) {
+  if (!await auth()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const { domain } = await request.json();
+  if (!domain || !/^[a-zA-Z0-9][a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(domain)) {
+    return NextResponse.json({ error: 'Invalid domain name' }, { status: 400 });
+  }
+
+  const domainRoot = `${WEB_ROOT}/${domain}`;
+  const backupDir = '/var/backups/hostpanel';
+  const fileName = `${domain}-${new Date().toISOString().slice(0, 10)}.tar.gz`;
+  const backupPath = `${backupDir}/${fileName}`;
+
+  if (process.platform !== 'linux') {
+    return NextResponse.json({
+      success: true,
+      message: `${domain} backup created (demo)`,
+      output: `Would create ${backupPath}`,
+      backupPath,
+    });
+  }
+
+  await runCommand(`mkdir -p ${shellQuote(backupDir)}`);
+  const r = await runCommand(`tar -czf ${shellQuote(backupPath)} -C ${shellQuote(domainRoot)} . 2>&1`, 120000);
+
+  return NextResponse.json({
+    success: r.success,
+    message: r.success ? `${domain} backup created` : `${domain} backup failed`,
+    output: r.stdout || r.stderr || r.error || backupPath,
+    backupPath: r.success ? backupPath : undefined,
+  }, { status: r.success ? 200 : 500 });
 }
 
 // ──────────────────────────────────────────────

@@ -83,11 +83,11 @@ export default function DashboardPage() {
   }, []);
 
   const quickActions = [
-    { icon: '🌐', label: 'Install WordPress', desc: 'One-click WP setup', href: '/dashboard/wordpress', color: '#3b82f6' },
-    { icon: '🔒', label: 'Add SSL Certificate', desc: "Free Let's Encrypt SSL", href: '/dashboard/ssl', color: '#22c55e' },
-    { icon: '🗄️', label: 'Create Database', desc: 'MySQL database + user', href: '/dashboard/databases', color: '#06b6d4' },
-    { icon: '🐘', label: 'Switch PHP Version', desc: 'PHP 7.4 → 8.x', href: '/dashboard/php', color: '#a855f7' },
-    { icon: '📁', label: 'Open File Manager', desc: 'Browse server files', href: '/dashboard/files', color: '#f59e0b' },
+    { icon: 'Sites', label: 'Manage Sites', desc: 'User workspace', href: '/dashboard/sites', color: '#06b6d4' },
+    { icon: 'WP', label: 'Install WordPress', desc: 'One-click WP setup', href: '/dashboard/wordpress', color: '#3b82f6' },
+    { icon: 'SSL', label: 'Add SSL Certificate', desc: "Let's Encrypt or PEM", href: '/dashboard/ssl', color: '#22c55e' },
+    { icon: 'DB', label: 'Create Database', desc: 'MariaDB database + user', href: '/dashboard/databases', color: '#06b6d4' },
+    { icon: 'PHP', label: 'Switch PHP Version', desc: 'PHP 8.2 to 8.5', href: '/dashboard/php', color: '#a855f7' },
   ];
 
   return (
