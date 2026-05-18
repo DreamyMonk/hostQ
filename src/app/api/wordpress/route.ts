@@ -83,7 +83,7 @@ export async function POST(request: Request) {
     { label: 'Create directory', cmd: `mkdir -p ${qSitePath}` },
     { label: 'Download WordPress', cmd: `wp core download --path=${qSitePath} --force --allow-root 2>&1` },
     { label: 'Create database', sql: `CREATE DATABASE IF NOT EXISTS ${mysqlIdentifier(dbName)};` },
-    { label: 'Create DB user', sql: `CREATE USER IF NOT EXISTS ${mysqlString(dbUser)}@'localhost' IDENTIFIED BY ${mysqlString(dbPassword)}; GRANT ALL PRIVILEGES ON ${mysqlIdentifier(dbName)}.* TO ${mysqlString(dbUser)}@'localhost'; FLUSH PRIVILEGES;` },
+    { label: 'Create DB user', sql: `CREATE USER IF NOT EXISTS ${mysqlString(dbUser)}@'localhost' IDENTIFIED BY ${mysqlString(dbPassword)}; ALTER USER ${mysqlString(dbUser)}@'localhost' IDENTIFIED BY ${mysqlString(dbPassword)}; GRANT ALL PRIVILEGES ON ${mysqlIdentifier(dbName)}.* TO ${mysqlString(dbUser)}@'localhost'; FLUSH PRIVILEGES;` },
     {
       label: 'Configure wp-config.php',
       cmd: `wp config create --path=${qSitePath} --dbname=${shellQuote(dbName)} --dbuser=${shellQuote(dbUser)} --dbpass=${shellQuote(dbPassword)} --dbhost=localhost --force --allow-root 2>&1`,

@@ -60,6 +60,7 @@ assert.match(wordpress, /WordPress installation failed/, 'WordPress install must
 assert.match(wordpress, /\.hostq-trash/, 'WordPress scanner must ignore soft-deleted sites in trash');
 assert.match(wordpress, /wp core download --path=\$\{qSitePath\} --force/, 'WordPress install must tolerate retrying over partial files');
 assert.match(wordpress, /wp config create --path=\$\{qSitePath\}.*--force/, 'WordPress config creation must tolerate retrying partial installs');
+assert.match(wordpress, /ALTER USER/, 'WordPress retry must reset existing database user passwords');
 
 const sshUpdate = readFileSync('scripts/hostq-update.sh', 'utf8');
 assert.match(sshUpdate, /api\.github\.com\/repos\/\$\{REPO\}\/releases\/latest/, 'SSH updater must be able to resolve latest release');
