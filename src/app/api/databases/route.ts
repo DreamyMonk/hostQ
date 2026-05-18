@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { mysqlIdentifier, mysqlString, runMysql } from '@/lib/exec';
+import { audit, clientIp } from '@/lib/security';
 
 async function auth() {
   const cookieStore = await cookies();
@@ -68,7 +69,8 @@ export async function GET() {
 
 // POST - create database / user
 export async function POST(request: Request) {
-  if (!await auth()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const actor = await auth();
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = await request.json();
   const { action, dbName, dbUser, dbPassword } = body;
@@ -79,6 +81,7 @@ export async function POST(request: Request) {
     }
     const r = await runMysql(`CREATE DATABASE IF NOT EXISTS ${mysqlIdentifier(dbName)};`);
     if (!r.success) return NextResponse.json({ error: r.error || r.stderr }, { status: 500 });
+    audit({ actor: actor.username, action: 'database.create', target: dbName, ip: clientIp(request) });
     return NextResponse.json({ success: true, message: `Database '${dbName}' created` });
   }
 
@@ -95,6 +98,7 @@ export async function POST(request: Request) {
       const r = await runMysql(sql);
       if (!r.success) return NextResponse.json({ error: r.error || r.stderr }, { status: 500 });
     }
+    audit({ actor: actor.username, action: 'database_user.create', target: `${dbName}:${dbUser}`, ip: clientIp(request) });
     return NextResponse.json({ success: true, message: `User '${dbUser}' created and granted on '${dbName}'` });
   }
 
@@ -103,7 +107,8 @@ export async function POST(request: Request) {
 
 // DELETE - drop database or user
 export async function DELETE(request: Request) {
-  if (!await auth()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const actor = await auth();
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { action, name } = await request.json();
   
@@ -111,6 +116,7 @@ export async function DELETE(request: Request) {
     if (!name || !/^[a-zA-Z0-9_]+$/.test(name)) return NextResponse.json({ error: 'Invalid database name' }, { status: 400 });
     const r = await runMysql(`DROP DATABASE IF EXISTS ${mysqlIdentifier(name)};`);
     if (!r.success) return NextResponse.json({ error: r.stderr }, { status: 500 });
+    audit({ actor: actor.username, action: 'database.drop', target: name, ip: clientIp(request) });
     return NextResponse.json({ success: true, message: `Database '${name}' dropped` });
   }
 
@@ -118,6 +124,7 @@ export async function DELETE(request: Request) {
     if (!name || !/^[a-zA-Z0-9_]+$/.test(name)) return NextResponse.json({ error: 'Invalid user name' }, { status: 400 });
     const r = await runMysql(`DROP USER IF EXISTS ${mysqlString(name)}@'localhost';`);
     if (!r.success) return NextResponse.json({ error: r.stderr }, { status: 500 });
+    audit({ actor: actor.username, action: 'database_user.drop', target: name, ip: clientIp(request) });
     return NextResponse.json({ success: true, message: `User '${name}' dropped` });
   }
 

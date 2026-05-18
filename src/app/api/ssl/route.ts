@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
-import { runCommand, shellQuote } from '@/lib/exec';
+import { runCommand, runHelper, shellQuote } from '@/lib/exec';
+import { audit, clientIp } from '@/lib/security';
 import fs from 'fs';
 import path from 'path';
 
@@ -49,7 +50,8 @@ export async function GET() {
 
 // POST - install SSL for a domain
 export async function POST(request: Request) {
-  if (!await auth()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const actor = await auth();
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { domain, email, webserver = 'nginx', staging = false, mode = 'letsencrypt', certificate, privateKey, chain } = await request.json();
   if (!domain) return NextResponse.json({ error: 'Domain required' }, { status: 400 });
@@ -71,6 +73,7 @@ export async function POST(request: Request) {
     const combinedCert = chain ? `${certificate.trim()}\n${String(chain).trim()}\n` : `${certificate.trim()}\n`;
 
     if (process.platform !== 'linux') {
+      audit({ actor: actor.username, action: 'ssl.manual_upload', target: domain, ip: clientIp(request), details: { demo: true } });
       return NextResponse.json({
         success: true,
         output: `Demo mode\nWould write certificate to ${fullchainPath}\nWould reload ${webserver}`,
@@ -82,7 +85,8 @@ export async function POST(request: Request) {
     fs.writeFileSync(fullchainPath, combinedCert, { mode: 0o644 });
     fs.writeFileSync(keyPath, `${String(privateKey).trim()}\n`, { mode: 0o600 });
 
-    const reload = await runCommand(`${webserver === 'apache' ? 'systemctl reload apache2' : 'nginx -t && systemctl reload nginx'} 2>&1`);
+    const reload = await runHelper('web.reload', { server: webserver === 'apache' ? 'apache' : 'nginx' });
+    audit({ actor: actor.username, action: 'ssl.manual_upload', target: domain, status: reload.success ? 'success' : 'failure', ip: clientIp(request) });
     return NextResponse.json({
       success: reload.success,
       output: reload.stdout || reload.stderr || `Certificate stored in ${certDir}`,
@@ -97,6 +101,7 @@ export async function POST(request: Request) {
   const cmd = `certbot --${plugin} -d ${shellQuote(domain)} --email ${shellQuote(email)} --agree-tos --non-interactive ${stagingFlag} 2>&1`;
   
   const r = await runCommand(cmd, 120000);
+  audit({ actor: actor.username, action: 'ssl.letsencrypt_issue', target: domain, status: r.success ? 'success' : 'failure', ip: clientIp(request), details: { webserver, staging } });
   
   return NextResponse.json({
     success: r.success,
@@ -107,7 +112,8 @@ export async function POST(request: Request) {
 
 // PATCH - renew a certificate
 export async function PATCH(request: Request) {
-  if (!await auth()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const actor = await auth();
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { domain } = await request.json();
   const cmd = domain && /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(domain)
@@ -115,6 +121,7 @@ export async function PATCH(request: Request) {
     : 'certbot renew --non-interactive 2>&1';
   
   const r = await runCommand(cmd, 120000);
+  audit({ actor: actor.username, action: 'ssl.renew', target: domain || 'all', status: r.success ? 'success' : 'failure', ip: clientIp(request) });
   return NextResponse.json({
     success: r.success,
     output: r.stdout || r.stderr,
@@ -124,7 +131,8 @@ export async function PATCH(request: Request) {
 
 // DELETE - revoke/delete certificate
 export async function DELETE(request: Request) {
-  if (!await auth()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const actor = await auth();
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { domain } = await request.json();
   if (!domain) return NextResponse.json({ error: 'Domain required' }, { status: 400 });
@@ -134,6 +142,7 @@ export async function DELETE(request: Request) {
   }
 
   const r = await runCommand(`certbot delete --cert-name ${shellQuote(domain)} --non-interactive 2>&1`, 30000);
+  audit({ actor: actor.username, action: 'ssl.delete', target: domain, status: r.success ? 'success' : 'failure', ip: clientIp(request) });
   return NextResponse.json({
     success: r.success,
     output: r.stdout || r.stderr,

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { mysqlIdentifier, mysqlString, runCommand, runMysql, shellQuote } from '@/lib/exec';
+import { audit, clientIp } from '@/lib/security';
 
 async function auth() {
   const cookieStore = await cookies();
@@ -40,7 +41,8 @@ export async function GET() {
 
 // POST - install WordPress
 export async function POST(request: Request) {
-  if (!await auth()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const actor = await auth();
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { domain, dbName, dbUser, dbPassword, adminEmail, siteTitle, adminUser, adminPass } = await request.json();
 
@@ -86,6 +88,7 @@ export async function POST(request: Request) {
     }
   }
 
+  audit({ actor: actor.username, action: 'wordpress.install', target: domain, ip: clientIp(request), details: { dbName } });
   return NextResponse.json({
     success: true,
     output: logs.join('\n'),
@@ -95,7 +98,8 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  if (!await auth()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const actor = await auth();
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { path: sitePath, dbName, deleteFiles = false, deleteDatabase = false } = await request.json();
   const webRoot = process.env.WEB_ROOT || '/var/www/html';
@@ -105,8 +109,9 @@ export async function DELETE(request: Request) {
 
   const logs: string[] = [];
   if (deleteFiles) {
-    const r = await runCommand(`rm -rf ${shellQuote(sitePath)}`, 30000);
-    logs.push(r.success ? `Deleted files at ${sitePath}` : `Failed deleting files: ${r.stderr || r.error}`);
+    const trashPath = `${webRoot}/.hostq-trash/${Date.now()}-${String(sitePath).split('/').pop()}`;
+    const r = await runCommand(`mkdir -p ${shellQuote(`${webRoot}/.hostq-trash`)} && mv ${shellQuote(sitePath)} ${shellQuote(trashPath)}`, 30000);
+    logs.push(r.success ? `Soft-deleted files to ${trashPath}` : `Failed moving files: ${r.stderr || r.error}`);
   }
   if (deleteDatabase && dbName) {
     if (!/^[a-zA-Z0-9_]+$/.test(dbName)) return NextResponse.json({ error: 'Invalid database name' }, { status: 400 });
@@ -114,5 +119,6 @@ export async function DELETE(request: Request) {
     logs.push(r.success ? `Dropped database ${dbName}` : `Failed dropping database: ${r.stderr || r.error}`);
   }
 
+  audit({ actor: actor.username, action: 'wordpress.delete', target: sitePath, ip: clientIp(request), details: { dbName, deleteFiles, deleteDatabase } });
   return NextResponse.json({ success: true, message: 'WordPress site removed', output: logs.join('\n') || 'No destructive action selected' });
 }

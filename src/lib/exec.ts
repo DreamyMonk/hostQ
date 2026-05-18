@@ -1,5 +1,6 @@
 // lib/exec.ts - Server-side shell command executor
 import { exec } from 'child_process';
+import path from 'path';
 import { promisify } from 'util';
 
 const execAsync = promisify(exec);
@@ -27,6 +28,11 @@ export async function runCommand(command: string, timeout = 30000): Promise<Exec
       error: error.message || 'Unknown error',
     };
   }
+}
+
+export async function runHelper(task: string, payload: Record<string, unknown> = {}, timeout = 180000): Promise<ExecResult> {
+  const helper = process.env.HOSTQ_HELPER || path.join(process.cwd(), 'scripts', 'hostq-helper.mjs');
+  return runCommand(`node ${shellQuote(helper)} ${shellQuote(JSON.stringify({ task, payload }))}`, timeout);
 }
 
 export function shellQuote(value: string): string {

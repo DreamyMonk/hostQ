@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Archive, Database, ExternalLink, FileCode2, FolderOpen, Globe, HardDriveDownload,
   Plus, RefreshCw, Server, Settings2, ShieldCheck, ToggleLeft, ToggleRight, Trash2,
-  Wrench
+  UserPlus, Wrench, X
 } from 'lucide-react';
 
 interface Site {
@@ -14,6 +14,11 @@ interface Site {
   enabled: boolean;
   server: string;
   ssl: boolean;
+}
+
+interface SiteUser {
+  username: string;
+  role: 'owner' | 'developer' | 'viewer';
 }
 
 const EMPTY_FORM = {
@@ -36,6 +41,8 @@ export default function SitesPage() {
   const [selected, setSelected] = useState<Site | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [output, setOutput] = useState('');
+  const [siteUsers, setSiteUsers] = useState<SiteUser[]>([]);
+  const [userForm, setUserForm] = useState({ username: '', role: 'developer' as SiteUser['role'] });
 
   const showMessage = (type: 'success' | 'error', text: string) => {
     setMessage({ type, text });
@@ -116,6 +123,7 @@ export default function SitesPage() {
   };
 
   const backupSite = async (site: Site) => {
+    if (!confirm(`Create a full file backup for ${site.domain}? Large sites can take a while.`)) return;
     setBusy(true);
     setOutput(`Creating backup for ${site.domain}...`);
     try {
@@ -134,7 +142,7 @@ export default function SitesPage() {
   };
 
   const deleteSite = async (site: Site, deleteFiles: boolean) => {
-    if (!confirm(`Delete ${site.domain}?${deleteFiles ? ' Site files will also be removed.' : ''}`)) return;
+    if (!confirm(`Delete ${site.domain}?${deleteFiles ? ' Site files will be soft-deleted to backup trash.' : ' Only the web server vhost will be removed.'}`)) return;
     setBusy(true);
     try {
       const response = await fetch('/api/domains', {
@@ -152,6 +160,51 @@ export default function SitesPage() {
       }
     } finally {
       setBusy(false);
+    }
+  };
+
+  const loadSiteUsers = useCallback(async (domain: string) => {
+    const response = await fetch(`/api/site-users?domain=${encodeURIComponent(domain)}`);
+    const data = await response.json();
+    setSiteUsers(data.users || []);
+  }, []);
+
+  const openManager = (site: Site) => {
+    setSelected(site);
+    setUserForm({ username: '', role: 'developer' });
+    void loadSiteUsers(site.domain);
+  };
+
+  const addSiteUser = async () => {
+    if (!selected || !userForm.username) return;
+    const response = await fetch('/api/site-users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ domain: selected.domain, ...userForm }),
+    });
+    const data = await response.json();
+    if (data.success) {
+      showMessage('success', data.message);
+      setUserForm({ username: '', role: 'developer' });
+      loadSiteUsers(selected.domain);
+    } else {
+      showMessage('error', data.error || 'Unable to add user');
+    }
+  };
+
+  const removeSiteUser = async (username: string) => {
+    if (!selected || !confirm(`Remove ${username} access from ${selected.domain}?`)) return;
+    const response = await fetch('/api/site-users', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ domain: selected.domain, username }),
+    });
+    const data = await response.json();
+    if (data.success) {
+      showMessage('success', data.message);
+      loadSiteUsers(selected.domain);
+    } else {
+      showMessage('error', data.error || 'Unable to remove user');
     }
   };
 
@@ -230,7 +283,7 @@ export default function SitesPage() {
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                <button onClick={() => setSelected(site)} className="btn btn-primary btn-sm" style={{ justifyContent: 'center' }}>
+                <button onClick={() => openManager(site)} className="btn btn-primary btn-sm" style={{ justifyContent: 'center' }}>
                   <Settings2 size={13} /> Manage Site
                 </button>
                 <a href={`http://${site.domain}`} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm" style={{ justifyContent: 'center' }}>
@@ -330,6 +383,35 @@ export default function SitesPage() {
                   <div><div style={{ color: 'var(--text-muted)', fontSize: 11 }}>Type</div><strong>{selected.type}</strong></div>
                   <div><div style={{ color: 'var(--text-muted)', fontSize: 11 }}>Root</div><strong className="mono" style={{ fontSize: 11 }}>{selected.docRoot}</strong></div>
                 </div>
+              </div>
+
+              <div className="glass-card" style={{ padding: 16, marginTop: 18, background: 'var(--bg-base)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                  <strong>Site users</strong>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Per-site access roles</span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 150px auto', gap: 8, marginBottom: 12 }}>
+                  <input className="input" placeholder="username" value={userForm.username} onChange={event => setUserForm({ ...userForm, username: event.target.value })} />
+                  <select className="input" value={userForm.role} onChange={event => setUserForm({ ...userForm, role: event.target.value as SiteUser['role'] })}>
+                    <option value="owner">Owner</option>
+                    <option value="developer">Developer</option>
+                    <option value="viewer">Viewer</option>
+                  </select>
+                  <button onClick={addSiteUser} className="btn btn-primary btn-sm" disabled={busy || !userForm.username}><UserPlus size={14} /> Add</button>
+                </div>
+                {siteUsers.length === 0 ? (
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>No extra users assigned.</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {siteUsers.map(user => (
+                      <div key={`${selected.domain}-${user.username}`} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', border: '1px solid var(--border-subtle)', borderRadius: 8 }}>
+                        <strong style={{ flex: 1 }}>{user.username}</strong>
+                        <span className="badge">{user.role}</span>
+                        <button onClick={() => removeSiteUser(user.username)} className="btn btn-ghost btn-sm" title="Remove access"><X size={14} /></button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>

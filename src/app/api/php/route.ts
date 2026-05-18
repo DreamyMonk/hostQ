@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { runCommand } from '@/lib/exec';
+import { audit, clientIp } from '@/lib/security';
 
 async function auth() {
   const cookieStore = await cookies();
@@ -65,7 +66,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  if (!await auth()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const actor = await auth();
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   
   const { version } = await request.json();
   if (!version || !/^\d+\.\d+$/.test(version)) {
@@ -90,6 +92,7 @@ export async function POST(request: Request) {
 
   const verify = await runCommand('php --version');
   const newVersion = verify.stdout.match(/PHP (\d+\.\d+)/)?.[1] || version;
+  audit({ actor: actor.username, action: 'php.switch', target: version, ip: clientIp(request), details: { newVersion } });
 
   return NextResponse.json({
     success: true,

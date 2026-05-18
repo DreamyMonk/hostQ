@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
-import { runCommand } from '@/lib/exec';
+import { runCommand, runHelper } from '@/lib/exec';
+import { audit, clientIp } from '@/lib/security';
 
 async function auth() {
   const cookieStore = await cookies();
@@ -201,7 +202,8 @@ export async function GET() {
 // POST - install / start / stop / restart / test service
 // ──────────────────────────────────────────────
 export async function POST(request: NextRequest) {
-  if (!await auth()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const actor = await auth();
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { serviceId, action } = await request.json();
   const svc = SERVICES.find(s => s.id === serviceId);
@@ -216,21 +218,17 @@ export async function POST(request: NextRequest) {
   }
 
   let cmd = '';
+  let helperTask = '';
+  const helperPayload: Record<string, unknown> = { serviceId, action };
   switch (action) {
     case 'install':
-      cmd = `export DEBIAN_FRONTEND=noninteractive; apt-get update -qq; ${svc.installCmd} 2>&1`;
+      helperTask = 'service.install';
       break;
     case 'start':
-      cmd = `systemctl start ${svc.systemd} 2>&1`;
-      break;
     case 'stop':
-      cmd = `systemctl stop ${svc.systemd} 2>&1`;
-      break;
     case 'restart':
-      cmd = `systemctl restart ${svc.systemd} 2>&1`;
-      break;
     case 'enable':
-      cmd = `systemctl enable ${svc.systemd} 2>&1`;
+      helperTask = 'service.control';
       break;
     case 'test':
       cmd = `${svc.configCmd} 2>&1`;
@@ -256,24 +254,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
   }
 
-  const r = await runCommand(cmd, 180000);
-
-  // Auto-configure after install
-  if (action === 'install' && r.success) {
-    if (svc.id === 'nginx') {
-      await runCommand('systemctl enable nginx && systemctl start nginx');
-    } else if (svc.id === 'apache') {
-      await runCommand('a2enmod rewrite && a2enmod ssl && systemctl enable apache2 && systemctl start apache2');
-    } else if (svc.id === 'mysql') {
-      await runCommand('systemctl enable mariadb && systemctl start mariadb');
-    } else if (svc.id.startsWith('php')) {
-      const verMatch = svc.id.match(/^php(\d)(\d)fpm$/);
-      const ver = verMatch ? `${verMatch[1]}.${verMatch[2]}` : '';
-      if (ver) await runCommand(`systemctl enable php${ver}-fpm && systemctl start php${ver}-fpm`);
-    } else if (svc.id === 'pureftpd') {
-      await runCommand('systemctl enable pure-ftpd && systemctl start pure-ftpd');
-    }
-  }
+  const r = helperTask ? await runHelper(helperTask, helperPayload, 180000) : await runCommand(cmd, 180000);
+  audit({
+    actor: actor.username,
+    action: `service.${action}`,
+    target: serviceId,
+    status: r.success ? 'success' : 'failure',
+    ip: clientIp(request),
+  });
 
   return NextResponse.json({
     success: r.success,

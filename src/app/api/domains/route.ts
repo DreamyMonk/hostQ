@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
-import { runCommand, shellQuote } from '@/lib/exec';
+import { runCommand, runHelper, shellQuote } from '@/lib/exec';
+import { audit, clientIp } from '@/lib/security';
 import fs from 'fs';
 import path from 'path';
 
@@ -167,7 +168,8 @@ export async function GET() {
 // POST - add domain or subdomain
 // ──────────────────────────────────────────────
 export async function POST(request: NextRequest) {
-  if (!await auth()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const actor = await auth();
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { domain, type = 'domain', phpVersion = '8.4', server = 'nginx', parentDomain = '', siteType = 'php' } = await request.json();
 
@@ -188,6 +190,7 @@ export async function POST(request: NextRequest) {
   const logs: string[] = [];
 
   if (process.platform !== 'linux') {
+    audit({ actor: actor.username, action: 'site.create', target: domain, ip: clientIp(request), details: { demo: true, siteType, server } });
     return NextResponse.json({
       success: true,
       message: `Domain ${domain} configured (demo mode - no actual files created on Windows)`,
@@ -242,7 +245,7 @@ export async function POST(request: NextRequest) {
     const testR = await runCommand('nginx -t 2>&1');
     logs.push(testR.success ? `✓ Nginx config valid` : `✗ Config test failed: ${testR.stderr}`);
     if (testR.success) {
-      await runCommand('systemctl reload nginx');
+      await runHelper('web.reload', { server: 'nginx' });
       logs.push(`✓ Nginx reloaded`);
     }
   } else if (server === 'apache') {
@@ -251,10 +254,11 @@ export async function POST(request: NextRequest) {
     fs.writeFileSync(configPath, vhostContent);
     logs.push(`✓ Apache vhost created: ${configPath}`);
     await runCommand(`a2ensite ${shellQuote(`${domain}.conf`)} 2>&1`);
-    await runCommand('systemctl reload apache2 2>&1');
+    await runHelper('web.reload', { server: 'apache' });
     logs.push(`✓ Apache reloaded`);
   }
 
+  audit({ actor: actor.username, action: 'site.create', target: domain, ip: clientIp(request), details: { siteType, server, docRoot } });
   return NextResponse.json({
     success: true,
     message: `Domain ${domain} added successfully`,
@@ -267,7 +271,8 @@ export async function POST(request: NextRequest) {
 // PATCH - enable/disable domain
 // ──────────────────────────────────────────────
 export async function PATCH(request: NextRequest) {
-  if (!await auth()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const actor = await auth();
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { domain, action, server = 'nginx' } = await request.json();
   if (!domain) return NextResponse.json({ error: 'Domain required' }, { status: 400 });
@@ -276,6 +281,7 @@ export async function PATCH(request: NextRequest) {
   }
 
   if (process.platform !== 'linux') {
+    audit({ actor: actor.username, action: `site.${action}`, target: domain, ip: clientIp(request), details: { demo: true } });
     return NextResponse.json({ success: true, message: `${domain} ${action}d (demo)` });
   }
 
@@ -284,16 +290,17 @@ export async function PATCH(request: NextRequest) {
     await runCommand(`chown -R www-data:www-data ${shellQuote(domainRoot)} 2>/dev/null || true`);
     await runCommand(`find ${shellQuote(domainRoot)} -type d -exec chmod 755 {} \\; 2>/dev/null || true`);
     await runCommand(`find ${shellQuote(domainRoot)} -type f -exec chmod 644 {} \\; 2>/dev/null || true`);
+    audit({ actor: actor.username, action: 'site.permissions', target: domain, ip: clientIp(request) });
     return NextResponse.json({ success: true, message: `${domain} permissions repaired` });
   }
 
   if (server === 'nginx') {
     if (action === 'enable') {
       await runCommand(`ln -sf ${shellQuote(path.join(NGINX_AVAILABLE, domain))} ${shellQuote(path.join(NGINX_ENABLED, domain))}`);
-      await runCommand('systemctl reload nginx');
+      await runHelper('web.reload', { server: 'nginx' });
     } else {
       await runCommand(`rm -f ${shellQuote(path.join(NGINX_ENABLED, domain))}`);
-      await runCommand('systemctl reload nginx');
+      await runHelper('web.reload', { server: 'nginx' });
     }
   } else {
     if (action === 'enable') {
@@ -301,14 +308,16 @@ export async function PATCH(request: NextRequest) {
     } else {
       await runCommand(`a2dissite ${shellQuote(`${domain}.conf`)}`);
     }
-    await runCommand('systemctl reload apache2');
+    await runHelper('web.reload', { server: 'apache' });
   }
 
+  audit({ actor: actor.username, action: `site.${action}`, target: domain, ip: clientIp(request), details: { server } });
   return NextResponse.json({ success: true, message: `${domain} ${action}d` });
 }
 
 export async function PUT(request: NextRequest) {
-  if (!await auth()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const actor = await auth();
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { domain } = await request.json();
   if (!domain || !/^[a-zA-Z0-9][a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(domain)) {
@@ -321,6 +330,7 @@ export async function PUT(request: NextRequest) {
   const backupPath = `${backupDir}/${fileName}`;
 
   if (process.platform !== 'linux') {
+    audit({ actor: actor.username, action: 'site.backup', target: domain, ip: clientIp(request), details: { demo: true, backupPath } });
     return NextResponse.json({
       success: true,
       message: `${domain} backup created (demo)`,
@@ -331,6 +341,7 @@ export async function PUT(request: NextRequest) {
 
   await runCommand(`mkdir -p ${shellQuote(backupDir)}`);
   const r = await runCommand(`tar -czf ${shellQuote(backupPath)} -C ${shellQuote(domainRoot)} . 2>&1`, 120000);
+  audit({ actor: actor.username, action: 'site.backup', target: domain, status: r.success ? 'success' : 'failure', ip: clientIp(request), details: { backupPath } });
 
   return NextResponse.json({
     success: r.success,
@@ -344,7 +355,8 @@ export async function PUT(request: NextRequest) {
 // DELETE - remove domain
 // ──────────────────────────────────────────────
 export async function DELETE(request: NextRequest) {
-  if (!await auth()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const actor = await auth();
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { domain, deleteFiles = false, server = 'nginx' } = await request.json();
   if (!domain) return NextResponse.json({ error: 'Domain required' }, { status: 400 });
@@ -353,6 +365,7 @@ export async function DELETE(request: NextRequest) {
   }
 
   if (process.platform !== 'linux') {
+    audit({ actor: actor.username, action: 'site.delete', target: domain, ip: clientIp(request), details: { demo: true, deleteFiles } });
     return NextResponse.json({ success: true, message: `${domain} deleted (demo)` });
   }
 
@@ -361,20 +374,23 @@ export async function DELETE(request: NextRequest) {
   if (server === 'nginx') {
     await runCommand(`rm -f ${shellQuote(path.join(NGINX_ENABLED, domain))}`);
     await runCommand(`rm -f ${shellQuote(path.join(NGINX_AVAILABLE, domain))}`);
-    await runCommand('systemctl reload nginx');
+    await runHelper('web.reload', { server: 'nginx' });
     logs.push(`✓ Nginx vhost removed`);
   } else {
     await runCommand(`a2dissite ${shellQuote(`${domain}.conf`)}`);
     await runCommand(`rm -f ${shellQuote(path.join(APACHE_AVAILABLE, domain + '.conf'))}`);
-    await runCommand('systemctl reload apache2');
+    await runHelper('web.reload', { server: 'apache' });
     logs.push(`✓ Apache vhost removed`);
   }
 
   if (deleteFiles) {
     const domainRoot = `${WEB_ROOT}/${domain}`;
-    await runCommand(`rm -rf ${shellQuote(domainRoot)}`);
-    logs.push(`✓ Files deleted: ${domainRoot}`);
+    const deletedDir = '/var/backups/hostq/deleted-sites';
+    const destination = `${deletedDir}/${domain}-${Date.now()}`;
+    await runCommand(`mkdir -p ${shellQuote(deletedDir)} && mv ${shellQuote(domainRoot)} ${shellQuote(destination)} 2>/dev/null || true`);
+    logs.push(`✓ Files soft-deleted to: ${destination}`);
   }
 
+  audit({ actor: actor.username, action: 'site.delete', target: domain, ip: clientIp(request), details: { deleteFiles, server } });
   return NextResponse.json({ success: true, message: `Domain ${domain} removed`, output: logs.join('\n') });
 }
