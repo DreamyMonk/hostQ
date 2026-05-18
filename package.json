@@ -1,6 +1,6 @@
 {
   "name": "hostq",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -18,7 +18,6 @@
     "lucide-react": "^1.8.0",
     "next": "16.2.4",
     "nodemailer": "^8.0.5",
-    "otplib": "^13.4.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "recharts": "^3.8.1",

@@ -38,7 +38,14 @@ export default function LoginPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password, confirmPassword, otp }),
       });
-      const data = await response.json();
+      const raw = await response.text();
+      let data: { success?: boolean; requiresLogin?: boolean; error?: string; otpSecret?: string; otpAuthUrl?: string } = {};
+      try {
+        data = raw ? JSON.parse(raw) : {};
+      } catch {
+        setError(raw || `Server returned ${response.status}`);
+        return;
+      }
       if (response.ok && data.requiresLogin) {
         setSetupSecret(data.otpSecret || '');
         setSetupRequired(false);
@@ -53,8 +60,8 @@ export default function LoginPage() {
         return;
       }
       setError(data.error || 'Unable to continue');
-    } catch {
-      setError('Connection failed. Please try again.');
+    } catch (error) {
+      setError(error instanceof Error ? `Connection failed: ${error.message}` : 'Connection failed. Please try again.');
     } finally {
       setLoading(false);
     }
