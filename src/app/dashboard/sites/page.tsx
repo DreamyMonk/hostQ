@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Archive, Database, ExternalLink, FileCode2, FolderOpen, Globe, HardDriveDownload,
   Plus, RefreshCw, Server, Settings2, ShieldCheck, ToggleLeft, ToggleRight, Trash2,
-  UserPlus, Wrench, X
+  UserPlus, Wrench, X, AlertTriangle, CheckCircle2
 } from 'lucide-react';
 
 interface Site {
@@ -19,6 +19,12 @@ interface Site {
 interface SiteUser {
   username: string;
   role: 'owner' | 'developer' | 'viewer';
+}
+
+interface SiteSafety {
+  findings: { path: string; type: string; severity: 'low' | 'medium' | 'high'; message: string }[];
+  database: { detected: boolean; dbName?: string; dbUser?: string; exists?: boolean; message: string };
+  mode: 'demo' | 'live';
 }
 
 const EMPTY_FORM = {
@@ -43,6 +49,8 @@ export default function SitesPage() {
   const [output, setOutput] = useState('');
   const [siteUsers, setSiteUsers] = useState<SiteUser[]>([]);
   const [userForm, setUserForm] = useState({ username: '', password: '', role: 'developer' as SiteUser['role'] });
+  const [siteSafety, setSiteSafety] = useState<SiteSafety | null>(null);
+  const [safetyLoading, setSafetyLoading] = useState(false);
 
   const showMessage = (type: 'success' | 'error', text: string) => {
     setMessage({ type, text });
@@ -169,10 +177,46 @@ export default function SitesPage() {
     setSiteUsers(data.users || []);
   }, []);
 
+  const loadSiteSafety = useCallback(async (site: Site) => {
+    setSafetyLoading(true);
+    try {
+      const response = await fetch(`/api/site-safety?domain=${encodeURIComponent(site.domain)}&docRoot=${encodeURIComponent(site.docRoot)}`);
+      const data = await response.json();
+      if (response.ok) setSiteSafety(data);
+      else showMessage('error', data.error || 'Unable to inspect site safety');
+    } finally {
+      setSafetyLoading(false);
+    }
+  }, []);
+
   const openManager = (site: Site) => {
     setSelected(site);
     setUserForm({ username: '', password: '', role: 'developer' });
+    setSiteSafety(null);
     void loadSiteUsers(site.domain);
+    void loadSiteSafety(site);
+  };
+
+  const sanitizeSite = async (site: Site) => {
+    if (!confirm(`Sanitize files and repair permissions for ${site.domain}? Secret-like files will be moved to quarantine.`)) return;
+    setBusy(true);
+    try {
+      const response = await fetch('/api/site-safety', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domain: site.domain, docRoot: site.docRoot, action: 'sanitize' }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        showMessage('success', data.message);
+        setOutput(`Quarantined: ${data.quarantined ?? 0}\nQuarantine: ${data.quarantineRoot || 'demo mode'}`);
+        loadSiteSafety(site);
+      } else {
+        showMessage('error', data.error || 'Sanitize failed');
+      }
+    } finally {
+      setBusy(false);
+    }
   };
 
   const addSiteUser = async () => {
@@ -383,6 +427,53 @@ export default function SitesPage() {
                   <div><div style={{ color: 'var(--text-muted)', fontSize: 11 }}>Type</div><strong>{selected.type}</strong></div>
                   <div><div style={{ color: 'var(--text-muted)', fontSize: 11 }}>Root</div><strong className="mono" style={{ fontSize: 11 }}>{selected.docRoot}</strong></div>
                 </div>
+              </div>
+
+              <div className="glass-card" style={{ padding: 16, marginTop: 18, background: 'var(--bg-base)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {siteSafety && siteSafety.findings.length === 0 ? <CheckCircle2 size={16} color="var(--accent-green)" /> : <AlertTriangle size={16} color="var(--accent-yellow)" />}
+                    <strong>File permissions & database</strong>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={() => loadSiteSafety(selected)} className="btn btn-ghost btn-sm" disabled={safetyLoading}>
+                      <RefreshCw size={14} style={{ animation: safetyLoading ? 'spin 1s linear infinite' : 'none' }} /> Scan
+                    </button>
+                    <button onClick={() => sanitizeSite(selected)} className="btn btn-primary btn-sm" disabled={busy}>
+                      <Wrench size={14} /> Sanitize
+                    </button>
+                  </div>
+                </div>
+                {!siteSafety ? (
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{safetyLoading ? 'Scanning site...' : 'No scan loaded yet.'}</div>
+                ) : (
+                  <div style={{ display: 'grid', gap: 12 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
+                      <div style={{ padding: 10, border: '1px solid var(--border-subtle)', borderRadius: 8 }}>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Findings</div>
+                        <strong>{siteSafety.findings.length}</strong>
+                      </div>
+                      <div style={{ padding: 10, border: '1px solid var(--border-subtle)', borderRadius: 8 }}>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Database</div>
+                        <strong>{siteSafety.database.detected ? (siteSafety.database.exists ? 'Exists' : 'Missing') : 'Not detected'}</strong>
+                        {siteSafety.database.dbName && <div className="mono" style={{ fontSize: 11, color: 'var(--text-muted)' }}>{siteSafety.database.dbName}</div>}
+                      </div>
+                    </div>
+                    {siteSafety.findings.length > 0 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {siteSafety.findings.slice(0, 8).map((finding, index) => (
+                          <div key={`${finding.path}-${index}`} style={{ display: 'flex', gap: 10, padding: 10, border: '1px solid var(--border-subtle)', borderRadius: 8, background: '#fff' }}>
+                            <span className={`badge ${finding.severity === 'high' ? 'badge-red' : finding.severity === 'medium' ? 'badge-yellow' : 'badge-blue'}`}>{finding.severity}</span>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontSize: 13, fontWeight: 700 }}>{finding.message}</div>
+                              <div className="mono" style={{ fontSize: 11, color: 'var(--text-muted)', overflowWrap: 'anywhere' }}>{finding.path}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="glass-card" style={{ padding: 16, marginTop: 18, background: 'var(--bg-base)' }}>

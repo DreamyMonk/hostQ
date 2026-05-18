@@ -38,7 +38,13 @@ function safePath(reqPath: string): string {
 
 function safeChildName(name: string): string | null {
   if (!name || name.includes('/') || name.includes('\\') || name === '.' || name === '..') return null;
-  return name;
+  const sanitized = name
+    .replace(/[^\w.\- ]+/g, '-')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .slice(0, 180);
+  if (!sanitized || sanitized === '.' || sanitized === '..' || sanitized.startsWith('.env')) return null;
+  return sanitized;
 }
 
 function blockedPath(full: string): boolean {
@@ -173,7 +179,7 @@ export async function POST(request: NextRequest) {
       if (blockedPath(target)) return blockedResponse();
       await mkdir(target, { recursive: true });
       audit({ actor: actor.username, action: 'file.mkdir', target, ip: clientIp(request) });
-      return NextResponse.json({ success: true, message: `Folder '${name}' created` });
+      return NextResponse.json({ success: true, message: `Folder '${childName}' created` });
     }
 
     if (action === 'create_file') {
@@ -183,7 +189,7 @@ export async function POST(request: NextRequest) {
       if (blockedPath(target)) return blockedResponse();
       await writeFile(target, content || '', 'utf8');
       audit({ actor: actor.username, action: 'file.create', target, ip: clientIp(request) });
-      return NextResponse.json({ success: true, message: `File '${name}' created` });
+      return NextResponse.json({ success: true, message: `File '${childName}' created` });
     }
 
     if (action === 'save') {
