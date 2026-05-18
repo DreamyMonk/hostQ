@@ -6,6 +6,10 @@ const CSRF_COOKIE = 'hostq_csrf';
 const CSRF_HEADER = 'x-csrf-token';
 const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
+function allowInsecureHttp() {
+  return process.env.HOSTQ_ALLOW_INSECURE_HTTP === 'true';
+}
+
 function addSecurityHeaders(response: NextResponse, production: boolean) {
   response.headers.set('X-Frame-Options', 'DENY');
   response.headers.set('X-Content-Type-Options', 'nosniff');
@@ -28,7 +32,7 @@ export function proxy(request: NextRequest) {
   const forwardedProto = request.headers.get('x-forwarded-proto') || request.nextUrl.protocol.replace(':', '');
   const localHost = host.startsWith('localhost') || host.startsWith('127.0.0.1') || host.startsWith('[::1]');
 
-  if (production && !localHost && forwardedProto !== 'https') {
+  if (production && !localHost && forwardedProto !== 'https' && !allowInsecureHttp()) {
     const url = request.nextUrl.clone();
     url.protocol = 'https:';
     return addSecurityHeaders(NextResponse.redirect(url, 308), production);

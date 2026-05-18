@@ -30,6 +30,7 @@ export async function GET() {
 
   const panelUrl = process.env.PANEL_URL || '';
   const jwtSecret = process.env.JWT_SECRET || '';
+  const insecureHttp = process.env.HOSTQ_ALLOW_INSECURE_HTTP === 'true';
   const helperRequired = process.env.HOSTQ_REQUIRE_HELPER === 'true';
   const helper = process.env.HOSTQ_HELPER || '/usr/local/sbin/hostq-helper';
   const dataDir = process.env.HOSTQ_DATA_DIR || (process.platform === 'linux' ? '/etc/hostq' : '.hostq');
@@ -40,6 +41,9 @@ export async function GET() {
     panelUrl.startsWith('https://')
       ? ok('panel_url', 'HTTPS panel URL', panelUrl)
       : fail('panel_url', 'HTTPS panel URL', 'Set PANEL_URL=https://panel.yourdomain.com'),
+    insecureHttp
+      ? warn('insecure_http', 'Plain HTTP setup access', 'HOSTQ_ALLOW_INSECURE_HTTP=true is for first setup only. Disable it after HTTPS works.')
+      : ok('insecure_http', 'Plain HTTP setup access', 'Plain HTTP panel access is disabled'),
     jwtSecret.length >= 32 && !jwtSecret.includes('change_this') && !jwtSecret.includes('your_super_secret')
       ? ok('jwt_secret', 'Strong JWT secret', 'JWT secret appears customized')
       : fail('jwt_secret', 'Strong JWT secret', 'Generate a long random JWT_SECRET before production'),

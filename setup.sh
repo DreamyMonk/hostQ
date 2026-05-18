@@ -102,6 +102,11 @@ if [[ ! -f "$PANEL_DIR/.env.local" ]]; then
   cp "$PANEL_DIR/.env.example" "$PANEL_DIR/.env.local"
   warn "Created .env.local"
 fi
+if grep -q '^HOSTQ_ALLOW_INSECURE_HTTP=' "$PANEL_DIR/.env.local"; then
+  sed -i 's/^HOSTQ_ALLOW_INSECURE_HTTP=.*/HOSTQ_ALLOW_INSECURE_HTTP=true/' "$PANEL_DIR/.env.local"
+else
+  echo "HOSTQ_ALLOW_INSECURE_HTTP=true" >> "$PANEL_DIR/.env.local"
+fi
 
 mkdir -p /etc/hostq
 chmod 700 /etc/hostq

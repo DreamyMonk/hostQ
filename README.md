@@ -89,6 +89,7 @@ http://SERVER_IP:8090
 ```
 
 Use a domain and HTTPS for production. Port `8090` is intended as a direct setup/admin access port.
+The installer enables `HOSTQ_ALLOW_INSECURE_HTTP=true` so first login works on the direct IP setup port. After your domain and SSL are working, set it to `false` in `/opt/hostq/.env.local` and restart the panel.
 
 ## Updating
 
@@ -157,6 +158,7 @@ FILE_MANAGER_ROOT=/var/www
 WEB_ROOT=/var/www
 PANEL_URL=https://panel.yourdomain.com
 PANEL_PUBLIC_PORT=8090
+HOSTQ_ALLOW_INSECURE_HTTP=true
 NODE_OPTIONS=--max-old-space-size=384
 ```
 

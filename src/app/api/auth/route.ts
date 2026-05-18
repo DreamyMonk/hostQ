@@ -9,9 +9,10 @@ import {
   createCsrfToken,
   safeUsername,
 } from '@/lib/security';
+import { shouldUseSecureCookies } from '@/lib/http-security';
 
-function setSessionCookies(response: NextResponse, token: string) {
-  const secure = process.env.NODE_ENV === 'production';
+function setSessionCookies(response: NextResponse, request: Request, token: string) {
+  const secure = shouldUseSecureCookies(request);
   response.cookies.set('panel_token', token, {
     httpOnly: true,
     secure,
@@ -28,11 +29,11 @@ function setSessionCookies(response: NextResponse, token: string) {
   });
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const response = NextResponse.json({ setupRequired: !hasAdminAccount(), product: 'hostQ' });
   response.cookies.set(CSRF_COOKIE, createCsrfToken(), {
     httpOnly: false,
-    secure: process.env.NODE_ENV === 'production',
+    secure: shouldUseSecureCookies(request),
     sameSite: 'strict',
     maxAge: 60 * 60,
     path: '/',
@@ -76,7 +77,7 @@ export async function POST(request: Request) {
     audit({ actor, action: 'auth.login', status: 'success', ip, details: { sessionId: session.id, role: account.role } });
 
     const response = NextResponse.json({ success: true, message: 'Authenticated' });
-    setSessionCookies(response, token);
+    setSessionCookies(response, request, token);
 
     return response;
   } catch {
