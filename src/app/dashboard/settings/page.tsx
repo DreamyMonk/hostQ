@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { AlertTriangle, CheckCircle, Database, DownloadCloud, Eye, EyeOff, FolderOpen, Key, LockKeyhole, RefreshCw, Save, Server, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Database, DownloadCloud, Eye, EyeOff, FolderOpen, Globe2, Key, LockKeyhole, RefreshCw, Save, Server, XCircle } from 'lucide-react';
 
 type AuditEntry = { ts: string; action: string; actor?: string; target?: string; status: string };
 type Session = { id: string; username: string; role: string; lastSeenAt: string; revokedAt?: string };
@@ -11,6 +11,7 @@ type UpdateInfo = {
   updateAvailable: boolean;
   latest: null | { tag: string; name: string; notes: string; url: string; publishedAt: string; prerelease: boolean };
 };
+type PanelConfig = { panelDomain: string; panelUrl: string; allowInsecureHttp: boolean; envFile: string };
 
 export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
@@ -19,6 +20,8 @@ export default function SettingsPage() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [security, setSecurity] = useState<{ score: number; ready: boolean; checks: SecurityCheck[] } | null>(null);
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
+  const [panelConfig, setPanelConfig] = useState<PanelConfig | null>(null);
+  const [panelSaveMessage, setPanelSaveMessage] = useState('');
   const [updating, setUpdating] = useState(false);
   const [updateOutput, setUpdateOutput] = useState('');
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
@@ -38,16 +41,18 @@ export default function SettingsPage() {
   });
 
   const refreshSecurity = async () => {
-    const [auditResponse, sessionResponse, securityResponse, updateResponse] = await Promise.all([
+    const [auditResponse, sessionResponse, securityResponse, updateResponse, panelResponse] = await Promise.all([
       fetch('/api/audit'),
       fetch('/api/sessions'),
       fetch('/api/security'),
       fetch('/api/update'),
+      fetch('/api/panel'),
     ]);
     if (auditResponse.ok) setAudit(await auditResponse.json());
     if (sessionResponse.ok) setSessions((await sessionResponse.json()).sessions || []);
     if (securityResponse.ok) setSecurity(await securityResponse.json());
     if (updateResponse.ok) setUpdate(await updateResponse.json());
+    if (panelResponse.ok) setPanelConfig(await panelResponse.json());
   };
 
   useEffect(() => {
@@ -55,9 +60,27 @@ export default function SettingsPage() {
     return () => clearTimeout(id);
   }, []);
 
-  const handleSave = async () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+  const savePanelHost = async () => {
+    if (!panelConfig) return;
+    setPanelSaveMessage('');
+    const response = await fetch('/api/panel', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        panelDomain: panelConfig.panelDomain,
+        allowInsecureHttp: panelConfig.allowInsecureHttp,
+      }),
+    });
+    const data = await response.json();
+    if (response.ok) {
+      setPanelConfig(data.config);
+      setPanelSaveMessage(data.message || 'Panel host saved.');
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+      await refreshSecurity();
+    } else {
+      setPanelSaveMessage(data.error || 'Unable to save panel host');
+    }
   };
 
   const revokeSession = async (sessionId: string) => {
@@ -306,6 +329,45 @@ export default function SettingsPage() {
 
       {saved && <div className="alert alert-success">Settings saved. Restart hostQ to apply environment-backed changes.</div>}
 
+      <div className="glass-card" style={{ marginBottom:20, overflow:'hidden' }}>
+        <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border-subtle)', display:'flex', alignItems:'center', gap:10, fontWeight:700 }}>
+          <Globe2 size={16} color="#2563eb" /> Panel Host
+          {panelConfig && <span className={`badge ${panelConfig.allowInsecureHttp ? 'badge-yellow' : 'badge-green'}`} style={{ marginLeft:'auto' }}>{panelConfig.allowInsecureHttp ? 'HTTP setup mode' : 'HTTPS enforced'}</span>}
+        </div>
+        <div style={{ padding:20, display:'grid', gridTemplateColumns:'minmax(280px, 1fr) minmax(280px, 1fr)', gap:16, alignItems:'start' }}>
+          <div style={{ display:'grid', gap:12 }}>
+            <label style={{ display:'grid', gap:6 }}>
+              <span style={{ fontSize:13, fontWeight:650, color:'var(--text-secondary)' }}>Panel domain or subdomain</span>
+              <input
+                className="input"
+                placeholder="panel.example.com"
+                value={panelConfig?.panelDomain || ''}
+                onChange={event => setPanelConfig({ ...(panelConfig || { panelUrl:'', envFile:'', allowInsecureHttp:true }), panelDomain: event.target.value })}
+              />
+            </label>
+            <label style={{ display:'flex', alignItems:'center', gap:10, fontSize:13, color:'var(--text-secondary)' }}>
+              <input
+                type="checkbox"
+                checked={panelConfig?.allowInsecureHttp || false}
+                onChange={event => setPanelConfig({ ...(panelConfig || { panelDomain:'', panelUrl:'', envFile:'' }), allowInsecureHttp: event.target.checked })}
+              />
+              Allow temporary HTTP direct-IP setup access
+            </label>
+            <button onClick={savePanelHost} className="btn btn-primary btn-sm" style={{ justifyContent:'center', width:'fit-content' }}>
+              <Save size={14}/> Save Panel Host
+            </button>
+            {panelSaveMessage && <div className={panelSaveMessage.includes('Unable') || panelSaveMessage.includes('valid') ? 'alert alert-error' : 'alert alert-success'} style={{ marginBottom:0 }}>{panelSaveMessage}</div>}
+          </div>
+          <div style={{ border:'1px solid var(--border-subtle)', borderRadius:8, padding:14, background:'var(--bg-base)', display:'grid', gap:8 }}>
+            <div style={{ fontSize:12, color:'var(--text-muted)' }}>Panel URL after restart</div>
+            <strong style={{ overflowWrap:'anywhere' }}>{panelConfig?.allowInsecureHttp ? 'http' : 'https'}://{panelConfig?.panelDomain || 'panel.example.com'}</strong>
+            <div style={{ fontSize:12, color:'var(--text-muted)', lineHeight:1.6 }}>
+              Point this DNS record to the VPS IP, issue SSL for the domain, then turn off HTTP setup mode. Changes are written to <span className="mono">{panelConfig?.envFile || '/opt/hostq/.env.local'}</span>.
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
         {sections.map(section => (
           <div key={section.title} className="glass-card" style={{ overflow:'hidden' }}>
@@ -359,7 +421,7 @@ export default function SettingsPage() {
       </div>
 
       <div style={{ display:'flex', justifyContent:'flex-end', marginTop:20 }}>
-        <button id="save-settings-btn" onClick={handleSave} className="btn btn-primary">
+        <button id="save-settings-btn" onClick={savePanelHost} className="btn btn-primary">
           {saved ? <><CheckCircle size={15}/>Saved</> : <><Save size={15}/>Save Settings</>}
         </button>
       </div>

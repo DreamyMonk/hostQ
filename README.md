@@ -156,6 +156,7 @@ DB_ROOT_PASSWORD=mysql_root_pass
 PHPMYADMIN_URL=http://localhost/phpmyadmin
 FILE_MANAGER_ROOT=/var/www
 WEB_ROOT=/var/www
+PANEL_DOMAIN=panel.yourdomain.com
 PANEL_URL=https://panel.yourdomain.com
 PANEL_PUBLIC_PORT=8090
 HOSTQ_ALLOW_INSECURE_HTTP=true
@@ -196,6 +197,7 @@ Implemented controls:
 
 - CSRF tokens for mutating API requests
 - HTTPS-only enforcement in production
+- Admin panel host setting for `PANEL_DOMAIN`, `PANEL_URL`, and temporary direct-IP HTTP setup mode
 - Secure, strict cookies
 - Login rate limiting persisted on disk
 - Optional TOTP 2FA

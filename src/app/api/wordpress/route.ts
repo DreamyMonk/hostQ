@@ -17,16 +17,22 @@ export async function GET() {
   if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const webRoot = process.env.WEB_ROOT || '/var/www/html';
-  const r = await runCommand(`find ${webRoot} -name "wp-config.php" -maxdepth 4 2>/dev/null`);
+  const wpCli = await runCommand('command -v wp || test -x /usr/local/bin/wp', 5000);
+  const r = await runCommand(`find ${shellQuote(webRoot)} -maxdepth 4 -name "wp-config.php" 2>/dev/null`);
   
-  if (!r.success || !r.stdout) {
+  if (!wpCli.success) {
     return NextResponse.json({
       installations: [
         { domain: 'myblog.com', path: '/var/www/html/myblog', status: 'running', wpVersion: '6.4.3', db: 'myblog_db' },
         { domain: 'shop.example.com', path: '/var/www/html/shop', status: 'running', wpVersion: '6.4.2', db: 'shop_db' },
       ],
       demo: true,
+      message: 'WP-CLI was not detected. Install wp-cli to enable real WordPress management.',
     });
+  }
+
+  if (!r.success || !r.stdout) {
+    return NextResponse.json({ installations: [], demo: false, wpCliAvailable: true });
   }
 
   const paths = r.stdout.split('\n').filter(Boolean).map(p => p.replace('/wp-config.php', ''));
@@ -41,7 +47,7 @@ export async function GET() {
     db: '',
   }));
 
-  return NextResponse.json({ installations, demo: false });
+  return NextResponse.json({ installations, demo: false, wpCliAvailable: true });
 }
 
 // POST - install WordPress

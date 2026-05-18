@@ -45,6 +45,15 @@ const update = readFileSync('src/app/api/update/route.ts', 'utf8');
 assert.match(update, /confirm !== tag/, 'update API must require tag confirmation');
 assert.match(update, /runHelper\('panel.update'/, 'update API must use privileged helper');
 
+const panel = readFileSync('src/app/api/panel/route.ts', 'utf8');
+assert.match(panel, /canManagePanel/, 'panel host settings must be admin-only');
+assert.match(panel, /validPanelDomain/, 'panel host settings must validate domains');
+assert.match(panel, /HOSTQ_ALLOW_INSECURE_HTTP/, 'panel host settings must manage temporary HTTP setup mode');
+
+const wordpress = readFileSync('src/app/api/wordpress/route.ts', 'utf8');
+assert.match(wordpress, /command -v wp/, 'WordPress API must check WP-CLI before showing demo mode');
+assert.match(wordpress, /installations: \[\], demo: false/, 'WordPress API must return an empty real list instead of demo data when no installs exist');
+
 const sshUpdate = readFileSync('scripts/hostq-update.sh', 'utf8');
 assert.match(sshUpdate, /api\.github\.com\/repos\/\$\{REPO\}\/releases\/latest/, 'SSH updater must be able to resolve latest release');
 assert.match(sshUpdate, /panel\.update/, 'SSH updater must call the narrow helper update task');
