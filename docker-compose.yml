@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  panel:
+    build: .
+    container_name: hosting-panel
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PANEL_USERNAME=${PANEL_USERNAME:-admin}
+      - PANEL_PASSWORD=${PANEL_PASSWORD:-admin123}
+      - JWT_SECRET=${JWT_SECRET:-change-this-secret}
+      - JWT_EXPIRY=24h
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_ROOT_USER=root
+      - DB_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-rootpassword}
+      - PHPMYADMIN_URL=http://localhost:8080
+      - FILE_MANAGER_ROOT=/var/www
+      - WEB_ROOT=/var/www/html
+    volumes:
+      - /var/www:/var/www
+      - panel_logs:/app/logs
+    depends_on:
+      - mysql
+    networks:
+      - panel-network
+
+  mysql:
+    image: mariadb:11
+    container_name: hosting-panel-db
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-rootpassword}
+      - MYSQL_DATABASE=panel_data
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - panel-network
+    ports:
+      - "3306:3306"
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    container_name: hosting-panel-pma
+    restart: unless-stopped
+    environment:
+      - PMA_HOST=mysql
+      - PMA_PORT=3306
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-rootpassword}
+      - PMA_ARBITRARY=1
+    ports:
+      - "8080:80"
+    depends_on:
+      - mysql
+    networks:
+      - panel-network
+
+volumes:
+  mysql_data:
+  panel_logs:
+
+networks:
+  panel-network:
+    driver: bridge
