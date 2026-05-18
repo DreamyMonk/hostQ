@@ -65,7 +65,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid PEM content' }, { status: 400 });
     }
 
-    const certDir = `/etc/ssl/hostpanel/${domain}`;
+    const certDir = `/etc/ssl/hostq/${domain}`;
     const fullchainPath = path.join(certDir, 'fullchain.pem');
     const keyPath = path.join(certDir, 'privkey.pem');
     const combinedCert = chain ? `${certificate.trim()}\n${String(chain).trim()}\n` : `${certificate.trim()}\n`;

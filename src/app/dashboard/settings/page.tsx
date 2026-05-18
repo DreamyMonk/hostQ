@@ -136,7 +136,7 @@ export default function SettingsPage() {
             <div style={{ fontWeight:600, marginBottom:6, color:'#60a5fa' }}>Configuration Notes</div>
             <ul style={{ fontSize:13, color:'var(--text-secondary)', lineHeight:1.7, paddingLeft:16 }}>
               <li>Settings are stored in <span className="mono">.env.local</span> on the server</li>
-              <li>Restart the panel (<span className="mono">pm2 restart hosting-panel</span>) after changes</li>
+              <li>Restart the panel (<span className="mono">pm2 restart hostq</span>) after changes</li>
               <li>phpMyAdmin URL must be accessible from the browser, not the server</li>
               <li>File Manager Root restricts browsing to that directory for security</li>
               <li>Change default credentials immediately on production</li>
@@ -152,9 +152,9 @@ export default function SettingsPage() {
         </div>
         <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
           {[
-            { label:'Start (PM2)', cmd:'pm2 start npm --name hosting-panel -- start' },
-            { label:'Restart',     cmd:'pm2 restart hosting-panel' },
-            { label:'View Logs',   cmd:'pm2 logs hosting-panel' },
+            { label:'Start (PM2)', cmd:'pm2 start npm --name hostq -- start' },
+            { label:'Restart',     cmd:'pm2 restart hostq' },
+            { label:'View Logs',   cmd:'pm2 logs hostq' },
             { label:'Docker',      cmd:'docker-compose up -d' },
           ].map(d => (
             <div key={d.label} style={{ display:'grid', gridTemplateColumns:'120px 1fr', gap:12, alignItems:'center' }}>

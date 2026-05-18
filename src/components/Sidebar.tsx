@@ -30,7 +30,7 @@ export default function Sidebar() {
 
   useEffect(() => {
     const id = setTimeout(() => {
-      const savedMode = window.localStorage.getItem('hostpanel-mode');
+      const savedMode = window.localStorage.getItem('hostq-mode');
       if (savedMode === 'admin' || savedMode === 'user') setMode(savedMode);
     }, 0);
     return () => clearTimeout(id);
@@ -38,7 +38,7 @@ export default function Sidebar() {
 
   const switchMode = (nextMode: 'user' | 'admin') => {
     setMode(nextMode);
-    window.localStorage.setItem('hostpanel-mode', nextMode);
+    window.localStorage.setItem('hostq-mode', nextMode);
     router.push(nextMode === 'user' ? '/dashboard/sites' : '/dashboard');
   };
 
@@ -63,8 +63,8 @@ export default function Sidebar() {
           <Server size={18} color="white" />
         </div>
         <div>
-          <div style={{ fontWeight: 800, fontSize: 15, letterSpacing: '-0.3px' }}>HostPanel</div>
-          <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 500 }}>Control Panel</div>
+          <div style={{ fontWeight: 850, fontSize: 18, letterSpacing: '-0.7px' }}>hostQ</div>
+          <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600 }}>Control Panel v2</div>
         </div>
       </div>
 

@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "HostPanel - Hosting Control Panel",
-  description: "Single-user self-hosted web hosting control panel. Manage PHP, databases, SSL, WordPress installs, and files from one dashboard.",
+  title: "hostQ - Hosting Control Panel",
+  description: "Self-hosted hosting control panel. Manage sites, PHP, databases, SSL, WordPress installs, and files from one dashboard.",
   keywords: "hosting panel, control panel, PHP manager, SSL, WordPress installer, database manager",
 };
 

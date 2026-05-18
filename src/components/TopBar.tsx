@@ -17,7 +17,7 @@ const PAGE_TITLES: Record<string, { title: string; subtitle: string }> = {
 
 export default function TopBar() {
   const pathname = usePathname();
-  const info = PAGE_TITLES[pathname] || { title: 'HostPanel', subtitle: '' };
+  const info = PAGE_TITLES[pathname] || { title: 'hostQ', subtitle: '' };
   const now = new Date().toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' });
 
   return (

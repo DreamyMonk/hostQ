@@ -1,32 +1,47 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Server, Lock, User, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff, Loader2, Lock, Server, ShieldCheck, User } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
+  const [setupRequired, setSetupRequired] = useState<boolean | null>(null);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  useEffect(() => {
+    const id = setTimeout(async () => {
+      try {
+        const response = await fetch('/api/auth');
+        const data = await response.json();
+        setSetupRequired(Boolean(data.setupRequired));
+      } catch {
+        setSetupRequired(false);
+      }
+    }, 0);
+    return () => clearTimeout(id);
+  }, []);
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
     setLoading(true);
     setError('');
     try {
-      const res = await fetch('/api/auth', {
-        method: 'POST',
+      const response = await fetch('/api/auth', {
+        method: setupRequired ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username, password, confirmPassword }),
       });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        router.push('/dashboard');
-      } else {
-        setError(data.error || 'Invalid credentials');
+      const data = await response.json();
+      if (response.ok && data.success) {
+        router.push('/dashboard/sites');
+        return;
       }
+      setError(data.error || 'Unable to continue');
     } catch {
       setError('Connection failed. Please try again.');
     } finally {
@@ -34,179 +49,99 @@ export default function LoginPage() {
     }
   };
 
-  return (
-    <div className="min-h-screen flex" style={{ background: 'var(--bg-base)' }}>
-      {/* Left panel */}
-      <div className="hidden lg:flex flex-col justify-between w-1/2 p-12 relative overflow-hidden"
-        style={{
-          background: 'linear-gradient(135deg, #0f1117 0%, #161b22 50%, #0a0c10 100%)',
-          borderRight: '1px solid var(--border-subtle)'
-        }}>
-        {/* Animated background orbs */}
-        <div style={{
-          position:'absolute', top:'-100px', left:'-100px', width:'400px', height:'400px',
-          background:'radial-gradient(circle, rgba(59,130,246,0.15) 0%, transparent 70%)',
-          borderRadius:'50%', pointerEvents:'none'
-        }} />
-        <div style={{
-          position:'absolute', bottom:'-80px', right:'-80px', width:'350px', height:'350px',
-          background:'radial-gradient(circle, rgba(168,85,247,0.12) 0%, transparent 70%)',
-          borderRadius:'50%', pointerEvents:'none'
-        }} />
+  const isSetup = setupRequired === true;
 
-        {/* Logo */}
-        <div style={{ display:'flex', alignItems:'center', gap:12, position:'relative' }}>
-          <div style={{
-            width:42, height:42, background:'linear-gradient(135deg, #3b82f6, #8b5cf6)',
-            borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center'
-          }}>
-            <Server size={22} color="white" />
+  return (
+    <main style={{ minHeight: '100vh', background: '#f6f8fb', display: 'grid', gridTemplateColumns: 'minmax(0, 1.05fr) minmax(420px, 0.95fr)' }}>
+      <section style={{ padding: 48, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ width: 42, height: 42, borderRadius: 10, background: '#111827', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Server size={21} />
           </div>
           <div>
-            <div style={{ fontWeight:800, fontSize:18, letterSpacing:'-0.5px' }}>HostPanel</div>
-            <div style={{ fontSize:11, color:'var(--text-muted)', fontWeight:500 }}>Hosting Control Panel</div>
+            <div style={{ fontWeight: 850, fontSize: 22, letterSpacing: '-0.04em' }}>hostQ</div>
+            <div style={{ color: '#667085', fontSize: 13 }}>Practical hosting control panel</div>
           </div>
         </div>
 
-        {/* Features list */}
-        <div style={{ position:'relative' }}>
-          <h2 style={{ fontSize:32, fontWeight:800, lineHeight:1.2, marginBottom:8 }}>
-            Your server,<br />
-            <span className="gradient-text">fully in control.</span>
-          </h2>
-          <p style={{ color:'var(--text-secondary)', fontSize:15, marginBottom:40, lineHeight:1.6 }}>
-            Manage PHP versions, databases, SSL certificates, WordPress installs, and files from one premium dashboard.
+        <div style={{ maxWidth: 680 }}>
+          <div className="badge badge-blue" style={{ marginBottom: 18 }}>v2 control panel</div>
+          <h1 style={{ fontSize: 56, lineHeight: 1, letterSpacing: '-0.06em', color: '#101828', marginBottom: 20 }}>
+            Manage sites without babysitting the server.
+          </h1>
+          <p style={{ color: '#475467', fontSize: 18, lineHeight: 1.7, maxWidth: 580 }}>
+            Add sites, manage SSL, files, WordPress, databases, PHP and server services from a clean white workspace built for small VPS hosting.
           </p>
-          <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12, marginTop: 34 }}>
             {[
-              { icon:'PHP', label:'PHP Version Manager', desc:'Switch supported PHP 8.2, 8.3, 8.4, 8.5' },
-              { icon:'📁', label:'File Manager', desc:'Upload, edit, organize server files' },
-              { icon:'🌐', label:'WordPress Installer', desc:'One-click WP installs with WP-CLI' },
-              { icon:'🔒', label:'SSL Manager', desc:"Free Let's Encrypt SSL certificates" },
-              { icon:'🗄️', label:'Database Manager', desc:'MySQL databases with phpMyAdmin' },
-            ].map((f) => (
-              <div key={f.label} style={{ display:'flex', alignItems:'flex-start', gap:14 }}>
-                <div style={{
-                  width:38, height:38, background:'var(--bg-card)', border:'1px solid var(--border-default)',
-                  borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center',
-                  fontSize:16, flexShrink:0
-                }}>
-                  {f.icon}
-                </div>
-                <div>
-                  <div style={{ fontWeight:600, fontSize:14, marginBottom:2 }}>{f.label}</div>
-                  <div style={{ fontSize:12, color:'var(--text-muted)' }}>{f.desc}</div>
-                </div>
+              ['Sites', 'User workspace'],
+              ['Admin', 'Server controls'],
+              ['1GB VPS', 'Lightweight stack'],
+            ].map(([label, value]) => (
+              <div key={label} className="glass-card" style={{ padding: 18 }}>
+                <div style={{ fontSize: 12, color: '#667085', marginBottom: 6 }}>{label}</div>
+                <div style={{ fontWeight: 800, color: '#101828' }}>{value}</div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Bottom badge */}
-        <div style={{ display:'flex', gap:8, position:'relative' }}>
-          <span className="badge badge-green"> <span className="pulse-dot" style={{width:6,height:6,borderRadius:'50%',background:'#22c55e',display:'inline-block'}} />Single User</span>
-          <span className="badge badge-blue">Self-Hosted</span>
-          <span className="badge badge-purple">VPS Ready</span>
+        <div style={{ display: 'flex', gap: 10, color: '#667085', fontSize: 13 }}>
+          <ShieldCheck size={16} color="#16a34a" />
+          First deploy asks you to create the admin account before the panel opens.
         </div>
-      </div>
+      </section>
 
-      {/* Right panel - Login form */}
-      <div className="flex-1 flex items-center justify-center p-8">
-        <div className="w-full max-w-sm fade-in">
-          {/* Mobile logo */}
-          <div className="lg:hidden flex items-center gap-3 mb-8">
-            <div style={{
-              width:38, height:38, background:'linear-gradient(135deg, #3b82f6, #8b5cf6)',
-              borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center'
-            }}>
-              <Server size={20} color="white" />
+      <section style={{ background: 'white', borderLeft: '1px solid #e4e7ec', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+        <div style={{ width: '100%', maxWidth: 420 }}>
+          <div style={{ marginBottom: 28 }}>
+            <div style={{ color: '#2563eb', fontSize: 13, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
+              {setupRequired === null ? 'Checking panel' : isSetup ? 'First run setup' : 'Welcome back'}
             </div>
-            <span style={{ fontWeight:700, fontSize:16 }}>HostPanel</span>
+            <h2 style={{ fontSize: 30, letterSpacing: '-0.04em', color: '#101828', marginBottom: 8 }}>
+              {isSetup ? 'Create your admin account' : 'Sign in to hostQ'}
+            </h2>
+            <p style={{ color: '#667085', fontSize: 14, lineHeight: 1.6 }}>
+              {isSetup ? 'This account will be stored on the server with a hashed password.' : 'Use the admin account created during setup.'}
+            </p>
           </div>
 
-          <h1 style={{ fontSize:26, fontWeight:800, marginBottom:6 }}>Welcome back</h1>
-          <p style={{ color:'var(--text-secondary)', fontSize:14, marginBottom:32 }}>
-            Sign in to your hosting panel
-          </p>
+          {error && <div className="alert alert-error">{error}</div>}
 
-          {error && (
-            <div className="alert alert-error" style={{ marginBottom:20 }}>
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={handleLogin} style={{ display:'flex', flexDirection:'column', gap:16 }}>
-            <div>
-              <label style={{ fontSize:13, fontWeight:500, color:'var(--text-secondary)', marginBottom:6, display:'block' }}>
-                Username
-              </label>
-              <div style={{ position:'relative' }}>
-                <User size={15} style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', color:'var(--text-muted)' }} />
-                <input
-                  id="username"
-                  className="input"
-                  style={{ paddingLeft:36 }}
-                  type="text"
-                  value={username}
-                  onChange={e => setUsername(e.target.value)}
-                  placeholder="admin"
-                  autoComplete="username"
-                  required
-                />
+          <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <label style={{ display: 'grid', gap: 6 }}>
+              <span style={{ fontSize: 13, color: '#344054', fontWeight: 650 }}>Username</span>
+              <div style={{ position: 'relative' }}>
+                <User size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#98a2b3' }} />
+                <input className="input" style={{ paddingLeft: 38 }} value={username} onChange={event => setUsername(event.target.value)} placeholder="admin" autoComplete="username" required />
               </div>
-            </div>
+            </label>
 
-            <div>
-              <label style={{ fontSize:13, fontWeight:500, color:'var(--text-secondary)', marginBottom:6, display:'block' }}>
-                Password
-              </label>
-              <div style={{ position:'relative' }}>
-                <Lock size={15} style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', color:'var(--text-muted)' }} />
-                <input
-                  id="password"
-                  className="input"
-                  style={{ paddingLeft:36, paddingRight:40 }}
-                  type={showPass ? 'text' : 'password'}
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  autoComplete="current-password"
-                  required
-                />
-                <button type="button" onClick={() => setShowPass(!showPass)}
-                  style={{ position:'absolute', right:12, top:'50%', transform:'translateY(-50%)',
-                    background:'none', border:'none', cursor:'pointer', color:'var(--text-muted)', padding:2
-                  }}>
-                  {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
+            <label style={{ display: 'grid', gap: 6 }}>
+              <span style={{ fontSize: 13, color: '#344054', fontWeight: 650 }}>Password</span>
+              <div style={{ position: 'relative' }}>
+                <Lock size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#98a2b3' }} />
+                <input className="input" style={{ paddingLeft: 38, paddingRight: 42 }} type={showPass ? 'text' : 'password'} value={password} onChange={event => setPassword(event.target.value)} placeholder="At least 10 characters" autoComplete={isSetup ? 'new-password' : 'current-password'} required />
+                <button type="button" onClick={() => setShowPass(value => !value)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', border: 0, background: 'transparent', color: '#667085', cursor: 'pointer' }}>
+                  {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
-            </div>
+            </label>
 
-            <button
-              id="login-btn"
-              type="submit"
-              className="btn btn-primary btn-lg"
-              style={{ width:'100%', justifyContent:'center', marginTop:4 }}
-              disabled={loading}
-            >
-              {loading ? <Loader2 size={16} className="animate-spin" /> : <Lock size={16} />}
-              {loading ? 'Signing in…' : 'Sign In'}
+            {isSetup && (
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={{ fontSize: 13, color: '#344054', fontWeight: 650 }}>Confirm password</span>
+                <input className="input" type={showPass ? 'text' : 'password'} value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} placeholder="Repeat password" autoComplete="new-password" required />
+              </label>
+            )}
+
+            <button className="btn btn-primary btn-lg" style={{ justifyContent: 'center', marginTop: 8 }} disabled={loading || setupRequired === null}>
+              {loading || setupRequired === null ? <Loader2 size={17} className="animate-spin" /> : <ArrowRight size={17} />}
+              {setupRequired === null ? 'Checking...' : isSetup ? 'Create account' : 'Sign in'}
             </button>
           </form>
-
-          <p style={{ marginTop:24, fontSize:12, color:'var(--text-muted)', textAlign:'center' }}>
-            Default: admin / admin123 (change in .env.local)
-          </p>
-
-          {/* Security note */}
-          <div style={{
-            marginTop:28, padding:'12px 14px', background:'rgba(245,158,11,0.06)',
-            border:'1px solid rgba(245,158,11,0.15)', borderRadius:8, fontSize:12, color:'#f59e0b'
-          }}>
-            🔒 Change default credentials in <span className="mono">.env.local</span> before production use.
-          </div>
         </div>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }

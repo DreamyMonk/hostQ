@@ -28,7 +28,7 @@ function nginxVhostTemplate(domain: string, docRoot: string, phpVersion: string,
     ssl_protocols       TLSv1.2 TLSv1.3;
     ssl_ciphers         HIGH:!aNULL:!MD5;` : '';
 
-  return `# HostPanel managed - ${domain}
+  return `# hostQ managed - ${domain}
 server {
     listen 80;${sslBlock}
     server_name ${domain} www.${domain};
@@ -71,7 +71,7 @@ server {
 // Apache vhost template
 // ──────────────────────────────────────────────
 function apacheVhostTemplate(domain: string, docRoot: string): string {
-  return `# HostPanel managed - ${domain}
+  return `# hostQ managed - ${domain}
 <VirtualHost *:80>
     ServerName ${domain}
     ServerAlias www.${domain}
@@ -126,8 +126,8 @@ async function listDomains(): Promise<{ domain: string; type: 'domain'|'subdomai
     for (const file of available) {
       try {
         const content = fs.readFileSync(path.join(NGINX_AVAILABLE, file), 'utf8');
-        if (!content.includes('HostPanel managed')) continue;
-        const domainMatch = content.match(/# HostPanel managed - (.+)/);
+        if (!content.includes('hostQ managed') && !content.includes('HostPanel managed')) continue;
+        const domainMatch = content.match(/# (?:hostQ|HostPanel) managed - (.+)/);
         const rootMatch   = content.match(/root (.+);/);
         const sslMatch    = content.includes('ssl_certificate');
         const enabled     = fs.existsSync(path.join(NGINX_ENABLED, file));
@@ -209,14 +209,14 @@ export async function POST(request: NextRequest) {
 </head><body>
 <h1>${domain}</h1>
 <p>Your PHP website is ready. Upload your files to ${docRoot}</p>
-<p style="color:#8b949e;font-size:13px">PHP <?php echo PHP_VERSION; ?> - Managed by HostPanel</p>
+<p style="color:#667085;font-size:13px">PHP <?php echo PHP_VERSION; ?> - Managed by hostQ</p>
 </body></html>` : `<!DOCTYPE html>
 <html><head><title>Welcome to ${domain}</title>
 <style>body{font-family:system-ui,sans-serif;text-align:center;padding:60px;background:#0a0c10;color:#e6edf3}</style>
 </head><body>
 <h1>${domain}</h1>
 <p>Your website is ready. Upload your files to ${docRoot}</p>
-<p style="color:#8b949e;font-size:13px">Managed by HostPanel</p>
+<p style="color:#667085;font-size:13px">Managed by hostQ</p>
 </body></html>`;
   const starterFile = siteType === 'php' ? 'index.php' : 'index.html';
   fs.writeFileSync(path.join(docRoot, starterFile), indexHtml);
@@ -316,7 +316,7 @@ export async function PUT(request: NextRequest) {
   }
 
   const domainRoot = `${WEB_ROOT}/${domain}`;
-  const backupDir = '/var/backups/hostpanel';
+  const backupDir = '/var/backups/hostq';
   const fileName = `${domain}-${new Date().toISOString().slice(0, 10)}.tar.gz`;
   const backupPath = `${backupDir}/${fileName}`;
 

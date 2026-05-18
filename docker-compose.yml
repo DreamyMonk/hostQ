@@ -3,14 +3,13 @@ version: '3.8'
 services:
   panel:
     build: .
-    container_name: hosting-panel
+    container_name: hostq
     restart: unless-stopped
     ports:
       - "3000:3000"
     environment:
       - NODE_ENV=production
-      - PANEL_USERNAME=${PANEL_USERNAME:-admin}
-      - PANEL_PASSWORD=${PANEL_PASSWORD:-admin123}
+      - HOSTQ_DATA_DIR=/app/data
       - JWT_SECRET=${JWT_SECRET:-change-this-secret}
       - JWT_EXPIRY=24h
       - DB_HOST=mysql
@@ -22,7 +21,8 @@ services:
       - WEB_ROOT=/var/www/html
     volumes:
       - /var/www:/var/www
-      - panel_logs:/app/logs
+      - hostq_data:/app/data
+      - hostq_logs:/app/logs
     depends_on:
       - mysql
     networks:
@@ -30,7 +30,7 @@ services:
 
   mysql:
     image: mariadb:11
-    container_name: hosting-panel-db
+    container_name: hostq-db
     restart: unless-stopped
     environment:
       - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-rootpassword}
@@ -44,7 +44,7 @@ services:
 
   phpmyadmin:
     image: phpmyadmin/phpmyadmin:latest
-    container_name: hosting-panel-pma
+    container_name: hostq-pma
     restart: unless-stopped
     environment:
       - PMA_HOST=mysql
@@ -60,7 +60,8 @@ services:
 
 volumes:
   mysql_data:
-  panel_logs:
+  hostq_data:
+  hostq_logs:
 
 networks:
   panel-network:

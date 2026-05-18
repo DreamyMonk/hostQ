@@ -1,4 +1,4 @@
-# HostPanel - Hosting Control Panel
+# hostQ - Hosting Control Panel
 
 A single-user self-hosted hosting panel for a small VPS. It is built with Next.js 16, TypeScript, Tailwind CSS, and server-side Linux commands for real hosting operations.
 
@@ -50,21 +50,15 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-Default local login from `.env.local`:
-
-```text
-admin / admin123
-```
-
-Change this before any real deployment.
+On first run, hostQ asks you to create the admin account. The password is hashed and stored in `HOSTQ_DATA_DIR`.
 
 ## VPS Deployment
 
 On Ubuntu/Debian as root:
 
 ```bash
-git clone https://github.com/DreamyMonk/hostQ.git /opt/hosting-panel
-cd /opt/hosting-panel
+git clone https://github.com/DreamyMonk/hostQ.git /opt/hostq
+cd /opt/hostq
 bash setup.sh
 ```
 
@@ -87,8 +81,8 @@ Installed stack:
 1. Deploy with `bash setup.sh`.
 2. Open the panel URL shown at the end of setup.
 3. Login with the temporary default credentials.
-4. Edit `/opt/hosting-panel/.env.local` and change `PANEL_USERNAME`, `PANEL_PASSWORD`, and `JWT_SECRET`.
-5. Restart the panel with `pm2 restart hosting-panel`.
+4. Create the first admin account in the browser.
+5. Restart the panel with `pm2 restart hostq`.
 6. Use Services to confirm Nginx, MariaDB, PHP-FPM, Certbot, Pure-FTPd, WP-CLI, and phpMyAdmin are installed.
 7. Add a site from Domain Manager, choosing HTML/CSS, PHP, or WordPress-ready.
 8. Use SSL Manager for Let&apos;s Encrypt or manual PEM certificate upload.
@@ -96,7 +90,7 @@ Installed stack:
 
 ## UI Modes
 
-HostPanel has two navigation modes:
+hostQ has two navigation modes:
 
 - User mode: add sites and manage each site from one minimal workspace. Site management includes open site, files, SSL, WordPress, database, PHP shortcut, enable/disable, permission repair, backup, and delete.
 - Admin mode: manage server-level tools such as services, PHP-FPM versions, domain/vhost configuration, and panel settings.
@@ -106,8 +100,7 @@ HostPanel has two navigation modes:
 Copy and edit `.env.example` to `.env.local`:
 
 ```env
-PANEL_USERNAME=admin
-PANEL_PASSWORD=your_secure_password
+HOSTQ_DATA_DIR=/etc/hostq
 JWT_SECRET=random_256bit_string
 DB_HOST=localhost
 DB_ROOT_USER=root

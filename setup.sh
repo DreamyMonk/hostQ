@@ -1,5 +1,5 @@
 #!/bin/bash
-# HostPanel - VPS setup script
+# hostQ - VPS setup script
 # Target: Ubuntu 22.04/24.04 or Debian 12, run as root.
 
 set -euo pipefail
@@ -17,7 +17,7 @@ header() { echo -e "\n${BLUE}=== $1 ===${NC}"; }
 
 if [[ $EUID -ne 0 ]]; then error "Run as root: sudo bash setup.sh"; fi
 
-header "HostPanel VPS Setup"
+header "hostQ VPS Setup"
 echo "This script installs a lightweight LEMP hosting stack:"
 echo "  - Node.js 20 LTS"
 echo "  - Nginx 1.24+ where available"
@@ -86,21 +86,24 @@ npm install -g pm2 -q
 pm2 startup systemd -u root --hp /root >/dev/null 2>&1 || true
 log "Certbot, WP-CLI, Pure-FTPd, phpMyAdmin, and PM2 installed"
 
-header "Setting up HostPanel"
-PANEL_DIR="/opt/hosting-panel"
+header "Setting up hostQ"
+PANEL_DIR="/opt/hostq"
 mkdir -p "$PANEL_DIR"
 
 if [[ -f "./package.json" ]]; then
   rsync -a --delete --exclude node_modules --exclude .next ./ "$PANEL_DIR/"
   log "Copied panel files to $PANEL_DIR"
 else
-  warn "Run this script from the hosting-panel directory"
+  warn "Run this script from the hostQ directory"
 fi
 
 if [[ ! -f "$PANEL_DIR/.env.local" ]]; then
   cp "$PANEL_DIR/.env.example" "$PANEL_DIR/.env.local"
-  warn "Created .env.local. Edit it before exposing the panel: nano $PANEL_DIR/.env.local"
+  warn "Created .env.local. hostQ will ask you to create the admin account on first open."
 fi
+
+mkdir -p /etc/hostq
+chmod 700 /etc/hostq
 
 cd "$PANEL_DIR"
 npm ci
@@ -109,13 +112,13 @@ npm run build
 npm prune --omit=dev
 log "Panel built"
 
-pm2 delete hosting-panel >/dev/null 2>&1 || true
-pm2 start npm --name hosting-panel --max-memory-restart 384M -- start
+pm2 delete hostq >/dev/null 2>&1 || true
+pm2 start npm --name hostq --max-memory-restart 384M -- start
 pm2 save
 log "Panel started with PM2"
 
 header "Configuring Nginx reverse proxy"
-cat > /etc/nginx/sites-available/hosting-panel <<'EOF'
+cat > /etc/nginx/sites-available/hostq <<'EOF'
 server {
     listen 80;
     server_name _;
@@ -137,7 +140,7 @@ server {
 }
 EOF
 
-ln -sf /etc/nginx/sites-available/hosting-panel /etc/nginx/sites-enabled/
+ln -sf /etc/nginx/sites-available/hostq /etc/nginx/sites-enabled/
 rm -f /etc/nginx/sites-enabled/default
 nginx -t
 systemctl reload nginx
@@ -154,12 +157,11 @@ log "Firewall configured"
 header "Setup complete"
 SERVER_IP=$(curl -fsS ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')
 echo ""
-echo -e "${GREEN}HostPanel is running at: http://${SERVER_IP}${NC}"
-echo "Default login: admin / admin123"
-echo -e "${RED}Change credentials immediately: nano $PANEL_DIR/.env.local${NC}"
+echo -e "${GREEN}hostQ is running at: http://${SERVER_IP}${NC}"
+echo "Open the URL and create the first admin account."
 echo ""
 echo "Useful commands:"
 echo "  pm2 status"
-echo "  pm2 logs hosting-panel"
-echo "  pm2 restart hosting-panel"
+echo "  pm2 logs hostq"
+echo "  pm2 restart hostq"
 echo "  mysql_secure_installation"
