@@ -54,6 +54,9 @@ export default function WordPressPage() {
     if (!form.domain || !form.dbName || !form.dbUser || !form.dbPassword || !form.adminEmail) {
       showMsg('error', 'Please fill all required fields'); return;
     }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.adminEmail)) {
+      showMsg('error', 'Enter a valid admin email address'); return;
+    }
     setBusy(true);
     setOutput('Starting WordPress installation…\n');
     try {

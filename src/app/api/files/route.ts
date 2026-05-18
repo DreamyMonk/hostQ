@@ -31,7 +31,9 @@ const BLOCKED_EXTS = new Set(['.key', '.pem', '.p12', '.pfx', '.crt', '.csr']);
 
 function safePath(reqPath: string): string {
   const normalized = path.normalize(reqPath || '/').replace(/^(\.\.(\/|\\|$))+/, '');
-  const full = path.resolve(/*turbopackIgnore: true*/ ROOT, normalized.replace(/^[/\\]+/, ''));
+  const full = path.isAbsolute(normalized)
+    ? path.resolve(/*turbopackIgnore: true*/ normalized)
+    : path.resolve(/*turbopackIgnore: true*/ ROOT, normalized.replace(/^[/\\]+/, ''));
   if (full !== ROOT && !full.startsWith(ROOT + path.sep)) return ROOT;
   return full;
 }

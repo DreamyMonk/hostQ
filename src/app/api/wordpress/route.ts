@@ -5,13 +5,16 @@ import { mysqlIdentifier, mysqlString, runCommand, runMysql, shellQuote } from '
 import { audit, clientIp } from '@/lib/security';
 import { canManageSite, domainFromWebPath } from '@/lib/authz';
 
+function validEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
 async function auth() {
   const cookieStore = await cookies();
   const token = cookieStore.get('panel_token')?.value;
   return token ? verifyToken(token) : null;
 }
 
-// GET - list WordPress installations
 export async function GET() {
   const actor = await auth();
   if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -19,7 +22,7 @@ export async function GET() {
   const webRoot = process.env.WEB_ROOT || '/var/www/html';
   const wpCli = await runCommand('command -v wp || test -x /usr/local/bin/wp', 5000);
   const r = await runCommand(`find ${shellQuote(webRoot)} -maxdepth 4 -name "wp-config.php" 2>/dev/null`);
-  
+
   if (!wpCli.success) {
     return NextResponse.json({
       installations: [
@@ -35,11 +38,11 @@ export async function GET() {
     return NextResponse.json({ installations: [], demo: false, wpCliAvailable: true });
   }
 
-  const paths = r.stdout.split('\n').filter(Boolean).map(p => p.replace('/wp-config.php', ''));
-  const installations = paths.filter(p => {
+  const paths = r.stdout.split('\n').filter(Boolean).map((p) => p.replace('/wp-config.php', ''));
+  const installations = paths.filter((p) => {
     const domain = domainFromWebPath(p, webRoot);
     return !domain || canManageSite(actor, domain, 'view');
-  }).map(p => ({
+  }).map((p) => ({
     domain: p.split('/').pop() || p,
     path: p,
     status: 'running',
@@ -50,7 +53,6 @@ export async function GET() {
   return NextResponse.json({ installations, demo: false, wpCliAvailable: true });
 }
 
-// POST - install WordPress
 export async function POST(request: Request) {
   const actor = await auth();
   if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -63,6 +65,9 @@ export async function POST(request: Request) {
   if (!/^[a-zA-Z0-9][a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(domain)) {
     return NextResponse.json({ error: 'Invalid domain name' }, { status: 400 });
   }
+  if (!validEmail(adminEmail)) {
+    return NextResponse.json({ error: 'Enter a valid WordPress admin email address' }, { status: 400 });
+  }
   if (!canManageSite(actor, domain, 'write')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   if (!/^[a-zA-Z0-9_]+$/.test(dbName) || !/^[a-zA-Z0-9_]+$/.test(dbUser)) {
     return NextResponse.json({ error: 'Database name and user may only contain letters, numbers, and underscores' }, { status: 400 });
@@ -72,6 +77,7 @@ export async function POST(request: Request) {
   const sitePath = `${webRoot}/${domain}`;
   const qSitePath = shellQuote(sitePath);
   const logs: string[] = [];
+  let failed = false;
 
   const steps = [
     { label: 'Create directory', cmd: `mkdir -p ${qSitePath}` },
@@ -80,27 +86,45 @@ export async function POST(request: Request) {
     { label: 'Create DB user', sql: `CREATE USER IF NOT EXISTS ${mysqlString(dbUser)}@'localhost' IDENTIFIED BY ${mysqlString(dbPassword)}; GRANT ALL PRIVILEGES ON ${mysqlIdentifier(dbName)}.* TO ${mysqlString(dbUser)}@'localhost'; FLUSH PRIVILEGES;` },
     {
       label: 'Configure wp-config.php',
-      cmd: `wp config create --path=${qSitePath} --dbname=${shellQuote(dbName)} --dbuser=${shellQuote(dbUser)} --dbpass=${shellQuote(dbPassword)} --dbhost=localhost --allow-root 2>&1`
+      cmd: `wp config create --path=${qSitePath} --dbname=${shellQuote(dbName)} --dbuser=${shellQuote(dbUser)} --dbpass=${shellQuote(dbPassword)} --dbhost=localhost --allow-root 2>&1`,
     },
     {
       label: 'Install WordPress',
-      cmd: `wp core install --path=${qSitePath} --url=${shellQuote(`http://${domain}`)} --title=${shellQuote(siteTitle || domain)} --admin_user=${shellQuote(adminUser || 'admin')} --admin_password=${shellQuote(adminPass || 'changeme123')} --admin_email=${shellQuote(adminEmail)} --allow-root 2>&1`
+      cmd: `wp core install --path=${qSitePath} --url=${shellQuote(`http://${domain}`)} --title=${shellQuote(siteTitle || domain)} --admin_user=${shellQuote(adminUser || 'admin')} --admin_password=${shellQuote(adminPass || 'changeme123')} --admin_email=${shellQuote(adminEmail)} --allow-root 2>&1`,
     },
     { label: 'Set permissions', cmd: `chown -R www-data:www-data ${qSitePath} 2>/dev/null || true` },
   ];
 
   for (const step of steps) {
-    logs.push(`\n▶ ${step.label}...`);
+    logs.push(`\n> ${step.label}...`);
     if ('sql' in step && step.sql) {
       const r = await runMysql(step.sql);
-      logs.push(r.success ? '✓ Done' : `✗ ${r.stderr || r.error}`);
+      if (r.success) logs.push('OK Done');
+      else {
+        failed = true;
+        logs.push(`FAILED ${r.stderr || r.stdout || r.error}`);
+        break;
+      }
     } else if ('cmd' in step && step.cmd) {
       const r = await runCommand(step.cmd, 120000);
-      logs.push(r.success ? `✓ ${r.stdout || 'Done'}` : `✗ ${r.stderr || r.error}`);
+      if (r.success) logs.push(`OK ${r.stdout || 'Done'}`);
+      else {
+        failed = true;
+        logs.push(`FAILED ${r.stderr || r.stdout || r.error}`);
+        break;
+      }
     }
   }
 
-  audit({ actor: actor.username, action: 'wordpress.install', target: domain, ip: clientIp(request), details: { dbName } });
+  audit({ actor: actor.username, action: 'wordpress.install', target: domain, status: failed ? 'failure' : 'success', ip: clientIp(request), details: { dbName } });
+  if (failed) {
+    return NextResponse.json({
+      success: false,
+      output: logs.join('\n'),
+      error: 'WordPress installation failed. Check the installation log.',
+    }, { status: 500 });
+  }
+
   return NextResponse.json({
     success: true,
     output: logs.join('\n'),
@@ -125,12 +149,12 @@ export async function DELETE(request: Request) {
   if (deleteFiles) {
     const trashPath = `${webRoot}/.hostq-trash/${Date.now()}-${String(sitePath).split('/').pop()}`;
     const r = await runCommand(`mkdir -p ${shellQuote(`${webRoot}/.hostq-trash`)} && mv ${shellQuote(sitePath)} ${shellQuote(trashPath)}`, 30000);
-    logs.push(r.success ? `Soft-deleted files to ${trashPath}` : `Failed moving files: ${r.stderr || r.error}`);
+    logs.push(r.success ? `Soft-deleted files to ${trashPath}` : `Failed moving files: ${r.stderr || r.stdout || r.error}`);
   }
   if (deleteDatabase && dbName) {
     if (!/^[a-zA-Z0-9_]+$/.test(dbName)) return NextResponse.json({ error: 'Invalid database name' }, { status: 400 });
     const r = await runMysql(`DROP DATABASE IF EXISTS ${mysqlIdentifier(dbName)};`);
-    logs.push(r.success ? `Dropped database ${dbName}` : `Failed dropping database: ${r.stderr || r.error}`);
+    logs.push(r.success ? `Dropped database ${dbName}` : `Failed dropping database: ${r.stderr || r.stdout || r.error}`);
   }
 
   audit({ actor: actor.username, action: 'wordpress.delete', target: sitePath, ip: clientIp(request), details: { dbName, deleteFiles, deleteDatabase } });

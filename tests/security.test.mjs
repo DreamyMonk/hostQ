@@ -11,6 +11,7 @@ const files = readFileSync('src/app/api/files/route.ts', 'utf8');
 assert.match(files, /process\.platform === 'linux' \? '\/var\/www'/, 'file manager must lock Linux root to /var/www');
 assert.match(files, /BLOCKED_EXTS/, 'file manager must block secret extensions');
 assert.match(files, /file\.soft_delete/, 'file manager deletes must be soft deletes');
+assert.match(files, /path\.isAbsolute\(normalized\)/, 'file manager must accept absolute paths under /var/www without prefixing root twice');
 assert.doesNotMatch(files, /fs\.rm\(/, 'file manager must not hard-delete with fs.rm');
 
 const auth = readFileSync('src/lib/auth.ts', 'utf8');
@@ -53,6 +54,9 @@ assert.match(panel, /HOSTQ_ALLOW_INSECURE_HTTP/, 'panel host settings must manag
 const wordpress = readFileSync('src/app/api/wordpress/route.ts', 'utf8');
 assert.match(wordpress, /command -v wp/, 'WordPress API must check WP-CLI before showing demo mode');
 assert.match(wordpress, /installations: \[\], demo: false/, 'WordPress API must return an empty real list instead of demo data when no installs exist');
+assert.match(wordpress, /validEmail/, 'WordPress install must validate admin email before running WP-CLI');
+assert.match(wordpress, /status: failed \? 'failure' : 'success'/, 'WordPress install must audit failed installs as failures');
+assert.match(wordpress, /WordPress installation failed/, 'WordPress install must return failure when a step fails');
 
 const sshUpdate = readFileSync('scripts/hostq-update.sh', 'utf8');
 assert.match(sshUpdate, /api\.github\.com\/repos\/\$\{REPO\}\/releases\/latest/, 'SSH updater must be able to resolve latest release');
