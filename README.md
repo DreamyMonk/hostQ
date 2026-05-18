@@ -1,60 +1,48 @@
-# hostQ - Hosting Control Panel
+# hostQ
 
-A single-user self-hosted hosting panel for a small VPS. It is built with Next.js 16, TypeScript, Tailwind CSS, and server-side Linux commands for real hosting operations.
+hostQ is a lightweight self-hosted hosting control panel for small VPS servers. It is built with Next.js 16 and manages common hosting tasks such as sites, Nginx vhosts, PHP-FPM versions, MariaDB databases, WordPress, files, SSL, FTP, backups, and updates.
 
-## Supported OS and Server Size
+## Supported OS
 
-Recommended production targets:
+Production targets:
 
 - Ubuntu 22.04 LTS
 - Ubuntu 24.04 LTS
 - Debian 12
 
-Minimum VPS size:
+Minimum VPS:
 
-- 1 CPU core
+- 1 vCPU
 - 1 GB RAM
 - 10 GB disk
 
-Recommended VPS size:
+Recommended VPS:
 
-- 2 CPU cores
+- 2 vCPU
 - 2 GB RAM
 - 20 GB+ disk
 
-Local development works on Windows, macOS, and Linux, but real hosting actions such as Nginx vhosts, PHP-FPM switching, Certbot, Pure-FTPd, MariaDB, and file ownership changes require a Linux VPS with root access.
+Local development works on Windows, macOS, and Linux. Real hosting actions require a Linux VPS with root access.
 
 ## Features
 
-| Feature | Description |
+| Area | Features |
 |---|---|
-| Auth | Single-admin JWT login with a cookie session |
-| Dashboard | CPU, RAM, disk, uptime, service status |
-| Sites | Add, disable, delete, and manage domain/subdomain sites |
-| User/Admin UI Modes | User mode for site operations, admin mode for server and stack controls |
-| Site types | HTML/CSS static sites, PHP sites, and WordPress-ready folders |
-| WordPress | One-click install with WP-CLI plus admin, files, and delete actions |
-| PHP Manager | Manage currently supported PHP 8.2, 8.3, 8.4, and 8.5 FPM branches |
-| Database Manager | MariaDB/MySQL databases, users, grants, drops, and phpMyAdmin links |
-| File Manager | Browse, upload, edit, create, rename, and delete files inside a configured root |
-| SSL Manager | Let's Encrypt via Certbot, renewal, delete, and manual PEM certificate upload |
-| FTP | Pure-FTPd service install/start/stop controls |
-| Services | Nginx, MariaDB, PHP-FPM, Certbot, WP-CLI, phpMyAdmin, and Pure-FTPd management |
-
-## Local Development
-
-```bash
-npm install
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000).
-
-On first run, hostQ asks you to create the admin account. The password is hashed and stored in `HOSTQ_DATA_DIR`.
+| Auth | SSH-generated admin credentials, hashed passwords, JWT sessions, optional TOTP 2FA, login rate limits |
+| Security | CSRF protection, secure headers, HTTPS-only production mode, audit hash chain, session revocation |
+| Sites | Add sites, manage vhosts, enable/disable, soft-delete, backups, restore dry-run, per-site users |
+| Site Safety | File permission scan, sanitize action, secret-file quarantine, WordPress database detection |
+| Files | File manager locked to `/var/www` on Linux, safe filename normalization, blocked secret files |
+| WordPress | WP-CLI install, WordPress discovery, database setup, soft-delete |
+| Databases | MariaDB/MySQL databases, users, grants, drops, phpMyAdmin link |
+| PHP | PHP-FPM 8.2, 8.3, 8.4, and 8.5 management |
+| SSL | Let's Encrypt via Certbot, renew/delete, manual PEM upload |
+| Services | Nginx, Apache, MariaDB, PHP-FPM, Certbot, WP-CLI, Pure-FTPd, phpMyAdmin |
+| Updates | Web updater and SSH CLI updater using GitHub releases |
 
 ## VPS Deployment
 
-On Ubuntu/Debian as root:
+Run as root on a fresh Ubuntu/Debian VPS:
 
 ```bash
 git clone https://github.com/DreamyMonk/hostQ.git /opt/hostq
@@ -62,66 +50,182 @@ cd /opt/hostq
 bash setup.sh
 ```
 
-The installer chooses a lightweight Nginx-first LEMP stack for 1GB RAM / 1 CPU servers. Apache is available from the Services page, but Nginx + PHP-FPM is the default because it uses less memory.
-
-Installed stack:
+The setup script installs:
 
 - Node.js 20
-- Nginx 1.24+ where available
-- MariaDB 10.11 where available
-- PHP-FPM 8.2, 8.3, 8.4, 8.5
+- Nginx
+- MariaDB
+- PHP-FPM 8.2, 8.3, 8.4, 8.5 where available
 - Certbot
 - WP-CLI
 - Pure-FTPd
-- phpMyAdmin 5.2
-- PM2 with a 384 MB memory restart limit
+- phpMyAdmin
+- PM2
+- hostQ privileged helper
+- `hostq-update` SSH updater
 
-## How to Use
+At the end of setup, SSH prints the first admin login:
 
-1. Deploy with `bash setup.sh`.
-2. Open the panel URL shown at the end of setup.
-3. Login with the temporary default credentials.
-4. Create the first admin account in the browser.
-5. Restart the panel with `pm2 restart hostq`.
-6. Use Services to confirm Nginx, MariaDB, PHP-FPM, Certbot, Pure-FTPd, WP-CLI, and phpMyAdmin are installed.
-7. Add a site from Domain Manager, choosing HTML/CSS, PHP, or WordPress-ready.
-8. Use SSL Manager for Let&apos;s Encrypt or manual PEM certificate upload.
-9. Use File Manager or FTP to upload site files.
+```text
+Initial hostQ admin login:
+  Username: admin
+  Password: <generated-password>
+```
 
-## UI Modes
+Save the password immediately. It is shown only once.
 
-hostQ has two navigation modes:
+After login:
 
-- User mode: add sites and manage each site from one minimal workspace. Site management includes open site, files, SSL, WordPress, database, PHP shortcut, enable/disable, permission repair, backup, and delete.
-- Admin mode: manage server-level tools such as services, PHP-FPM versions, domain/vhost configuration, and panel settings.
+1. Open **Admin -> Security**.
+2. Change the generated password.
+3. Start and verify 2FA if you want TOTP enabled.
+4. Fix all red/yellow production readiness checks before exposing the panel publicly.
+
+## Updating
+
+From the panel:
+
+- Go to **Admin -> Security -> Updates**
+- Click **Check**
+- Click **Update** when a release is available
+
+From SSH:
+
+```bash
+sudo hostq-update
+```
+
+Update to a specific release:
+
+```bash
+sudo hostq-update v0.2.3
+```
+
+Updates create a backup first:
+
+```text
+/var/backups/hostq/panel-*.tar.gz
+```
+
+Release tags are expected to look like:
+
+```text
+v0.2.3
+```
+
+## Local Development
+
+```bash
+npm install
+npm run dev -- --port 8090
+```
+
+Open:
+
+[http://localhost:8090](http://localhost:8090)
+
+If no admin account exists locally, the browser fallback setup can create one. Production installs should use `setup.sh`, which generates the admin account over SSH.
 
 ## Configuration
 
-Copy and edit `.env.example` to `.env.local`:
+Copy `.env.example` to `.env.local` and edit:
 
 ```env
 HOSTQ_DATA_DIR=/etc/hostq
 JWT_SECRET=random_256bit_string
+JWT_EXPIRY=24h
+SESSION_IDLE_TIMEOUT_MINUTES=30
+
+HOSTQ_REQUIRE_HELPER=false
+HOSTQ_HELPER=/usr/local/sbin/hostq-helper
+
 DB_HOST=localhost
 DB_ROOT_USER=root
 DB_ROOT_PASSWORD=mysql_root_pass
+
 PHPMYADMIN_URL=http://localhost/phpmyadmin
 FILE_MANAGER_ROOT=/var/www
-WEB_ROOT=/var/www/html
+WEB_ROOT=/var/www
 PANEL_URL=https://panel.yourdomain.com
+NODE_OPTIONS=--max-old-space-size=384
 ```
+
+When helper coverage is complete on your server, enable:
+
+```env
+HOSTQ_REQUIRE_HELPER=true
+```
+
+## UI Modes
+
+hostQ has two main modes:
+
+- **User mode:** sites, files, WordPress, SSL, and database shortcuts.
+- **Admin mode:** server overview, domains, PHP, services, security, updates, sessions, and audit logs.
+
+Each site has a **Manage Site** panel with:
+
+- Open site
+- Files
+- SSL
+- WordPress
+- Database shortcut
+- PHP shortcut
+- Enable/disable
+- File permissions and database scan
+- Sanitize files and repair permissions
+- Backup
+- Soft-delete options
+- Per-site users and roles
+
+## Security Model
+
+Implemented controls:
+
+- CSRF tokens for mutating API requests
+- HTTPS-only enforcement in production
+- Secure, strict cookies
+- Login rate limiting persisted on disk
+- Optional TOTP 2FA
+- Session list and session revoke API
+- Per-site RBAC enforcement
+- Audit log hash chain and rotation
+- File manager restricted to `/var/www` on Linux
+- Secret-like files blocked or quarantined
+- Restore dry-run and confirmation flow
+- Privileged helper allowlist for sensitive tasks
+
+Read more in:
+
+[SECURITY_PRODUCTION.md](./SECURITY_PRODUCTION.md)
 
 ## Verification
 
+Before release or deployment:
+
 ```bash
 npm run lint
+npm run security:test
 npm run build
 ```
 
-## Security Notes
+The production build may show a non-blocking Turbopack trace warning for runtime filesystem APIs such as site safety checks.
 
-- Change default credentials immediately.
-- Use HTTPS for the panel itself.
-- Keep `FILE_MANAGER_ROOT` restricted to the smallest useful directory.
-- Do not expose MariaDB/MySQL publicly.
-- Run `mysql_secure_installation` after deployment.
+## GitHub Releases
+
+Create a release from a pushed tag:
+
+```bash
+git tag -a v0.2.3 -m "hostQ v0.2.3"
+git push origin v0.2.3
+```
+
+Then publish the release on GitHub:
+
+[https://github.com/DreamyMonk/hostQ/releases/new](https://github.com/DreamyMonk/hostQ/releases/new)
+
+The web and SSH updaters read GitHub releases from:
+
+```text
+DreamyMonk/hostQ
+```
