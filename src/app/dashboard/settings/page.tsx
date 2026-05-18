@@ -1,10 +1,12 @@
 'use client';
-import { useState } from 'react';
-import { Settings, Save, Eye, EyeOff, CheckCircle, Key, Server, Database, Link, FolderOpen } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Settings, Save, Eye, EyeOff, CheckCircle, Key, Server, Database, Link, FolderOpen, ShieldCheck } from 'lucide-react';
 
 export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [showPass, setShowPass] = useState(false);
+  const [audit, setAudit] = useState<{ entries: { ts: string; action: string; actor?: string; target?: string; status: string }[]; chainValid: boolean } | null>(null);
+  const [sessions, setSessions] = useState<{ id: string; username: string; role: string; lastSeenAt: string; revokedAt?: string }[]>([]);
 
   const [settings, setSettings] = useState({
     panelUsername: 'admin',
@@ -18,6 +20,11 @@ export default function SettingsPage() {
     dbRootUser: 'root',
     panelUrl: 'http://localhost:3000',
   });
+
+  useEffect(() => {
+    void fetch('/api/audit').then(r => r.ok ? r.json() : null).then(data => data && setAudit(data)).catch(() => {});
+    void fetch('/api/sessions').then(r => r.ok ? r.json() : null).then(data => setSessions(data?.sessions || [])).catch(() => {});
+  }, []);
 
   const handleSave = async () => {
     // In production, this would call an API to update the .env file
@@ -125,6 +132,39 @@ export default function SettingsPage() {
             </div>
           </div>
         ))}
+      </div>
+
+      <div className="glass-card" style={{ marginTop:24, overflow:'hidden' }}>
+        <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border-subtle)', display:'flex', alignItems:'center', gap:10, fontWeight:600 }}>
+          <ShieldCheck size={16} color="#16a34a" /> Security Center
+          {audit && <span className={`badge ${audit.chainValid ? 'badge-green' : 'badge-red'}`} style={{ marginLeft:'auto' }}>{audit.chainValid ? 'Audit chain valid' : 'Audit tamper warning'}</span>}
+        </div>
+        <div style={{ padding:20, display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
+          <div>
+            <div style={{ fontWeight:700, marginBottom:10 }}>Active sessions</div>
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              {sessions.slice(0, 8).map(session => (
+                <div key={session.id} style={{ border:'1px solid var(--border-subtle)', borderRadius:8, padding:10 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', gap:8 }}><strong>{session.username}</strong><span className="badge">{session.role}</span></div>
+                  <div className="mono" style={{ fontSize:11, color:'var(--text-muted)' }}>{session.id.slice(0, 8)} · {new Date(session.lastSeenAt).toLocaleString()}</div>
+                </div>
+              ))}
+              {sessions.length === 0 && <div style={{ color:'var(--text-muted)', fontSize:13 }}>No sessions visible.</div>}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontWeight:700, marginBottom:10 }}>Recent audit events</div>
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              {(audit?.entries || []).slice(0, 8).map((entry, index) => (
+                <div key={`${entry.ts}-${index}`} style={{ border:'1px solid var(--border-subtle)', borderRadius:8, padding:10 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', gap:8 }}><strong>{entry.action}</strong><span className="badge">{entry.status}</span></div>
+                  <div className="mono" style={{ fontSize:11, color:'var(--text-muted)' }}>{entry.actor || 'system'} · {entry.target || '-'} · {new Date(entry.ts).toLocaleString()}</div>
+                </div>
+              ))}
+              {!audit?.entries?.length && <div style={{ color:'var(--text-muted)', fontSize:13 }}>No audit events yet.</div>}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Info box */}

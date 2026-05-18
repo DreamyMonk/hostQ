@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { runCommand, runHelper, shellQuote } from '@/lib/exec';
 import { audit, clientIp } from '@/lib/security';
+import { canManageSite } from '@/lib/authz';
 import fs from 'fs';
 import path from 'path';
 
@@ -58,6 +59,7 @@ export async function POST(request: Request) {
   if (!/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(domain)) {
     return NextResponse.json({ error: 'Invalid domain format' }, { status: 400 });
   }
+  if (!canManageSite(actor, domain, 'danger')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   if (mode === 'manual') {
     if (!certificate || !privateKey) {
@@ -82,7 +84,7 @@ export async function POST(request: Request) {
     }
 
     fs.mkdirSync(certDir, { recursive: true, mode: 0o700 });
-    fs.writeFileSync(fullchainPath, combinedCert, { mode: 0o644 });
+    fs.writeFileSync(fullchainPath, combinedCert, { mode: 0o640 });
     fs.writeFileSync(keyPath, `${String(privateKey).trim()}\n`, { mode: 0o600 });
 
     const reload = await runHelper('web.reload', { server: webserver === 'apache' ? 'apache' : 'nginx' });
@@ -116,6 +118,7 @@ export async function PATCH(request: Request) {
   if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { domain } = await request.json();
+  if (domain && !canManageSite(actor, domain, 'danger')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   const cmd = domain && /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(domain)
     ? `certbot renew --cert-name ${shellQuote(domain)} --non-interactive 2>&1`
     : 'certbot renew --non-interactive 2>&1';
@@ -140,6 +143,7 @@ export async function DELETE(request: Request) {
   if (!/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(domain)) {
     return NextResponse.json({ error: 'Invalid domain format' }, { status: 400 });
   }
+  if (!canManageSite(actor, domain, 'danger')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const r = await runCommand(`certbot delete --cert-name ${shellQuote(domain)} --non-interactive 2>&1`, 30000);
   audit({ actor: actor.username, action: 'ssl.delete', target: domain, status: r.success ? 'success' : 'failure', ip: clientIp(request) });

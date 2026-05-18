@@ -13,6 +13,15 @@ export interface ExecResult {
 }
 
 export async function runCommand(command: string, timeout = 30000): Promise<ExecResult> {
+  const dangerous = /\b(apt-get|systemctl|rm\s+-|mv\s+|chmod|chown|ln\s+-|certbot|wp\s|mysql\s|tar\s+-|a2en|a2dis|update-alternatives)\b/.test(command);
+  if (process.env.HOSTQ_REQUIRE_HELPER === 'true' && dangerous) {
+    return {
+      stdout: '',
+      stderr: 'Direct privileged shell execution is disabled. Add this action to hostq-helper allowlist.',
+      success: false,
+      error: 'Direct privileged shell execution disabled',
+    };
+  }
   try {
     const { stdout, stderr } = await execAsync(command, {
       timeout,

@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { runCommand } from '@/lib/exec';
 import { audit, clientIp } from '@/lib/security';
+import { canManagePanel } from '@/lib/authz';
 
 async function auth() {
   const cookieStore = await cookies();
@@ -13,7 +14,9 @@ async function auth() {
 const SUPPORTED_PHP_VERSIONS = ['8.2', '8.3', '8.4', '8.5'];
 
 export async function GET() {
-  if (!await auth()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const actor = await auth();
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!canManagePanel(actor)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   
   const results = await Promise.all([
     runCommand('php --version'),
@@ -68,6 +71,7 @@ export async function GET() {
 export async function POST(request: Request) {
   const actor = await auth();
   if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!canManagePanel(actor)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   
   const { version } = await request.json();
   if (!version || !/^\d+\.\d+$/.test(version)) {

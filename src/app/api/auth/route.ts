@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createAdminAccount, hasAdminAccount, signToken, validateCredentials } from '@/lib/auth';
+import { createAdminAccount, createSession, hasAdminAccount, revokeSession, validateCredentials, validateOtp, verifyToken } from '@/lib/auth';
 import {
   CSRF_COOKIE,
   audit,
@@ -43,7 +43,7 @@ export async function GET() {
 export async function POST(request: Request) {
   const ip = clientIp(request);
   try {
-    const { username, password } = await request.json();
+    const { username, password, otp } = await request.json();
     const actor = safeUsername(String(username || 'unknown')) || 'unknown';
     const limit = checkLoginRateLimit(`${ip}:${actor}`);
     if (!limit.allowed) {
@@ -58,14 +58,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Username and password required' }, { status: 400 });
     }
 
-    if (!validateCredentials(username, password)) {
+    const account = validateCredentials(username, password);
+    if (!account) {
       audit({ actor, action: 'auth.login', status: 'failure', ip });
       return NextResponse.json({ error: 'Invalid username or password' }, { status: 401 });
     }
+    if (!validateOtp(account, otp)) {
+      audit({ actor, action: 'auth.login.otp_failed', status: 'failure', ip });
+      return NextResponse.json({ error: 'Valid two-factor code required' }, { status: 401 });
+    }
 
-    const token = signToken(username);
+    const { token, session } = createSession(account, {
+      ip,
+      userAgent: request.headers.get('user-agent') || undefined,
+    });
     clearLoginRateLimit(`${ip}:${actor}`);
-    audit({ actor, action: 'auth.login', status: 'success', ip });
+    audit({ actor, action: 'auth.login', status: 'success', ip, details: { sessionId: session.id, role: account.role } });
 
     const response = NextResponse.json({ success: true, message: 'Authenticated' });
     setSessionCookies(response, token);
@@ -96,17 +104,25 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: created.error || 'Account setup failed' }, { status: 400 });
     }
 
-    const token = signToken(username);
     audit({ actor: username, action: 'auth.first_admin_created', status: 'success', ip });
-    const response = NextResponse.json({ success: true, message: 'Admin account created' });
-    setSessionCookies(response, token);
-    return response;
+    return NextResponse.json({
+      success: true,
+      requiresLogin: true,
+      message: 'Admin account created. Save the 2FA secret and sign in with a TOTP code.',
+      otpSecret: created.otpSecret,
+      otpAuthUrl: created.otpAuthUrl,
+    });
   } catch {
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
 
-export async function DELETE() {
+export async function DELETE(request: Request) {
+  const raw = request.headers.get('cookie')?.match(/panel_token=([^;]+)/)?.[1];
+  if (raw) {
+    const payload = verifyToken(decodeURIComponent(raw));
+    if (payload?.sessionId) revokeSession(payload.sessionId);
+  }
   const response = NextResponse.json({ success: true });
   response.cookies.delete('panel_token');
   response.cookies.delete(CSRF_COOKIE);

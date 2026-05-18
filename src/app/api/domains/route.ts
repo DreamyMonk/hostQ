@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { runCommand, runHelper, shellQuote } from '@/lib/exec';
 import { audit, clientIp } from '@/lib/security';
+import { canManagePanel, canManageSite } from '@/lib/authz';
 import fs from 'fs';
 import path from 'path';
 
@@ -155,9 +156,10 @@ async function listDomains(): Promise<{ domain: string; type: 'domain'|'subdomai
 // GET - list domains
 // ──────────────────────────────────────────────
 export async function GET() {
-  if (!await auth()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const actor = await auth();
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const domains  = await listDomains();
+  const domains  = (await listDomains()).filter((site) => canManageSite(actor, site.domain, 'view'));
   const webserver = await detectWebServer();
   const demo     = process.platform !== 'linux';
 
@@ -170,6 +172,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const actor = await auth();
   if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!canManagePanel(actor)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const { domain, type = 'domain', phpVersion = '8.4', server = 'nginx', parentDomain = '', siteType = 'php' } = await request.json();
 
@@ -279,6 +282,7 @@ export async function PATCH(request: NextRequest) {
   if (!/^[a-zA-Z0-9][a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(domain)) {
     return NextResponse.json({ error: 'Invalid domain name' }, { status: 400 });
   }
+  if (!canManageSite(actor, domain, action === 'permissions' ? 'write' : 'danger')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   if (process.platform !== 'linux') {
     audit({ actor: actor.username, action: `site.${action}`, target: domain, ip: clientIp(request), details: { demo: true } });
@@ -323,6 +327,7 @@ export async function PUT(request: NextRequest) {
   if (!domain || !/^[a-zA-Z0-9][a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(domain)) {
     return NextResponse.json({ error: 'Invalid domain name' }, { status: 400 });
   }
+  if (!canManageSite(actor, domain, 'backup')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const domainRoot = `${WEB_ROOT}/${domain}`;
   const backupDir = '/var/backups/hostq';
@@ -363,6 +368,7 @@ export async function DELETE(request: NextRequest) {
   if (!/^[a-zA-Z0-9][a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(domain)) {
     return NextResponse.json({ error: 'Invalid domain name' }, { status: 400 });
   }
+  if (!canManageSite(actor, domain, 'danger')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   if (process.platform !== 'linux') {
     audit({ actor: actor.username, action: 'site.delete', target: domain, ip: clientIp(request), details: { demo: true, deleteFiles } });

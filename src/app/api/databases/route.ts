@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { mysqlIdentifier, mysqlString, runMysql } from '@/lib/exec';
 import { audit, clientIp } from '@/lib/security';
+import { canManagePanel } from '@/lib/authz';
 
 async function auth() {
   const cookieStore = await cookies();
@@ -12,7 +13,9 @@ async function auth() {
 
 // GET - list all databases
 export async function GET() {
-  if (!await auth()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const actor = await auth();
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!canManagePanel(actor)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const r = await runMysql('SHOW DATABASES;');
   if (!r.success) {
@@ -71,6 +74,7 @@ export async function GET() {
 export async function POST(request: Request) {
   const actor = await auth();
   if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!canManagePanel(actor)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const body = await request.json();
   const { action, dbName, dbUser, dbPassword } = body;
@@ -109,6 +113,7 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   const actor = await auth();
   if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!canManagePanel(actor)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const { action, name } = await request.json();
   

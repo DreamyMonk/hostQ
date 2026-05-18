@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { runCommand, runHelper } from '@/lib/exec';
 import { audit, clientIp } from '@/lib/security';
+import { canManagePanel } from '@/lib/authz';
 
 async function auth() {
   const cookieStore = await cookies();
@@ -192,7 +193,9 @@ async function checkService(svc: ServiceDef) {
 // GET - return all service statuses
 // ──────────────────────────────────────────────
 export async function GET() {
-  if (!await auth()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const actor = await auth();
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!canManagePanel(actor)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const statuses = await Promise.all(SERVICES.map(checkService));
   return NextResponse.json({ services: statuses, demo: process.platform !== 'linux' });
@@ -204,6 +207,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const actor = await auth();
   if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!canManagePanel(actor)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const { serviceId, action } = await request.json();
   const svc = SERVICES.find(s => s.id === serviceId);

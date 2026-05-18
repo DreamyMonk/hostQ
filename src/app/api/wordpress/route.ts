@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { mysqlIdentifier, mysqlString, runCommand, runMysql, shellQuote } from '@/lib/exec';
 import { audit, clientIp } from '@/lib/security';
+import { canManageSite, domainFromWebPath } from '@/lib/authz';
 
 async function auth() {
   const cookieStore = await cookies();
@@ -12,7 +13,8 @@ async function auth() {
 
 // GET - list WordPress installations
 export async function GET() {
-  if (!await auth()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const actor = await auth();
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const webRoot = process.env.WEB_ROOT || '/var/www/html';
   const r = await runCommand(`find ${webRoot} -name "wp-config.php" -maxdepth 4 2>/dev/null`);
@@ -28,7 +30,10 @@ export async function GET() {
   }
 
   const paths = r.stdout.split('\n').filter(Boolean).map(p => p.replace('/wp-config.php', ''));
-  const installations = paths.map(p => ({
+  const installations = paths.filter(p => {
+    const domain = domainFromWebPath(p, webRoot);
+    return !domain || canManageSite(actor, domain, 'view');
+  }).map(p => ({
     domain: p.split('/').pop() || p,
     path: p,
     status: 'running',
@@ -52,6 +57,7 @@ export async function POST(request: Request) {
   if (!/^[a-zA-Z0-9][a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(domain)) {
     return NextResponse.json({ error: 'Invalid domain name' }, { status: 400 });
   }
+  if (!canManageSite(actor, domain, 'write')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   if (!/^[a-zA-Z0-9_]+$/.test(dbName) || !/^[a-zA-Z0-9_]+$/.test(dbUser)) {
     return NextResponse.json({ error: 'Database name and user may only contain letters, numbers, and underscores' }, { status: 400 });
   }
@@ -106,6 +112,8 @@ export async function DELETE(request: Request) {
   if (!sitePath || !String(sitePath).startsWith(webRoot)) {
     return NextResponse.json({ error: 'Invalid WordPress path' }, { status: 400 });
   }
+  const domain = domainFromWebPath(sitePath, webRoot);
+  if (domain && !canManageSite(actor, domain, 'danger')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const logs: string[] = [];
   if (deleteFiles) {

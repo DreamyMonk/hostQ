@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
+import { findAccount } from '@/lib/auth';
 import { audit, clientIp } from '@/lib/security';
+import { canManageSite, domainFromWebPath } from '@/lib/authz';
 import fs from 'fs';
 import path from 'path';
 import { promisify } from 'util';
@@ -61,7 +63,8 @@ function formatSize(bytes: number): string {
 
 // GET - list directory or read file
 export async function GET(request: NextRequest) {
-  if (!await auth()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const actor = await auth();
+  if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   if (!fs.existsSync(ROOT)) await mkdir(ROOT, { recursive: true, mode: 0o755 });
   const { searchParams } = request.nextUrl;
@@ -69,6 +72,8 @@ export async function GET(request: NextRequest) {
   const action  = searchParams.get('action') || 'list';
   const full    = safePath(reqPath);
   if (blockedPath(full)) return blockedResponse();
+  const domain = domainFromWebPath(full, ROOT);
+  if (domain && !canManageSite(actor, domain, 'view')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   try {
     const s = await stat(full);
@@ -89,6 +94,10 @@ export async function GET(request: NextRequest) {
         try {
           const entryFull = path.join(full, entry.name);
           if (blockedPath(entryFull)) return null;
+          if (full === ROOT && actor.role !== 'admin') {
+            const account = findAccount(actor.username);
+            if (!account?.sitePermissions?.[entry.name]) return null;
+          }
           const entrystat = await stat(entryFull);
           return {
             name: entry.name,
@@ -135,6 +144,8 @@ export async function POST(request: NextRequest) {
     const form = await request.formData();
     const reqPath = String(form.get('path') || '/');
     const full = safePath(reqPath);
+    const domain = domainFromWebPath(full, ROOT);
+    if (domain && !canManageSite(actor, domain, 'files')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     const file = form.get('file');
     if (!(file instanceof File)) return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
     const name = safeChildName(file.name);
@@ -151,6 +162,8 @@ export async function POST(request: NextRequest) {
   const { action, path: reqPath, name, content } = body;
   const full  = safePath(reqPath);
   if (blockedPath(full)) return blockedResponse();
+  const domain = domainFromWebPath(full, ROOT);
+  if (domain && !canManageSite(actor, domain, 'files')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   try {
     if (action === 'mkdir') {
@@ -192,6 +205,8 @@ export async function PATCH(request: NextRequest) {
 
   const { path: reqPath, newName } = await request.json();
   const full    = safePath(reqPath);
+  const domain = domainFromWebPath(full, ROOT);
+  if (domain && !canManageSite(actor, domain, 'files')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   const childName = safeChildName(newName);
   if (!childName) return NextResponse.json({ error: 'Invalid file name' }, { status: 400 });
   const newFull = path.join(path.dirname(full), childName);
@@ -215,6 +230,8 @@ export async function DELETE(request: NextRequest) {
   const full = safePath(reqPath);
   if (full === ROOT) return NextResponse.json({ error: 'Cannot delete root' }, { status: 400 });
   if (blockedPath(full)) return blockedResponse();
+  const domain = domainFromWebPath(full, ROOT);
+  if (domain && !canManageSite(actor, domain, 'danger')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   try {
     await mkdir(TRASH, { recursive: true, mode: 0o700 });

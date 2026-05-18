@@ -42,7 +42,7 @@ export default function SitesPage() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [output, setOutput] = useState('');
   const [siteUsers, setSiteUsers] = useState<SiteUser[]>([]);
-  const [userForm, setUserForm] = useState({ username: '', role: 'developer' as SiteUser['role'] });
+  const [userForm, setUserForm] = useState({ username: '', password: '', role: 'developer' as SiteUser['role'] });
 
   const showMessage = (type: 'success' | 'error', text: string) => {
     setMessage({ type, text });
@@ -171,7 +171,7 @@ export default function SitesPage() {
 
   const openManager = (site: Site) => {
     setSelected(site);
-    setUserForm({ username: '', role: 'developer' });
+    setUserForm({ username: '', password: '', role: 'developer' });
     void loadSiteUsers(site.domain);
   };
 
@@ -185,7 +185,7 @@ export default function SitesPage() {
     const data = await response.json();
     if (data.success) {
       showMessage('success', data.message);
-      setUserForm({ username: '', role: 'developer' });
+      setUserForm({ username: '', password: '', role: 'developer' });
       loadSiteUsers(selected.domain);
     } else {
       showMessage('error', data.error || 'Unable to add user');
@@ -390,8 +390,9 @@ export default function SitesPage() {
                   <strong>Site users</strong>
                   <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Per-site access roles</span>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 150px auto', gap: 8, marginBottom: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 150px auto', gap: 8, marginBottom: 12 }}>
                   <input className="input" placeholder="username" value={userForm.username} onChange={event => setUserForm({ ...userForm, username: event.target.value })} />
+                  <input className="input" type="password" placeholder="new user password" value={userForm.password} onChange={event => setUserForm({ ...userForm, password: event.target.value })} />
                   <select className="input" value={userForm.role} onChange={event => setUserForm({ ...userForm, role: event.target.value as SiteUser['role'] })}>
                     <option value="owner">Owner</option>
                     <option value="developer">Developer</option>

@@ -9,6 +9,8 @@ export default function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [otp, setOtp] = useState('');
+  const [setupSecret, setSetupSecret] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -34,9 +36,18 @@ export default function LoginPage() {
       const response = await fetch('/api/auth', {
         method: setupRequired ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password, confirmPassword }),
+        body: JSON.stringify({ username, password, confirmPassword, otp }),
       });
       const data = await response.json();
+      if (response.ok && data.requiresLogin) {
+        setSetupSecret(data.otpSecret || '');
+        setSetupRequired(false);
+        setPassword('');
+        setConfirmPassword('');
+        setOtp('');
+        setError('');
+        return;
+      }
       if (response.ok && data.success) {
         router.push('/dashboard/sites');
         return;
@@ -107,6 +118,11 @@ export default function LoginPage() {
           </div>
 
           {error && <div className="alert alert-error">{error}</div>}
+          {setupSecret && (
+            <div className="alert alert-warning">
+              Two-factor authentication is now enabled. Add this secret to your authenticator app, then sign in with the 6-digit code: <strong className="mono">{setupSecret}</strong>
+            </div>
+          )}
 
           <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <label style={{ display: 'grid', gap: 6 }}>
@@ -132,6 +148,13 @@ export default function LoginPage() {
               <label style={{ display: 'grid', gap: 6 }}>
                 <span style={{ fontSize: 13, color: '#344054', fontWeight: 650 }}>Confirm password</span>
                 <input className="input" type={showPass ? 'text' : 'password'} value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} placeholder="Repeat password" autoComplete="new-password" required />
+              </label>
+            )}
+
+            {!isSetup && (
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={{ fontSize: 13, color: '#344054', fontWeight: 650 }}>2FA code</span>
+                <input className="input mono" inputMode="numeric" pattern="[0-9]*" value={otp} onChange={event => setOtp(event.target.value)} placeholder="123456" autoComplete="one-time-code" required />
               </label>
             )}
 

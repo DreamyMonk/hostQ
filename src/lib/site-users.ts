@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { createSiteAccount, findAccount, updateSiteAccount } from './auth';
 
 export type SiteRole = 'owner' | 'developer' | 'viewer';
 
@@ -39,7 +40,7 @@ export function listSiteUsers(domain?: string): SiteUser[] {
   return domain ? users.filter((user) => user.domain === domain) : users;
 }
 
-export function addSiteUser(domain: string, username: string, role: SiteRole): SiteUser {
+export function addSiteUser(domain: string, username: string, role: SiteRole, password?: string): SiteUser {
   if (!/^[a-zA-Z0-9][a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(domain)) throw new Error('Invalid domain');
   if (!/^[a-zA-Z0-9_.-]{3,32}$/.test(username)) throw new Error('Invalid username');
   if (!['owner', 'developer', 'viewer'].includes(role)) throw new Error('Invalid role');
@@ -47,6 +48,14 @@ export function addSiteUser(domain: string, username: string, role: SiteRole): S
   const users = readUsers();
   if (users.some((user) => user.domain === domain && user.username === username)) {
     throw new Error('User already has access to this site');
+  }
+  const account = findAccount(username);
+  if (!account && !password) throw new Error('Password required for a new site user');
+  const nextPermissions = { ...(account?.sitePermissions || {}), [domain]: role };
+  if (account) {
+    updateSiteAccount(username, nextPermissions);
+  } else {
+    createSiteAccount(username, password || '', nextPermissions);
   }
   const user: SiteUser = {
     id: `${domain}:${username}`,
@@ -63,5 +72,11 @@ export function removeSiteUser(domain: string, username: string): boolean {
   const users = readUsers();
   const next = users.filter((user) => !(user.domain === domain && user.username === username));
   writeUsers(next);
+  const account = findAccount(username);
+  if (account?.role === 'user') {
+    const permissions = { ...(account.sitePermissions || {}) };
+    delete permissions[domain];
+    updateSiteAccount(username, permissions);
+  }
   return next.length !== users.length;
 }

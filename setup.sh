@@ -104,6 +104,13 @@ fi
 
 mkdir -p /etc/hostq
 chmod 700 /etc/hostq
+install -m 0750 -o root -g root "$PANEL_DIR/scripts/hostq-helper.mjs" /usr/local/sbin/hostq-helper
+cat > /etc/sudoers.d/hostq-helper <<'EOF'
+Defaults!/usr/local/sbin/hostq-helper !requiretty
+root ALL=(root) NOPASSWD: /usr/local/sbin/hostq-helper
+EOF
+chmod 0440 /etc/sudoers.d/hostq-helper
+log "Installed hostQ privileged helper allowlist"
 
 cd "$PANEL_DIR"
 npm ci
