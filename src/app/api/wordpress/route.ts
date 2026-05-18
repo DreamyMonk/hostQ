@@ -21,7 +21,7 @@ export async function GET() {
 
   const webRoot = process.env.WEB_ROOT || '/var/www/html';
   const wpCli = await runCommand('command -v wp || test -x /usr/local/bin/wp', 5000);
-  const r = await runCommand(`find ${shellQuote(webRoot)} -maxdepth 4 -name "wp-config.php" 2>/dev/null`);
+  const r = await runCommand(`find ${shellQuote(webRoot)} -path ${shellQuote(`${webRoot}/.hostq-trash`)} -prune -o -maxdepth 4 -name "wp-config.php" -print 2>/dev/null`);
 
   if (!wpCli.success) {
     return NextResponse.json({

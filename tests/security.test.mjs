@@ -57,6 +57,7 @@ assert.match(wordpress, /installations: \[\], demo: false/, 'WordPress API must 
 assert.match(wordpress, /validEmail/, 'WordPress install must validate admin email before running WP-CLI');
 assert.match(wordpress, /status: failed \? 'failure' : 'success'/, 'WordPress install must audit failed installs as failures');
 assert.match(wordpress, /WordPress installation failed/, 'WordPress install must return failure when a step fails');
+assert.match(wordpress, /\.hostq-trash/, 'WordPress scanner must ignore soft-deleted sites in trash');
 
 const sshUpdate = readFileSync('scripts/hostq-update.sh', 'utf8');
 assert.match(sshUpdate, /api\.github\.com\/repos\/\$\{REPO\}\/releases\/latest/, 'SSH updater must be able to resolve latest release');
