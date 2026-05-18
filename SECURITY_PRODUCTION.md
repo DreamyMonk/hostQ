@@ -68,3 +68,11 @@ HOSTQ_HELPER=/usr/local/sbin/hostq-helper
 - Publish hostQ releases as GitHub tags like `v0.2.0`.
 - The panel updater downloads release tarballs from `DreamyMonk/hostQ`, creates `/var/backups/hostq/panel-*.tar.gz`, rebuilds, prunes dev dependencies, and restarts `hostq`.
 - Keep update actions inside `scripts/hostq-helper.mjs`; do not add a generic shell update endpoint.
+- SSH update command:
+
+```bash
+sudo hostq-update          # latest GitHub release
+sudo hostq-update v0.2.2   # specific release tag
+```
+
+- `hostq-update` calls `/usr/local/sbin/hostq-helper` with the narrow `panel.update` task.

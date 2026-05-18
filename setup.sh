@@ -105,12 +105,13 @@ fi
 mkdir -p /etc/hostq
 chmod 700 /etc/hostq
 install -m 0750 -o root -g root "$PANEL_DIR/scripts/hostq-helper.mjs" /usr/local/sbin/hostq-helper
+install -m 0750 -o root -g root "$PANEL_DIR/scripts/hostq-update.sh" /usr/local/bin/hostq-update
 cat > /etc/sudoers.d/hostq-helper <<'EOF'
 Defaults!/usr/local/sbin/hostq-helper !requiretty
 root ALL=(root) NOPASSWD: /usr/local/sbin/hostq-helper
 EOF
 chmod 0440 /etc/sudoers.d/hostq-helper
-log "Installed hostQ privileged helper allowlist"
+log "Installed hostQ privileged helper allowlist and SSH updater"
 
 cd "$PANEL_DIR"
 npm ci
@@ -205,4 +206,6 @@ echo "Useful commands:"
 echo "  pm2 status"
 echo "  pm2 logs hostq"
 echo "  pm2 restart hostq"
+echo "  sudo hostq-update"
+echo "  sudo hostq-update v0.2.2"
 echo "  mysql_secure_installation"

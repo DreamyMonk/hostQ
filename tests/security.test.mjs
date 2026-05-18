@@ -21,6 +21,7 @@ assert.match(auth, /otpEnabled: false/, 'initial admin creation must not force 2
 const setup = readFileSync('setup.sh', 'utf8');
 assert.match(setup, /Initial hostQ admin login/, 'setup must print generated admin credentials over SSH');
 assert.match(setup, /admin\.json/, 'setup must create the admin account file');
+assert.match(setup, /hostq-update/, 'setup must install the SSH update command');
 
 const authz = readFileSync('src/lib/authz.ts', 'utf8');
 assert.match(authz, /canManageSite/, 'RBAC helper must enforce site permissions');
@@ -34,5 +35,9 @@ assert.match(helper, /panel\.update/, 'helper must expose a narrow panel update 
 const update = readFileSync('src/app/api/update/route.ts', 'utf8');
 assert.match(update, /confirm !== tag/, 'update API must require tag confirmation');
 assert.match(update, /runHelper\('panel.update'/, 'update API must use privileged helper');
+
+const sshUpdate = readFileSync('scripts/hostq-update.sh', 'utf8');
+assert.match(sshUpdate, /api\.github\.com\/repos\/\$\{REPO\}\/releases\/latest/, 'SSH updater must be able to resolve latest release');
+assert.match(sshUpdate, /panel\.update/, 'SSH updater must call the narrow helper update task');
 
 console.log('Security regression checks passed');
