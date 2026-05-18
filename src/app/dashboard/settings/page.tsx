@@ -1,10 +1,16 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { AlertTriangle, CheckCircle, Database, Eye, EyeOff, FolderOpen, Key, LockKeyhole, RefreshCw, Save, Server, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Database, DownloadCloud, Eye, EyeOff, FolderOpen, Key, LockKeyhole, RefreshCw, Save, Server, XCircle } from 'lucide-react';
 
 type AuditEntry = { ts: string; action: string; actor?: string; target?: string; status: string };
 type Session = { id: string; username: string; role: string; lastSeenAt: string; revokedAt?: string };
 type SecurityCheck = { id: string; label: string; detail: string; status: 'pass' | 'warn' | 'fail' };
+type UpdateInfo = {
+  current: string;
+  repo: string;
+  updateAvailable: boolean;
+  latest: null | { tag: string; name: string; notes: string; url: string; publishedAt: string; prerelease: boolean };
+};
 
 export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
@@ -12,6 +18,9 @@ export default function SettingsPage() {
   const [audit, setAudit] = useState<{ entries: AuditEntry[]; chainValid: boolean } | null>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [security, setSecurity] = useState<{ score: number; ready: boolean; checks: SecurityCheck[] } | null>(null);
+  const [update, setUpdate] = useState<UpdateInfo | null>(null);
+  const [updating, setUpdating] = useState(false);
+  const [updateOutput, setUpdateOutput] = useState('');
   const [settings, setSettings] = useState({
     panelUsername: 'admin',
     panelPassword: '',
@@ -26,14 +35,16 @@ export default function SettingsPage() {
   });
 
   const refreshSecurity = async () => {
-    const [auditResponse, sessionResponse, securityResponse] = await Promise.all([
+    const [auditResponse, sessionResponse, securityResponse, updateResponse] = await Promise.all([
       fetch('/api/audit'),
       fetch('/api/sessions'),
       fetch('/api/security'),
+      fetch('/api/update'),
     ]);
     if (auditResponse.ok) setAudit(await auditResponse.json());
     if (sessionResponse.ok) setSessions((await sessionResponse.json()).sessions || []);
     if (securityResponse.ok) setSecurity(await securityResponse.json());
+    if (updateResponse.ok) setUpdate(await updateResponse.json());
   };
 
   useEffect(() => {
@@ -54,6 +65,25 @@ export default function SettingsPage() {
       body: JSON.stringify({ sessionId }),
     });
     await refreshSecurity();
+  };
+
+  const runUpdate = async () => {
+    if (!update?.latest) return;
+    if (!confirm(`Update hostQ from ${update.current} to ${update.latest.tag}? A panel backup will be created first.`)) return;
+    setUpdating(true);
+    setUpdateOutput('Starting update...');
+    try {
+      const response = await fetch('/api/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tag: update.latest.tag, confirm: update.latest.tag }),
+      });
+      const data = await response.json();
+      setUpdateOutput(data.output || data.message || '');
+      if (!data.success) alert(data.error || data.message || 'Update failed');
+    } finally {
+      setUpdating(false);
+    }
   };
 
   const sections = [
@@ -156,6 +186,43 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      <div className="glass-card" style={{ marginBottom:20, overflow:'hidden' }}>
+        <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border-subtle)', display:'flex', alignItems:'center', gap:10, fontWeight:700 }}>
+          <DownloadCloud size={16} color="#2563eb" /> Updates
+          {update && <span className={`badge ${update.updateAvailable ? 'badge-yellow' : 'badge-green'}`} style={{ marginLeft:'auto' }}>{update.updateAvailable ? 'Update available' : 'Up to date'}</span>}
+        </div>
+        <div style={{ padding:20, display:'grid', gridTemplateColumns:'minmax(0, 1fr) auto', gap:16, alignItems:'start' }}>
+          <div>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:10, marginBottom:12 }}>
+              <div style={{ padding:10, border:'1px solid var(--border-subtle)', borderRadius:8, background:'var(--bg-base)' }}>
+                <div style={{ fontSize:11, color:'var(--text-muted)' }}>Installed</div>
+                <strong>{update?.current || 'Checking...'}</strong>
+              </div>
+              <div style={{ padding:10, border:'1px solid var(--border-subtle)', borderRadius:8, background:'var(--bg-base)' }}>
+                <div style={{ fontSize:11, color:'var(--text-muted)' }}>Latest Release</div>
+                <strong>{update?.latest?.tag || 'No release found'}</strong>
+              </div>
+              <div style={{ padding:10, border:'1px solid var(--border-subtle)', borderRadius:8, background:'var(--bg-base)' }}>
+                <div style={{ fontSize:11, color:'var(--text-muted)' }}>Repository</div>
+                <strong>{update?.repo || 'DreamyMonk/hostQ'}</strong>
+              </div>
+            </div>
+            {update?.latest?.notes && (
+              <div style={{ fontSize:12, color:'var(--text-secondary)', lineHeight:1.6, whiteSpace:'pre-wrap', maxHeight:120, overflow:'auto' }}>
+                {update.latest.notes}
+              </div>
+            )}
+            {updateOutput && <div className="terminal" style={{ marginTop:12 }}>{updateOutput.split('\n').map((line, index) => <div key={index}>{line || ' '}</div>)}</div>}
+          </div>
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            <button onClick={refreshSecurity} className="btn btn-ghost btn-sm"><RefreshCw size={14}/> Check</button>
+            <button onClick={runUpdate} className="btn btn-primary btn-sm" disabled={!update?.updateAvailable || updating}>
+              {updating ? <span className="spinner" /> : <DownloadCloud size={14}/>} Update
+            </button>
+          </div>
+        </div>
+      </div>
+
       {saved && <div className="alert alert-success">Settings saved. Restart hostQ to apply environment-backed changes.</div>}
 
       <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
@@ -200,6 +267,7 @@ export default function SettingsPage() {
             { label:'Restart', cmd:'pm2 restart hostq' },
             { label:'Logs', cmd:'pm2 logs hostq' },
             { label:'Helper enforcement', cmd:'HOSTQ_REQUIRE_HELPER=true' },
+            { label:'Create release', cmd:'gh release create v0.2.0 --generate-notes' },
           ].map(item => (
             <div key={item.label} style={{ display:'grid', gap:6 }}>
               <span style={{ fontSize:12, color:'var(--text-muted)' }}>{item.label}</span>

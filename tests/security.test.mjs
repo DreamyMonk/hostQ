@@ -24,5 +24,10 @@ assert.match(authz, /canManagePanel/, 'RBAC helper must enforce admin-only actio
 const helper = readFileSync('scripts/hostq-helper.mjs', 'utf8');
 assert.doesNotMatch(helper, /task === 'shell'/, 'helper must not expose a generic shell task');
 assert.match(helper, /Task is not allowed/, 'helper must deny unknown tasks');
+assert.match(helper, /panel\.update/, 'helper must expose a narrow panel update task');
+
+const update = readFileSync('src/app/api/update/route.ts', 'utf8');
+assert.match(update, /confirm !== tag/, 'update API must require tag confirmation');
+assert.match(update, /runHelper\('panel.update'/, 'update API must use privileged helper');
 
 console.log('Security regression checks passed');

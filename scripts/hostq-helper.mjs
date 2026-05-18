@@ -25,6 +25,12 @@ const INSTALLS = new Map([
   ['pureftpd', ['apt-get install -y pure-ftpd pure-ftpd-common']],
 ]);
 
+const UPDATE_REPO = 'DreamyMonk/hostQ';
+
+function validTag(tag) {
+  return /^v\d+\.\d+\.\d+([.-][A-Za-z0-9]+)?$/.test(String(tag || ''));
+}
+
 function runShell(command) {
   return new Promise((resolve) => {
     execFile('/bin/sh', ['-lc', command], { timeout: 180000, maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
@@ -59,6 +65,29 @@ async function main() {
     const server = String(payload.server || 'nginx');
     if (server === 'apache') result = await runShell('apache2ctl configtest && systemctl reload apache2');
     else result = await runShell('nginx -t && systemctl reload nginx');
+  } else if (task === 'panel.update') {
+    const tag = String(payload.tag || '');
+    if (!validTag(tag)) throw new Error('Release tag is not allowed');
+    const panelDir = '/opt/hostq';
+    const backup = `/var/backups/hostq/panel-${Date.now()}.tar.gz`;
+    const archive = `/tmp/hostq-${tag}.tar.gz`;
+    const unpack = `/tmp/hostq-${tag}`;
+    result = await runShell([
+      'set -e',
+      `mkdir -p /var/backups/hostq ${unpack}`,
+      `[ -d ${panelDir} ]`,
+      `tar -czf ${backup} -C ${panelDir} .`,
+      `curl -fsSL -o ${archive} https://codeload.github.com/${UPDATE_REPO}/tar.gz/refs/tags/${tag}`,
+      `tar -xzf ${archive} -C ${unpack} --strip-components=1`,
+      `rsync -a --delete --exclude .env.local --exclude node_modules --exclude .next ${unpack}/ ${panelDir}/`,
+      `cd ${panelDir}`,
+      'npm ci',
+      'npm run build',
+      'npm prune --omit=dev',
+      'pm2 restart hostq || systemctl restart hostq',
+      `rm -rf ${unpack} ${archive}`,
+      `echo "Updated hostQ to ${tag}. Backup: ${backup}"`,
+    ].join(' && '));
   } else {
     throw new Error('Task is not allowed');
   }

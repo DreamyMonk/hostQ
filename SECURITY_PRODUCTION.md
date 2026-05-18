@@ -64,3 +64,6 @@ HOSTQ_HELPER=/usr/local/sbin/hostq-helper
 - Rotate `JWT_SECRET` after a suspected compromise.
 - Keep Node.js LTS and supported PHP versions only.
 - Run `npm run lint`, `npm run build`, and `npm run security:test` before deploy.
+- Publish hostQ releases as GitHub tags like `v0.2.0`.
+- The panel updater downloads release tarballs from `DreamyMonk/hostQ`, creates `/var/backups/hostq/panel-*.tar.gz`, rebuilds, prunes dev dependencies, and restarts `hostq`.
+- Keep update actions inside `scripts/hostq-helper.mjs`; do not add a generic shell update endpoint.
