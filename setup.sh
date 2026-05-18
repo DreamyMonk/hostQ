@@ -99,7 +99,7 @@ fi
 
 if [[ ! -f "$PANEL_DIR/.env.local" ]]; then
   cp "$PANEL_DIR/.env.example" "$PANEL_DIR/.env.local"
-  warn "Created .env.local. hostQ will ask you to create the admin account on first open."
+  warn "Created .env.local"
 fi
 
 mkdir -p /etc/hostq
@@ -114,6 +114,30 @@ log "Installed hostQ privileged helper allowlist"
 
 cd "$PANEL_DIR"
 npm ci
+
+ADMIN_USER="admin"
+ADMIN_PASS="$(openssl rand -base64 24 | tr -d '/+=' | cut -c1-20)"
+if [[ ! -f /etc/hostq/admin.json ]]; then
+  HOSTQ_ADMIN_USER="$ADMIN_USER" HOSTQ_ADMIN_PASS="$ADMIN_PASS" node <<'NODE'
+const fs = require('fs');
+const bcrypt = require('bcryptjs');
+const username = process.env.HOSTQ_ADMIN_USER;
+const password = process.env.HOSTQ_ADMIN_PASS;
+fs.mkdirSync('/etc/hostq', { recursive: true, mode: 0o700 });
+fs.writeFileSync('/etc/hostq/admin.json', JSON.stringify({
+  username,
+  passwordHash: bcrypt.hashSync(password, 12),
+  role: 'admin',
+  otpEnabled: false,
+  createdAt: new Date().toISOString()
+}, null, 2), { mode: 0o600 });
+NODE
+  log "Generated hostQ admin credentials"
+else
+  ADMIN_PASS=""
+  warn "Existing /etc/hostq/admin.json found; admin credentials were not regenerated"
+fi
+
 export NODE_OPTIONS="--max-old-space-size=384"
 npm run build
 npm prune --omit=dev
@@ -165,7 +189,17 @@ header "Setup complete"
 SERVER_IP=$(curl -fsS ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')
 echo ""
 echo -e "${GREEN}hostQ is running at: http://${SERVER_IP}${NC}"
-echo "Open the URL and create the first admin account."
+if [[ -n "$ADMIN_PASS" ]]; then
+  echo ""
+  echo -e "${YELLOW}Initial hostQ admin login:${NC}"
+  echo "  Username: $ADMIN_USER"
+  echo "  Password: $ADMIN_PASS"
+  echo ""
+  echo "Save this password now. It is shown only once."
+  echo "After login, change the password and enable 2FA from Admin > Security."
+else
+  echo "Use the existing admin account in /etc/hostq/admin.json."
+fi
 echo ""
 echo "Useful commands:"
 echo "  pm2 status"

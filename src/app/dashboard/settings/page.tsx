@@ -21,6 +21,9 @@ export default function SettingsPage() {
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
   const [updating, setUpdating] = useState(false);
   const [updateOutput, setUpdateOutput] = useState('');
+  const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+  const [otpSetup, setOtpSetup] = useState<{ otpSecret: string; otpAuthUrl: string } | null>(null);
+  const [otpCode, setOtpCode] = useState('');
   const [settings, setSettings] = useState({
     panelUsername: 'admin',
     panelPassword: '',
@@ -83,6 +86,52 @@ export default function SettingsPage() {
       if (!data.success) alert(data.error || data.message || 'Update failed');
     } finally {
       setUpdating(false);
+    }
+  };
+
+  const changeAccountPassword = async () => {
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      alert('New password and confirm password do not match');
+      return;
+    }
+    const response = await fetch('/api/account', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'change_password', ...passwordForm }),
+    });
+    const data = await response.json();
+    if (data.success) {
+      alert(data.message);
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    } else {
+      alert(data.error || 'Password change failed');
+    }
+  };
+
+  const start2fa = async () => {
+    const response = await fetch('/api/account', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'start_2fa' }),
+    });
+    const data = await response.json();
+    if (data.success) setOtpSetup({ otpSecret: data.otpSecret, otpAuthUrl: data.otpAuthUrl });
+    else alert(data.error || 'Unable to start 2FA setup');
+  };
+
+  const enable2fa = async () => {
+    const response = await fetch('/api/account', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'enable_2fa', otp: otpCode }),
+    });
+    const data = await response.json();
+    if (data.success) {
+      alert('2FA enabled');
+      setOtpSetup(null);
+      setOtpCode('');
+    } else {
+      alert(data.error || 'Unable to enable 2FA');
     }
   };
 
@@ -182,6 +231,38 @@ export default function SettingsPage() {
               ))}
               {!audit?.entries?.length && <div style={{ color:'var(--text-muted)', fontSize:13 }}>No audit events yet.</div>}
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="glass-card" style={{ marginBottom:20, overflow:'hidden' }}>
+        <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border-subtle)', display:'flex', alignItems:'center', gap:10, fontWeight:700 }}>
+          <Key size={16} color="#3b82f6" /> Account Access
+        </div>
+        <div style={{ padding:20, display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(300px, 1fr))', gap:16 }}>
+          <div style={{ display:'grid', gap:10 }}>
+            <strong>Change password</strong>
+            <input className="input" type="password" placeholder="Current password" value={passwordForm.currentPassword} onChange={event => setPasswordForm({ ...passwordForm, currentPassword: event.target.value })} />
+            <input className="input" type="password" placeholder="New password" value={passwordForm.newPassword} onChange={event => setPasswordForm({ ...passwordForm, newPassword: event.target.value })} />
+            <input className="input" type="password" placeholder="Confirm new password" value={passwordForm.confirmPassword} onChange={event => setPasswordForm({ ...passwordForm, confirmPassword: event.target.value })} />
+            <button onClick={changeAccountPassword} className="btn btn-primary btn-sm" style={{ justifyContent:'center' }}>Change Password</button>
+          </div>
+          <div style={{ display:'grid', gap:10 }}>
+            <strong>Two-factor authentication</strong>
+            {!otpSetup ? (
+              <>
+                <div style={{ color:'var(--text-muted)', fontSize:13, lineHeight:1.6 }}>2FA is optional after SSH setup. Start setup, add the secret to your authenticator app, then verify a 6-digit code.</div>
+                <button onClick={start2fa} className="btn btn-ghost btn-sm" style={{ justifyContent:'center' }}>Start 2FA Setup</button>
+              </>
+            ) : (
+              <>
+                <div className="alert alert-warning" style={{ marginBottom:0 }}>
+                  Secret: <strong className="mono">{otpSetup.otpSecret}</strong>
+                </div>
+                <input className="input mono" inputMode="numeric" placeholder="6-digit code" value={otpCode} onChange={event => setOtpCode(event.target.value)} />
+                <button onClick={enable2fa} className="btn btn-primary btn-sm" style={{ justifyContent:'center' }}>Verify And Enable 2FA</button>
+              </>
+            )}
           </div>
         </div>
       </div>

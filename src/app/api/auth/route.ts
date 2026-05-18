@@ -108,9 +108,7 @@ export async function PUT(request: Request) {
     return NextResponse.json({
       success: true,
       requiresLogin: true,
-      message: 'Admin account created. Save the 2FA secret and sign in with a TOTP code.',
-      otpSecret: created.otpSecret,
-      otpAuthUrl: created.otpAuthUrl,
+      message: 'Admin account created. Sign in and enable 2FA from Security settings.',
     });
   } catch {
     return NextResponse.json({ error: 'Server error' }, { status: 500 });

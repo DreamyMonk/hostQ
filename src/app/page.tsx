@@ -10,7 +10,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [otp, setOtp] = useState('');
-  const [setupSecret, setSetupSecret] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -47,7 +46,6 @@ export default function LoginPage() {
         return;
       }
       if (response.ok && data.requiresLogin) {
-        setSetupSecret(data.otpSecret || '');
         setSetupRequired(false);
         setPassword('');
         setConfirmPassword('');
@@ -106,7 +104,7 @@ export default function LoginPage() {
 
         <div style={{ display: 'flex', gap: 10, color: '#667085', fontSize: 13 }}>
           <ShieldCheck size={16} color="#16a34a" />
-          First deploy asks you to create the admin account before the panel opens.
+          VPS setup prints the generated admin username and password in SSH.
         </div>
       </section>
 
@@ -120,16 +118,11 @@ export default function LoginPage() {
               {isSetup ? 'Create your admin account' : 'Sign in to hostQ'}
             </h2>
             <p style={{ color: '#667085', fontSize: 14, lineHeight: 1.6 }}>
-              {isSetup ? 'This account will be stored on the server with a hashed password.' : 'Use the admin account created during setup.'}
+              {isSetup ? 'Manual fallback setup. On VPS installs, setup.sh generates this account in SSH.' : 'Use the admin credentials printed at the end of setup.sh.'}
             </p>
           </div>
 
           {error && <div className="alert alert-error">{error}</div>}
-          {setupSecret && (
-            <div className="alert alert-warning">
-              Two-factor authentication is now enabled. Add this secret to your authenticator app, then sign in with the 6-digit code: <strong className="mono">{setupSecret}</strong>
-            </div>
-          )}
 
           <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <label style={{ display: 'grid', gap: 6 }}>
@@ -161,7 +154,7 @@ export default function LoginPage() {
             {!isSetup && (
               <label style={{ display: 'grid', gap: 6 }}>
                 <span style={{ fontSize: 13, color: '#344054', fontWeight: 650 }}>2FA code</span>
-                <input className="input mono" inputMode="numeric" pattern="[0-9]*" value={otp} onChange={event => setOtp(event.target.value)} placeholder="123456" autoComplete="one-time-code" required />
+                <input className="input mono" inputMode="numeric" pattern="[0-9]*" value={otp} onChange={event => setOtp(event.target.value)} placeholder="Only if enabled" autoComplete="one-time-code" />
               </label>
             )}
 

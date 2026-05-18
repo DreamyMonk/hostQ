@@ -115,6 +115,11 @@ function readAccount(): Account | null {
   }
 }
 
+function writeAccount(account: Account) {
+  fs.mkdirSync(dataDir(), { recursive: true, mode: 0o700 });
+  fs.writeFileSync(accountPath(), JSON.stringify(account, null, 2), { mode: 0o600 });
+}
+
 function readUsers(): Account[] {
   try {
     return JSON.parse(fs.readFileSync(usersPath(), 'utf8')) as Account[];
@@ -158,16 +163,11 @@ export function createAdminAccount(username: string, password: string): { succes
     username,
     passwordHash: bcrypt.hashSync(password, 12),
     role: 'admin',
-    otpSecret: base32Encode(crypto.randomBytes(20)),
-    otpEnabled: true,
+    otpEnabled: false,
     createdAt: new Date().toISOString(),
   };
-  fs.writeFileSync(accountPath(), JSON.stringify(account, null, 2), { mode: 0o600 });
-  return {
-    success: true,
-    otpSecret: account.otpSecret,
-    otpAuthUrl: `otpauth://totp/${encodeURIComponent(`hostQ:${username}`)}?secret=${account.otpSecret}&issuer=hostQ`,
-  };
+  writeAccount(account);
+  return { success: true };
 }
 
 export function findAccount(username: string): Account | null {
@@ -190,6 +190,41 @@ export function validateOtp(account: Account, token?: string): boolean {
   if (!account.otpEnabled || !account.otpSecret) return true;
   const clean = String(token || '').replace(/\s+/g, '');
   return clean.length === 6 && [0, -1, 1].some((offset) => totp(account.otpSecret || '', offset) === clean);
+}
+
+export function changePassword(username: string, currentPassword: string, newPassword: string): { success: boolean; error?: string } {
+  const account = findAccount(username);
+  if (!account || !bcrypt.compareSync(currentPassword, account.passwordHash)) return { success: false, error: 'Current password is incorrect' };
+  if (newPassword.length < 10) return { success: false, error: 'New password must be at least 10 characters' };
+  const updated = { ...account, passwordHash: bcrypt.hashSync(newPassword, 12) };
+  if (account.role === 'admin') writeAccount(updated);
+  else writeUsers(readUsers().map((user) => user.username === username ? updated : user));
+  revokeUserSessions(username);
+  return { success: true };
+}
+
+export function startOtpSetup(username: string): { success: boolean; error?: string; otpSecret?: string; otpAuthUrl?: string } {
+  const account = findAccount(username);
+  if (!account) return { success: false, error: 'Account not found' };
+  const otpSecret = base32Encode(crypto.randomBytes(20));
+  const updated = { ...account, otpSecret, otpEnabled: false };
+  if (account.role === 'admin') writeAccount(updated);
+  else writeUsers(readUsers().map((user) => user.username === username ? updated : user));
+  return {
+    success: true,
+    otpSecret,
+    otpAuthUrl: `otpauth://totp/${encodeURIComponent(`hostQ:${username}`)}?secret=${otpSecret}&issuer=hostQ`,
+  };
+}
+
+export function enableOtp(username: string, token: string): { success: boolean; error?: string } {
+  const account = findAccount(username);
+  if (!account?.otpSecret) return { success: false, error: 'Start 2FA setup first' };
+  if (!validateOtp({ ...account, otpEnabled: true }, token)) return { success: false, error: 'Invalid 2FA code' };
+  const updated = { ...account, otpEnabled: true };
+  if (account.role === 'admin') writeAccount(updated);
+  else writeUsers(readUsers().map((user) => user.username === username ? updated : user));
+  return { success: true };
 }
 
 export function createSiteAccount(username: string, password: string, sitePermissions: Account['sitePermissions']): Account {

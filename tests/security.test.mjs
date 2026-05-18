@@ -16,6 +16,11 @@ const auth = readFileSync('src/lib/auth.ts', 'utf8');
 assert.match(auth, /validateOtp/, 'auth must require TOTP validation');
 assert.match(auth, /revokeSession/, 'auth must support session revocation');
 assert.match(auth, /SESSION_IDLE_TIMEOUT/, 'auth must enforce idle timeout');
+assert.match(auth, /otpEnabled: false/, 'initial admin creation must not force 2FA before setup');
+
+const setup = readFileSync('setup.sh', 'utf8');
+assert.match(setup, /Initial hostQ admin login/, 'setup must print generated admin credentials over SSH');
+assert.match(setup, /admin\.json/, 'setup must create the admin account file');
 
 const authz = readFileSync('src/lib/authz.ts', 'utf8');
 assert.match(authz, /canManageSite/, 'RBAC helper must enforce site permissions');

@@ -17,7 +17,8 @@ hostQ should run behind HTTPS only. Use a real DNS name, install a certificate w
 
 ## Accounts And Sessions
 
-- First-run admin setup enables TOTP. Store the secret in an authenticator app before signing in.
+- `setup.sh` generates the first admin username/password over SSH and writes `/etc/hostq/admin.json`.
+- TOTP is optional on first login. Enable it from Admin -> Security after changing the generated password.
 - User accounts are per-site and enforced by API RBAC.
 - Admin sessions can be viewed and revoked through `/api/sessions`.
 - Idle sessions expire using `SESSION_IDLE_TIMEOUT_MINUTES`.
