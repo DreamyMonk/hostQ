@@ -11,6 +11,7 @@ hostQ should run behind HTTPS only. Use a real DNS name, install a certificate w
 ## Network
 
 - Allow only `22/tcp`, `80/tcp`, `443/tcp`, and FTP ports you intentionally use.
+- `setup.sh` also opens `PANEL_PUBLIC_PORT` for direct setup access. The default is `8090`; close it or firewall it to trusted IPs after HTTPS/domain access is working.
 - Bind the Next.js app to `127.0.0.1`.
 - Put Nginx in front with `X-Forwarded-Proto` preserved.
 - Enable HSTS after HTTPS works.

@@ -88,6 +88,7 @@ log "Certbot, WP-CLI, Pure-FTPd, phpMyAdmin, and PM2 installed"
 
 header "Setting up hostQ"
 PANEL_DIR="/opt/hostq"
+PANEL_PUBLIC_PORT="${PANEL_PUBLIC_PORT:-8090}"
 mkdir -p "$PANEL_DIR"
 
 if [[ -f "./package.json" ]]; then
@@ -153,6 +154,7 @@ header "Configuring Nginx reverse proxy"
 cat > /etc/nginx/sites-available/hostq <<'EOF'
 server {
     listen 80;
+    listen __PANEL_PUBLIC_PORT__;
     server_name _;
 
     client_max_body_size 64M;
@@ -171,6 +173,7 @@ server {
     }
 }
 EOF
+sed -i "s/__PANEL_PUBLIC_PORT__/${PANEL_PUBLIC_PORT}/g" /etc/nginx/sites-available/hostq
 
 ln -sf /etc/nginx/sites-available/hostq /etc/nginx/sites-enabled/
 rm -f /etc/nginx/sites-enabled/default
@@ -183,6 +186,7 @@ ufw allow 22/tcp comment SSH >/dev/null 2>&1 || true
 ufw allow 21/tcp comment FTP >/dev/null 2>&1 || true
 ufw allow 80/tcp comment HTTP >/dev/null 2>&1 || true
 ufw allow 443/tcp comment HTTPS >/dev/null 2>&1 || true
+ufw allow ${PANEL_PUBLIC_PORT}/tcp comment hostQ >/dev/null 2>&1 || true
 ufw --force enable >/dev/null 2>&1 || true
 log "Firewall configured"
 
@@ -190,6 +194,7 @@ header "Setup complete"
 SERVER_IP=$(curl -fsS ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')
 echo ""
 echo -e "${GREEN}hostQ is running at: http://${SERVER_IP}${NC}"
+echo -e "${GREEN}Direct setup URL: http://${SERVER_IP}:${PANEL_PUBLIC_PORT}${NC}"
 if [[ -n "$ADMIN_PASS" ]]; then
   echo ""
   echo -e "${YELLOW}Initial hostQ admin login:${NC}"

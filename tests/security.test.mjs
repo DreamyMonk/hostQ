@@ -22,6 +22,10 @@ const setup = readFileSync('setup.sh', 'utf8');
 assert.match(setup, /Initial hostQ admin login/, 'setup must print generated admin credentials over SSH');
 assert.match(setup, /admin\.json/, 'setup must create the admin account file');
 assert.match(setup, /hostq-update/, 'setup must install the SSH update command');
+assert.match(setup, /PANEL_PUBLIC_PORT="\$\{PANEL_PUBLIC_PORT:-8090\}"/, 'setup must default the direct panel port to 8090');
+assert.match(setup, /listen __PANEL_PUBLIC_PORT__;/, 'nginx config must include the direct panel setup port');
+assert.match(setup, /ufw allow \$\{PANEL_PUBLIC_PORT\}\/tcp/, 'firewall must open the direct panel setup port');
+assert.match(setup, /<<'EOF'/, 'nginx heredoc must not expand proxy header variables');
 
 const authz = readFileSync('src/lib/authz.ts', 'utf8');
 assert.match(authz, /canManageSite/, 'RBAC helper must enforce site permissions');

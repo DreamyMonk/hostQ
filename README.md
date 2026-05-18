@@ -81,6 +81,15 @@ After login:
 3. Start and verify 2FA if you want TOTP enabled.
 4. Fix all red/yellow production readiness checks before exposing the panel publicly.
 
+By default Nginx exposes the panel on:
+
+```text
+http://SERVER_IP
+http://SERVER_IP:8090
+```
+
+Use a domain and HTTPS for production. Port `8090` is intended as a direct setup/admin access port.
+
 ## Updating
 
 From the panel:
@@ -147,6 +156,7 @@ PHPMYADMIN_URL=http://localhost/phpmyadmin
 FILE_MANAGER_ROOT=/var/www
 WEB_ROOT=/var/www
 PANEL_URL=https://panel.yourdomain.com
+PANEL_PUBLIC_PORT=8090
 NODE_OPTIONS=--max-old-space-size=384
 ```
 
