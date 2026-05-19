@@ -1,6 +1,6 @@
 # hostQ
 
-hostQ is a lightweight Go hosting control panel for small VPS servers. It runs as one `hostq-panel` systemd service behind Nginx.
+hostQ is a lightweight hosting control panel for small VPS servers. It runs as one `hostq-panel` systemd service behind Nginx.
 
 ## Supported OS
 
@@ -18,16 +18,16 @@ Minimum VPS:
 
 | Area | Features |
 |---|---|
-| Runtime | Single Go HTTP server, systemd service, Nginx reverse proxy |
+| Runtime | Single native HTTP server, systemd service, Nginx reverse proxy |
 | Auth | SSH-generated admin credentials, bcrypt password hash, signed HTTP-only sessions |
-| Sites | Add PHP sites, Nginx vhosts, enable/disable, soft-delete, backups, FastCGI cache toggle |
-| WordPress | WP-CLI install and discovery |
-| Files | File manager locked to `/var/www`, create folder/file, chmod, soft-delete, secret blocking |
-| Databases | MariaDB/MySQL inventory, create generated user/password, delete |
+| Sites | Add a site, then open one site manager for files, database, SSL, WordPress, PHP, FTP, cache, backups, and delete |
+| WordPress | WP-CLI install and discovery inside each site manager |
+| Files | Per-site file manager under `/var/www/<domain>/htdocs`, create folder/file, chmod, move/copy flow, soft-delete, secret blocking |
+| Databases | Per-site MariaDB/MySQL database and generated user/password |
 | PHP | PHP-FPM 8.2, 8.3, 8.4, 8.5 service status and per-site switch |
 | SSL | Let's Encrypt install/renew/delete and stale Nginx SSL repair |
 | Services | Narrow allowlist for Nginx, MariaDB, Redis, PHP-FPM, Pure-FTPd |
-| Updates | SSH updater that downloads a GitHub tag, backs up, rebuilds Go, restarts systemd |
+| Updates | SSH updater that downloads a GitHub tag, backs up, rebuilds the panel, restarts systemd |
 
 ## VPS Deployment
 
@@ -36,12 +36,12 @@ Run as root on a fresh Ubuntu/Debian VPS:
 ```bash
 git clone https://github.com/DreamyMonk/hostQ.git /opt/hostq
 cd /opt/hostq
-bash setup.sh
+bash install.sh
 ```
 
-The setup script installs:
+The installer installs:
 
-- Go
+- Native build toolchain
 - Nginx
 - MariaDB
 - PHP-FPM 8.2, 8.3, 8.4, 8.5 where available
@@ -52,7 +52,7 @@ The setup script installs:
 - `hostq-panel.service`
 - `hostq-update`
 
-At the end of setup, SSH prints the first admin login:
+At the end of install, SSH prints the first admin login:
 
 ```text
 Initial hostQ admin login:
@@ -75,7 +75,7 @@ Use a real domain and HTTPS for production. Port `8090` is intended as direct se
 
 ```bash
 sudo hostq-update
-sudo hostq-update v0.3.0
+sudo hostq-update v0.3.1
 ```
 
 Updates create a backup first:
@@ -84,11 +84,11 @@ Updates create a backup first:
 /var/backups/hostq/panel-*.tar.gz
 ```
 
-## Manual Go Reinstall
+## Manual Reinstall
 
 ```bash
 cd /opt/hostq
-sudo bash scripts/install-go-panel.sh
+sudo bash install.sh
 sudo systemctl restart nginx hostq-panel
 ```
 
@@ -113,12 +113,12 @@ proxy_pass http://127.0.0.1:8091;
 ## Local Development
 
 ```bash
-go run ./cmd/hostq-panel
+go run .
 ```
 
 Validation:
 
 ```bash
-go test ./cmd/hostq-panel
-go build ./cmd/hostq-panel
+go test ./...
+go build .
 ```

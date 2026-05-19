@@ -108,19 +108,20 @@
     mode: "0600"
   loop:
     - { key: "WEB_ROOT", value: "{{ hostq_web_root }}" }
-    - { key: "HOSTQ_GO_ADDR", value: "127.0.0.1:8091" }
+    - { key: "HOSTQ_ADDR", value: "127.0.0.1:8091" }
     - { key: "PANEL_PUBLIC_PORT", value: "{{ hostq_panel_public_port }}" }
     - { key: "PANEL_DOMAIN", value: "{{ hostq_panel_domain }}" }
     - { key: "HOSTQ_ALLOW_INSECURE_HTTP", value: "{{ hostq_allow_insecure_http | ternary('true', 'false') }}" }
   no_log: false
   tags: [install, config]
 
-- name: Run hostQ setup
-  ansible.builtin.command: bash setup.sh
+- name: Run hostQ installer
+  ansible.builtin.command: bash install.sh
   args:
     chdir: "{{ hostq_dir }}"
   environment:
     PANEL_PUBLIC_PORT: "{{ hostq_panel_public_port }}"
+    HOSTQ_ASSUME_YES: "true"
   register: hostq_setup
   changed_when: "'Setup complete' in hostq_setup.stdout"
   tags: [install]

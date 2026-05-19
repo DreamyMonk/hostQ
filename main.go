@@ -97,11 +97,11 @@ var phpVersionRe = regexp.MustCompile(`^(8\.2|8\.3|8\.4|8\.5)$`)
 func main() {
 	app := &App{
 		cfg: Config{
-			Addr:          env("HOSTQ_GO_ADDR", "127.0.0.1:8091"),
+			Addr:          env("HOSTQ_ADDR", "127.0.0.1:8091"),
 			DataDir:       env("HOSTQ_DATA_DIR", "/etc/hostq"),
 			WebRoot:       env("WEB_ROOT", "/var/www"),
 			NginxSitesDir: env("HOSTQ_NGINX_AVAILABLE", "/etc/nginx/sites-available"),
-			JWTSecret:     env("JWT_SECRET", "change_this_hostq_go_secret"),
+			JWTSecret:     env("JWT_SECRET", "change_this_hostq_secret"),
 		},
 	}
 	if len(os.Args) > 1 && os.Args[1] == "init-admin" {
@@ -119,6 +119,7 @@ func main() {
 	mux.HandleFunc("/login", app.login)
 	mux.HandleFunc("/logout", app.logout)
 	mux.HandleFunc("/sites", app.requireAuth(app.sites))
+	mux.HandleFunc("/site", app.requireAuth(app.siteManager))
 	mux.HandleFunc("/site-action", app.requireAuth(app.siteAction))
 	mux.HandleFunc("/files", app.requireAuth(app.files))
 	mux.HandleFunc("/databases", app.requireAuth(app.databases))
@@ -128,7 +129,7 @@ func main() {
 	mux.HandleFunc("/services", app.requireAuth(app.services))
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("ok")) })
 
-	log.Printf("hostQ Go panel listening on http://%s", app.cfg.Addr)
+	log.Printf("hostQ panel listening on http://%s", app.cfg.Addr)
 	log.Fatal(http.ListenAndServe(app.cfg.Addr, securityHeaders(mux)))
 }
 
@@ -214,7 +215,7 @@ func (a *App) sign(value string) string {
 func (a *App) sessionCookie(username string) *http.Cookie {
 	payload := fmt.Sprintf("%s:%d:%s", username, time.Now().Add(24*time.Hour).Unix(), randomToken())
 	return &http.Cookie{
-		Name:     "hostq_go_session",
+		Name:     "hostq_session",
 		Value:    base64.RawURLEncoding.EncodeToString([]byte(payload)) + "." + a.sign(payload),
 		Path:     "/",
 		HttpOnly: true,
@@ -224,7 +225,7 @@ func (a *App) sessionCookie(username string) *http.Cookie {
 }
 
 func (a *App) verifySession(r *http.Request) bool {
-	cookie, err := r.Cookie("hostq_go_session")
+	cookie, err := r.Cookie("hostq_session")
 	if err != nil {
 		return false
 	}
@@ -265,7 +266,7 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 	}
 	account, err := a.readAccount()
 	if err != nil {
-		a.render(w, "login", map[string]any{"Title": "Sign in", "Error": "Admin account is not initialized. Run setup.sh first."})
+		a.render(w, "login", map[string]any{"Title": "Sign in", "Error": "Admin account is not initialized. Run install.sh first."})
 		return
 	}
 	username := r.FormValue("username")
@@ -281,7 +282,7 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) logout(w http.ResponseWriter, r *http.Request) {
-	http.SetCookie(w, &http.Cookie{Name: "hostq_go_session", Value: "", Path: "/", MaxAge: -1})
+	http.SetCookie(w, &http.Cookie{Name: "hostq_session", Value: "", Path: "/", MaxAge: -1})
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 
@@ -302,7 +303,7 @@ func (a *App) sites(w http.ResponseWriter, r *http.Request) {
 		_ = os.MkdirAll(root, 0755)
 		index := filepath.Join(root, "index.html")
 		if _, err := os.Stat(index); err != nil {
-			_ = os.WriteFile(index, []byte("<h1>"+template.HTMLEscapeString(domain)+"</h1><p>Managed by hostQ Go</p>"), 0644)
+			_ = os.WriteFile(index, []byte("<h1>"+template.HTMLEscapeString(domain)+"</h1><p>Managed by hostQ</p>"), 0644)
 		}
 		a.writeNginxSite(domain, root, false, "8.4")
 		a.audit("site.create", "success", domain)
@@ -310,6 +311,19 @@ func (a *App) sites(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.render(w, "sites", map[string]any{"Title": "Sites", "Sites": a.listSites()})
+}
+
+func (a *App) siteManager(w http.ResponseWriter, r *http.Request) {
+	domain := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("domain")))
+	site, ok := a.findSite(domain)
+	if !ok {
+		http.Redirect(w, r, "/sites", http.StatusSeeOther)
+		return
+	}
+	a.render(w, "site", map[string]any{
+		"Title": "Manage " + site.Domain,
+		"Site":  site,
+	})
 }
 
 func (a *App) files(w http.ResponseWriter, r *http.Request) {
@@ -418,6 +432,21 @@ func (a *App) fileAction(w http.ResponseWriter, r *http.Request) {
 			_ = os.Chmod(chmodPath, os.FileMode(parsed))
 			a.audit("file.chmod", "success", chmodPath)
 		}
+	case "move", "copy":
+		from := a.safeWebPath(r.FormValue("target"))
+		to := a.safeWebPath(r.FormValue("dest"))
+		if !a.canMutateWebPath(from) || !a.canMutateWebPath(to) || blockedFileName(filepath.Base(to)) {
+			break
+		}
+		_ = os.MkdirAll(filepath.Dir(to), 0755)
+		if action == "move" {
+			_ = os.Rename(from, to)
+			a.audit("file.move", "success", from+" -> "+to)
+			break
+		}
+		if info, err := os.Stat(from); err == nil && !info.IsDir() && copyFile(from, to) == nil {
+			a.audit("file.copy", "success", from+" -> "+to)
+		}
 	}
 	http.Redirect(w, r, "/files?path="+basePath, http.StatusSeeOther)
 }
@@ -433,6 +462,7 @@ func (a *App) databases(w http.ResponseWriter, r *http.Request) {
 		"Created":   r.URL.Query().Get("created"),
 		"User":      r.URL.Query().Get("user"),
 		"Password":  r.URL.Query().Get("password"),
+		"Site":      strings.TrimSpace(r.URL.Query().Get("site")),
 	})
 }
 
@@ -521,6 +551,7 @@ func (a *App) wordpress(w http.ResponseWriter, r *http.Request) {
 		"Title":    "WordPress",
 		"Installs": a.listWordPress(),
 		"Output":   r.URL.Query().Get("output"),
+		"Site":     strings.TrimSpace(r.URL.Query().Get("site")),
 	})
 }
 
@@ -649,6 +680,7 @@ func (a *App) ssl(w http.ResponseWriter, r *http.Request) {
 		"Sites":        a.listSites(),
 		"Created":      r.URL.Query().Get("created"),
 		"Output":       r.URL.Query().Get("output"),
+		"Site":         strings.TrimSpace(r.URL.Query().Get("site")),
 	})
 }
 
@@ -1020,7 +1052,7 @@ server {
 
 func (a *App) audit(action, status, target string) {
 	_ = os.MkdirAll(a.cfg.DataDir, 0700)
-	file := filepath.Join(a.cfg.DataDir, "audit-go.log")
+	file := filepath.Join(a.cfg.DataDir, "audit.log")
 	line, _ := json.Marshal(map[string]string{"ts": time.Now().Format(time.RFC3339), "action": action, "status": status, "target": target})
 	f, err := os.OpenFile(file, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 	if err == nil {
@@ -1039,18 +1071,19 @@ func (a *App) render(w http.ResponseWriter, view string, data map[string]any) {
 const layoutTemplate = `
 {{define "layout"}}
 <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>hostQ Go - {{.Title}}</title>
+<title>hostQ - {{.Title}}</title>
 <style>
 body{margin:0;font-family:Inter,system-ui,Segoe UI,sans-serif;background:#f4f7fb;color:#101828}a{color:inherit;text-decoration:none}.shell{display:grid;grid-template-columns:248px 1fr;min-height:100vh}.side{background:#fff;border-right:1px solid #e5e7eb;padding:20px 14px;position:sticky;top:0;height:100vh;box-sizing:border-box}.brand{font-size:22px;font-weight:900;margin:0 8px 24px;display:flex;gap:10px;align-items:center}.mark{width:36px;height:36px;border-radius:9px;background:#2563eb;color:#fff;display:grid;place-items:center}.nav a{display:block;padding:10px 12px;border-radius:8px;margin-bottom:4px;color:#475467;font-weight:650;font-size:14px}.nav a:hover{background:#eef4ff;color:#2563eb}.main{padding:0}.bar{height:64px;background:#fff;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;padding:0 28px}.content{padding:26px 28px}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}.card{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:14px;box-shadow:0 1px 2px rgba(16,24,40,.04)}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}.btn{border:1px solid #cbd5e1;border-radius:7px;background:#fff;padding:8px 11px;font-weight:800;cursor:pointer}.primary{background:#2563eb;color:#fff;border-color:#2563eb}.danger{color:#dc2626}.input{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:7px;padding:10px;background:#fff}.muted{color:#667085;font-size:13px}.badge{display:inline-block;border:1px solid #cbd5e1;border-radius:999px;padding:3px 8px;font-size:12px;background:#fff}.ok{color:#15803d}.bad{color:#dc2626}.actions{display:flex;gap:6px;flex-wrap:wrap}.inline{display:inline-flex;gap:6px;align-items:center}.mini{padding:6px 8px;font-size:12px}.mono{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden}td,th{border-bottom:1px solid #e5e7eb;padding:11px;text-align:left;font-size:13px}th{font-size:12px;text-transform:uppercase;color:#667085;background:#f8fafc}.login{max-width:380px;margin:12vh auto}
-</style></head><body>{{if eq .View "login"}}{{template "login" .}}{{else}}<div class="shell"><aside class="side"><div class="brand"><span class="mark">Q</span><span>hostQ</span></div><nav class="nav"><a href="/">Dashboard</a><a href="/sites">Sites</a><a href="/wordpress">WordPress</a><a href="/files">Files</a><a href="/databases">Databases</a><a href="/php">PHP</a><a href="/ssl">SSL</a><a href="/services">Services</a><a href="/logout">Logout</a></nav></aside><main class="main"><div class="bar"><strong>{{.Title}}</strong><span class="badge">Go single server</span></div><div class="content">{{if eq .View "dashboard"}}{{template "dashboard" .}}{{else if eq .View "sites"}}{{template "sites" .}}{{else if eq .View "wordpress"}}{{template "wordpress" .}}{{else if eq .View "files"}}{{template "files" .}}{{else if eq .View "databases"}}{{template "databases" .}}{{else if eq .View "php"}}{{template "php" .}}{{else if eq .View "ssl"}}{{template "ssl" .}}{{else if eq .View "services"}}{{template "services" .}}{{end}}</div></main></div>{{end}}</body></html>
+</style></head><body>{{if eq .View "login"}}{{template "login" .}}{{else}}<div class="shell"><aside class="side"><div class="brand"><span class="mark">Q</span><span>hostQ</span></div><nav class="nav"><a href="/">Dashboard</a><a href="/sites">Sites</a><a href="/services">Server</a><a href="/logout">Logout</a></nav></aside><main class="main"><div class="bar"><strong>{{.Title}}</strong><span class="badge">Single server</span></div><div class="content">{{if eq .View "dashboard"}}{{template "dashboard" .}}{{else if eq .View "sites"}}{{template "sites" .}}{{else if eq .View "site"}}{{template "site" .}}{{else if eq .View "wordpress"}}{{template "wordpress" .}}{{else if eq .View "files"}}{{template "files" .}}{{else if eq .View "databases"}}{{template "databases" .}}{{else if eq .View "php"}}{{template "php" .}}{{else if eq .View "ssl"}}{{template "ssl" .}}{{else if eq .View "services"}}{{template "services" .}}{{end}}</div></main></div>{{end}}</body></html>
 {{end}}
-{{define "login"}}<div class="login card"><h1>hostQ</h1><p class="muted">Go hosting control panel</p>{{if .Error}}<div class="card bad">{{.Error}}</div>{{end}}<form method="post"><p><input class="input" name="username" placeholder="Username" autocomplete="username"></p><p><input class="input" name="password" type="password" placeholder="Password" autocomplete="current-password"></p><button class="btn primary" type="submit">Sign in</button></form></div>{{end}}
-{{define "dashboard"}}<div class="top"><div><h1>Dashboard</h1><p class="muted">Single Go server runtime for low-memory VPS deployments</p></div><span class="badge">{{now.Format "Jan 02 15:04"}}</span></div><div class="grid"><div class="card"><h2>{{len .Sites}}</h2><p class="muted">Sites</p></div><div class="card"><h2>{{len .Services}}</h2><p class="muted">Services tracked</p></div></div>{{end}}
-{{define "sites"}}<div class="top"><h1>Sites</h1></div>{{if .Error}}<div class="card bad">{{.Error}}</div>{{end}}<div class="card"><form method="post"><div class="grid"><input class="input" name="domain" placeholder="example.com"><button class="btn primary">Add PHP Site</button></div><p class="muted">Each site uses /var/www/domain/htdocs so website files stay separate from logs, backups, and private data.</p></form></div><table><tr><th>Domain</th><th>Root</th><th>PHP</th><th>Status</th><th>Cache</th><th>Actions</th></tr>{{range .Sites}}<tr><td>{{.Domain}}</td><td class="muted mono">{{.Root}}</td><td>{{.PHPVersion}}</td><td>{{if .Enabled}}<span class="ok">enabled</span>{{else}}<span class="bad">disabled</span>{{end}}</td><td>{{if .Cache}}on{{else}}off{{end}}</td><td><div class="actions"><form method="post" action="/site-action"><input type="hidden" name="domain" value="{{.Domain}}">{{if .Enabled}}<button class="btn mini" name="action" value="disable">Disable</button>{{else}}<button class="btn mini" name="action" value="enable">Enable</button>{{end}}</form><form method="post" action="/site-action"><input type="hidden" name="domain" value="{{.Domain}}">{{if .Cache}}<button class="btn mini" name="action" value="cache-off">Cache off</button>{{else}}<button class="btn mini" name="action" value="cache-on">Cache on</button>{{end}}</form><form method="post" action="/site-action"><input type="hidden" name="domain" value="{{.Domain}}"><button class="btn mini" name="action" value="permissions">Fix permissions</button></form><form method="post" action="/site-action"><input type="hidden" name="domain" value="{{.Domain}}"><button class="btn mini" name="action" value="backup">Backup</button></form><form method="post" action="/site-action"><input type="hidden" name="domain" value="{{.Domain}}"><button class="btn mini danger" name="action" value="delete">Soft delete</button></form></div></td></tr>{{end}}</table>{{end}}
-{{define "wordpress"}}<div class="top"><h1>WordPress</h1><span class="badge">WP-CLI</span></div>{{if .Output}}<pre class="card mono" style="white-space:pre-wrap">{{.Output}}</pre>{{end}}<div class="card"><form method="post" class="grid"><input class="input" name="domain" placeholder="example.com"><input class="input" name="title" placeholder="Site title"><input class="input" name="admin_user" placeholder="admin username"><input class="input" name="admin_pass" placeholder="admin password"><input class="input" name="admin_email" placeholder="admin@example.com"><button class="btn primary">Install WordPress</button></form></div><table><tr><th>Domain</th><th>Path</th><th>Status</th></tr>{{range .Installs}}<tr><td>{{.Domain}}</td><td class="mono muted">{{.Path}}</td><td>{{.Status}}</td></tr>{{else}}<tr><td colspan="3" class="muted">No WordPress installs found.</td></tr>{{end}}</table>{{end}}
-{{define "files"}}<div class="top"><h1>Files</h1><span class="badge mono">{{.Path}}</span></div><div class="card"><form class="grid" method="post"><input type="hidden" name="path" value="{{.Path}}"><input class="input" name="name" placeholder="folder-or-file-name"><div class="actions"><button class="btn primary" name="action" value="mkdir">New folder</button><button class="btn" name="action" value="touch">New file</button></div></form><p class="muted">Secret files such as .env, private keys, and certificate bundles are hidden and blocked by default.</p></div><table><tr><th>Name</th><th>Type</th><th>Actions</th></tr>{{range .Items}}<tr><td>{{if eq .Kind "dir"}}<a href="/files?path={{.Path}}">{{.Name}}</a>{{else}}{{.Name}}{{end}}</td><td>{{.Kind}}</td><td><div class="actions"><form method="post"><input type="hidden" name="path" value="{{$.Path}}"><input type="hidden" name="target" value="{{.Path}}"><input class="input mini mono" name="mode" placeholder="755" style="width:80px"><button class="btn mini" name="action" value="chmod">Chmod</button></form><form method="post"><input type="hidden" name="path" value="{{$.Path}}"><input type="hidden" name="target" value="{{.Path}}"><button class="btn mini danger" name="action" value="delete">Soft delete</button></form></div></td></tr>{{end}}</table>{{end}}
-{{define "databases"}}<div class="top"><h1>Databases</h1><span class="badge">MariaDB/MySQL</span></div>{{if .Created}}<div class="card ok"><b>Database created:</b> <span class="mono">{{.Created}}</span><br><b>User:</b> <span class="mono">{{.User}}</span><br><b>Password:</b> <span class="mono">{{.Password}}</span><p class="muted">Save this password now. It is shown only once.</p></div>{{end}}<div class="card"><form method="post" class="grid"><input class="input" name="name" placeholder="project_name"><button class="btn primary" name="action" value="create">Create database</button></form></div><table><tr><th>Database</th><th>Actions</th></tr>{{range .Databases}}<tr><td class="mono">{{.Name}}</td><td><form method="post"><input type="hidden" name="target" value="{{.Name}}"><button class="btn mini danger" name="action" value="delete">Delete database</button></form></td></tr>{{else}}<tr><td class="muted" colspan="2">No user databases found, or mysql CLI is not available to the panel user.</td></tr>{{end}}</table>{{end}}
+{{define "login"}}<div class="login card"><h1>hostQ</h1><p class="muted">Manage sites without babysitting the server.</p>{{if .Error}}<div class="card bad">{{.Error}}</div>{{end}}<form method="post"><p><input class="input" name="username" placeholder="Username" autocomplete="username"></p><p><input class="input" name="password" type="password" placeholder="Password" autocomplete="current-password"></p><button class="btn primary" type="submit">Sign in</button></form></div>{{end}}
+{{define "dashboard"}}<div class="top"><div><h1>Dashboard</h1><p class="muted">Manage sites without babysitting the server.</p></div><span class="badge">{{now.Format "Jan 02 15:04"}}</span></div><div class="grid"><div class="card"><h2>{{len .Sites}}</h2><p class="muted">Sites</p></div><div class="card"><h2>{{len .Services}}</h2><p class="muted">Services tracked</p></div></div>{{end}}
+{{define "sites"}}<div class="top"><h1>Sites</h1></div>{{if .Error}}<div class="card bad">{{.Error}}</div>{{end}}<div class="card"><form method="post"><div class="grid"><input class="input" name="domain" placeholder="example.com"><button class="btn primary">Add Site</button></div><p class="muted">Add a site, then open its management panel for files, database, SSL, WordPress, PHP, cache, FTP and backups.</p></form></div><table><tr><th>Domain</th><th>Root</th><th>PHP</th><th>Status</th><th>Action</th></tr>{{range .Sites}}<tr><td>{{.Domain}}</td><td class="muted mono">{{.Root}}</td><td>{{.PHPVersion}}</td><td>{{if .Enabled}}<span class="ok">enabled</span>{{else}}<span class="bad">disabled</span>{{end}}</td><td><a class="btn mini primary" href="/site?domain={{.Domain}}">Open Manager</a></td></tr>{{end}}</table>{{end}}
+{{define "site"}}<div class="top"><div><h1>{{.Site.Domain}}</h1><p class="muted mono">{{.Site.Root}}</p></div><a class="btn" href="/sites">Back</a></div><div class="grid"><a class="card" href="/files?path=/{{.Site.Domain}}/htdocs"><h2>Files</h2><p class="muted">Browse htdocs, create, move, copy, chmod and soft-delete files.</p></a><a class="card" href="/databases?site={{.Site.Domain}}"><h2>Database</h2><p class="muted">Create or manage the site database.</p></a><a class="card" href="/ssl?site={{.Site.Domain}}"><h2>SSL</h2><p class="muted">Install, renew or repair certificates.</p></a><a class="card" href="/wordpress?site={{.Site.Domain}}"><h2>WordPress</h2><p class="muted">Install or discover WordPress for this site.</p></a><a class="card" href="/php"><h2>PHP</h2><p class="muted">Current PHP {{.Site.PHPVersion}}.</p></a><div class="card"><h2>FTP</h2><p class="muted">Pure-FTPd service is managed from Server.</p></div></div><div class="card"><div class="actions"><form method="post" action="/site-action"><input type="hidden" name="domain" value="{{.Site.Domain}}">{{if .Site.Enabled}}<button class="btn" name="action" value="disable">Disable</button>{{else}}<button class="btn" name="action" value="enable">Enable</button>{{end}}</form><form method="post" action="/site-action"><input type="hidden" name="domain" value="{{.Site.Domain}}">{{if .Site.Cache}}<button class="btn" name="action" value="cache-off">Cache off</button>{{else}}<button class="btn" name="action" value="cache-on">Cache on</button>{{end}}</form><form method="post" action="/site-action"><input type="hidden" name="domain" value="{{.Site.Domain}}"><button class="btn" name="action" value="permissions">Fix permissions</button></form><form method="post" action="/site-action"><input type="hidden" name="domain" value="{{.Site.Domain}}"><button class="btn" name="action" value="backup">Backup</button></form><form method="post" action="/site-action"><input type="hidden" name="domain" value="{{.Site.Domain}}"><button class="btn danger" name="action" value="delete">Soft delete</button></form></div></div>{{end}}
+{{define "wordpress"}}<div class="top"><h1>WordPress</h1><span class="badge">WP-CLI</span></div>{{if .Output}}<pre class="card mono" style="white-space:pre-wrap">{{.Output}}</pre>{{end}}<div class="card"><form method="post" class="grid"><input class="input" name="domain" placeholder="example.com" value="{{.Site}}"><input class="input" name="title" placeholder="Site title"><input class="input" name="admin_user" placeholder="admin username"><input class="input" name="admin_pass" placeholder="admin password"><input class="input" name="admin_email" placeholder="admin@example.com"><button class="btn primary">Install WordPress</button></form></div><table><tr><th>Domain</th><th>Path</th><th>Status</th></tr>{{range .Installs}}<tr><td>{{.Domain}}</td><td class="mono muted">{{.Path}}</td><td>{{.Status}}</td></tr>{{else}}<tr><td colspan="3" class="muted">No WordPress installs found.</td></tr>{{end}}</table>{{end}}
+{{define "files"}}<div class="top"><h1>Files</h1><span class="badge mono">{{.Path}}</span></div><div class="card"><form class="grid" method="post"><input type="hidden" name="path" value="{{.Path}}"><input class="input" name="name" placeholder="folder-or-file-name"><div class="actions"><button class="btn primary" name="action" value="mkdir">New folder</button><button class="btn" name="action" value="touch">New file</button></div></form><p class="muted">Secret files such as .env, private keys, and certificate bundles are hidden and blocked by default.</p></div><table><tr><th>Name</th><th>Type</th><th>Actions</th></tr>{{range .Items}}<tr><td>{{if eq .Kind "dir"}}<a href="/files?path={{.Path}}">{{.Name}}</a>{{else}}{{.Name}}{{end}}</td><td>{{.Kind}}</td><td><div class="actions"><form method="post"><input type="hidden" name="path" value="{{$.Path}}"><input type="hidden" name="target" value="{{.Path}}"><input class="input mini mono" name="mode" placeholder="755" style="width:80px"><button class="btn mini" name="action" value="chmod">Chmod</button></form><form method="post"><input type="hidden" name="path" value="{{$.Path}}"><input type="hidden" name="target" value="{{.Path}}"><input class="input mini mono" name="dest" placeholder="/site/htdocs/new-name" style="width:190px"><button class="btn mini" name="action" value="copy">Copy</button><button class="btn mini" name="action" value="move">Move</button></form><form method="post"><input type="hidden" name="path" value="{{$.Path}}"><input type="hidden" name="target" value="{{.Path}}"><button class="btn mini danger" name="action" value="delete">Soft delete</button></form></div></td></tr>{{end}}</table>{{end}}
+{{define "databases"}}<div class="top"><h1>Databases</h1><span class="badge">MariaDB/MySQL</span></div>{{if .Created}}<div class="card ok"><b>Database created:</b> <span class="mono">{{.Created}}</span><br><b>User:</b> <span class="mono">{{.User}}</span><br><b>Password:</b> <span class="mono">{{.Password}}</span><p class="muted">Save this password now. It is shown only once.</p></div>{{end}}<div class="card"><form method="post" class="grid"><input class="input" name="name" placeholder="project_name" value="{{.Site}}"><button class="btn primary" name="action" value="create">Create database</button></form></div><table><tr><th>Database</th><th>Actions</th></tr>{{range .Databases}}<tr><td class="mono">{{.Name}}</td><td><form method="post"><input type="hidden" name="target" value="{{.Name}}"><button class="btn mini danger" name="action" value="delete">Delete database</button></form></td></tr>{{else}}<tr><td class="muted" colspan="2">No user databases found, or mysql CLI is not available to the panel user.</td></tr>{{end}}</table>{{end}}
 {{define "php"}}<div class="top"><h1>PHP Manager</h1><span class="badge">FPM</span></div><div class="grid">{{range .PHP}}<div class="card"><h2>PHP {{.Version}}</h2><p class="muted mono">{{.Service}}</p><p class="{{if eq .Status "active"}}ok{{else}}bad{{end}}">{{.Status}}</p></div>{{end}}</div><div class="card"><form method="post" class="grid"><select class="input" name="domain">{{range .Sites}}<option value="{{.Domain}}">{{.Domain}} current {{.PHPVersion}}</option>{{end}}</select><select class="input" name="version"><option>8.4</option><option>8.3</option><option>8.2</option><option>8.5</option></select><button class="btn primary">Switch site PHP</button></form></div>{{end}}
-{{define "ssl"}}<div class="top"><h1>SSL</h1><span class="badge">Let's Encrypt</span></div>{{if .Output}}<pre class="card mono" style="white-space:pre-wrap">{{.Output}}</pre>{{end}}<div class="card"><form method="post" class="grid"><input class="input" name="domain" placeholder="example.com"><input class="input" name="email" placeholder="admin@example.com"><button class="btn primary" name="action" value="issue">Install SSL</button><button class="btn" name="action" value="renew">Renew</button><button class="btn danger" name="action" value="delete">Delete cert</button></form><p class="muted">Install SSL repairs stale Nginx certificate references before running certbot, so missing /etc/letsencrypt files do not block reinstall.</p></div><table><tr><th>Certificate</th><th>Expiry</th><th>Status</th><th>Days left</th></tr>{{range .Certificates}}<tr><td class="mono">{{.Domain}}</td><td>{{.Expiry}}</td><td>{{.Status}}</td><td>{{.Days}}d</td></tr>{{else}}<tr><td class="muted" colspan="4">No certificates found, or certbot is not installed.</td></tr>{{end}}</table>{{end}}
+{{define "ssl"}}<div class="top"><h1>SSL</h1><span class="badge">Let's Encrypt</span></div>{{if .Output}}<pre class="card mono" style="white-space:pre-wrap">{{.Output}}</pre>{{end}}<div class="card"><form method="post" class="grid"><input class="input" name="domain" placeholder="example.com" value="{{.Site}}"><input class="input" name="email" placeholder="admin@example.com"><button class="btn primary" name="action" value="issue">Install SSL</button><button class="btn" name="action" value="renew">Renew</button><button class="btn danger" name="action" value="delete">Delete cert</button></form><p class="muted">Install SSL repairs stale Nginx certificate references before running certbot, so missing /etc/letsencrypt files do not block reinstall.</p></div><table><tr><th>Certificate</th><th>Expiry</th><th>Status</th><th>Days left</th></tr>{{range .Certificates}}<tr><td class="mono">{{.Domain}}</td><td>{{.Expiry}}</td><td>{{.Status}}</td><td>{{.Days}}d</td></tr>{{else}}<tr><td class="muted" colspan="4">No certificates found, or certbot is not installed.</td></tr>{{end}}</table>{{end}}
 {{define "services"}}<div class="top"><h1>Services</h1></div><table><tr><th>Name</th><th>Status</th><th>Actions</th></tr>{{range .Services}}<tr><td>{{.Name}}</td><td>{{.Status}}</td><td><form method="post" style="display:flex;gap:6px"><input type="hidden" name="id" value="{{.ID}}"><button class="btn" name="action" value="restart">Restart</button><button class="btn" name="action" value="start">Start</button><button class="btn danger" name="action" value="stop">Stop</button></form></td></tr>{{end}}</table>{{end}}
 `

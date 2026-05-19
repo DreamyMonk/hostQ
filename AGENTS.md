@@ -1,8 +1,8 @@
 # hostQ Agent Notes
 
-hostQ is now a Go-only control panel.
+hostQ is now a single native control panel.
 
-- Production entrypoint: `cmd/hostq-panel/main.go`
+- Production entrypoint: `main.go`
 - Runtime: one `hostq-panel` systemd service behind Nginx
-- Validation: `go test ./cmd/hostq-panel` and `go build ./cmd/hostq-panel`
+- Validation: `go test ./...` and `go build .`
 - Do not reintroduce another web runtime for the panel.

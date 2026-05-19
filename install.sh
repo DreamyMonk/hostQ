@@ -1,5 +1,5 @@
 #!/bin/bash
-# hostQ - Go-first VPS setup script
+# hostQ - VPS setup script
 # Target: Ubuntu 22.04/24.04 or Debian 12, run as root.
 
 set -euo pipefail
@@ -15,19 +15,21 @@ warn() { echo -e "${YELLOW}[warn]${NC} $1"; }
 error() { echo -e "${RED}[error]${NC} $1"; exit 1; }
 header() { echo -e "\n${BLUE}=== $1 ===${NC}"; }
 
-if [[ $EUID -ne 0 ]]; then error "Run as root: sudo bash setup.sh"; fi
+if [[ $EUID -ne 0 ]]; then error "Run as root: sudo bash install.sh"; fi
 
 header "hostQ VPS Setup"
-echo "This script installs a lightweight Go hosting control panel:"
-echo "  - hostQ Go panel as a systemd service"
+echo "This script installs a lightweight hosting control panel:"
+echo "  - hostQ panel as a systemd service"
 echo "  - Nginx reverse proxy on ports 80 and 8090"
 echo "  - MariaDB"
 echo "  - PHP 8.2, 8.3, 8.4, 8.5 FPM where available"
 echo "  - Certbot, WP-CLI, Pure-FTPd, phpMyAdmin"
 echo "  - PHP OPcache enabled by default; Redis optional from Services"
 echo ""
-read -r -p "Continue? [y/N] " confirm
-[[ "$confirm" =~ ^[Yy]$ ]] || exit 0
+if [[ "${HOSTQ_ASSUME_YES:-false}" != "true" ]]; then
+  read -r -p "Continue? [y/N] " confirm
+  [[ "$confirm" =~ ^[Yy]$ ]] || exit 0
+fi
 
 export DEBIAN_FRONTEND=noninteractive
 
@@ -37,11 +39,11 @@ apt-get upgrade -y -qq
 apt-get install -y -qq ca-certificates curl gnupg lsb-release software-properties-common unzip rsync git build-essential openssl
 log "System updated"
 
-header "Installing Go"
+header "Installing build toolchain"
 if ! command -v go >/dev/null 2>&1; then
   apt-get install -y -qq golang-go
 fi
-log "$(go version) installed"
+log "Native build toolchain ready"
 
 header "Installing Nginx"
 apt-get install -y -qq nginx
@@ -114,10 +116,10 @@ chmod +x /usr/local/bin/wp
 apt-get install -y -qq phpmyadmin >/dev/null 2>&1 || warn "phpMyAdmin package install failed; install manually if needed"
 log "Certbot, WP-CLI, Pure-FTPd, and phpMyAdmin installed"
 
-header "Setting up hostQ Go panel"
+header "Setting up hostQ panel"
 PANEL_DIR="/opt/hostq"
 PANEL_PUBLIC_PORT="${PANEL_PUBLIC_PORT:-8090}"
-GO_ADDR="${HOSTQ_GO_ADDR:-127.0.0.1:8091}"
+PANEL_ADDR="${HOSTQ_ADDR:-127.0.0.1:8091}"
 mkdir -p "$PANEL_DIR" /etc/hostq
 chmod 700 /etc/hostq
 
@@ -141,15 +143,15 @@ touch "$PANEL_DIR/.env.local"
 grep -q '^HOSTQ_ALLOW_INSECURE_HTTP=' "$PANEL_DIR/.env.local" \
   && sed -i 's/^HOSTQ_ALLOW_INSECURE_HTTP=.*/HOSTQ_ALLOW_INSECURE_HTTP=true/' "$PANEL_DIR/.env.local" \
   || echo "HOSTQ_ALLOW_INSECURE_HTTP=true" >> "$PANEL_DIR/.env.local"
-grep -q '^HOSTQ_GO_ADDR=' "$PANEL_DIR/.env.local" \
-  && sed -i "s/^HOSTQ_GO_ADDR=.*/HOSTQ_GO_ADDR=${GO_ADDR}/" "$PANEL_DIR/.env.local" \
-  || echo "HOSTQ_GO_ADDR=${GO_ADDR}" >> "$PANEL_DIR/.env.local"
+grep -q '^HOSTQ_ADDR=' "$PANEL_DIR/.env.local" \
+  && sed -i "s/^HOSTQ_ADDR=.*/HOSTQ_ADDR=${PANEL_ADDR}/" "$PANEL_DIR/.env.local" \
+  || echo "HOSTQ_ADDR=${PANEL_ADDR}" >> "$PANEL_DIR/.env.local"
 
 install -m 0750 -o root -g root "$PANEL_DIR/scripts/hostq-update.sh" /usr/local/bin/hostq-update
 
 cd "$PANEL_DIR"
 go mod download
-go build -trimpath -ldflags="-s -w" -o /usr/local/bin/hostq-panel ./cmd/hostq-panel
+go build -trimpath -ldflags="-s -w" -o /usr/local/bin/hostq-panel .
 log "Built /usr/local/bin/hostq-panel"
 
 ADMIN_USER="admin"
@@ -165,12 +167,12 @@ fi
 
 cat > /etc/systemd/system/hostq-panel.service <<EOF
 [Unit]
-Description=hostQ Go hosting control panel
+Description=hostQ hosting control panel
 After=network.target nginx.service mariadb.service
 
 [Service]
 Type=simple
-Environment=HOSTQ_GO_ADDR=${GO_ADDR}
+Environment=HOSTQ_ADDR=${PANEL_ADDR}
 Environment=HOSTQ_DATA_DIR=/etc/hostq
 Environment=WEB_ROOT=/var/www
 EnvironmentFile=-${PANEL_DIR}/.env.local
@@ -186,7 +188,7 @@ WantedBy=multi-user.target
 EOF
 systemctl daemon-reload
 systemctl enable --now hostq-panel
-log "hostQ Go service started"
+log "hostQ service started"
 
 systemctl disable --now hostq >/dev/null 2>&1 || true
 
@@ -200,7 +202,7 @@ server {
     client_max_body_size 64M;
 
     location / {
-        proxy_pass http://__GO_ADDR__;
+        proxy_pass http://__PANEL_ADDR__;
         proxy_http_version 1.1;
         proxy_read_timeout 60s;
         proxy_buffering off;
@@ -214,7 +216,7 @@ server {
 }
 EOF
 sed -i "s/__PANEL_PUBLIC_PORT__/${PANEL_PUBLIC_PORT}/g" /etc/nginx/sites-available/hostq
-sed -i "s#__GO_ADDR__#${GO_ADDR}#g" /etc/nginx/sites-available/hostq
+sed -i "s#__PANEL_ADDR__#${PANEL_ADDR}#g" /etc/nginx/sites-available/hostq
 
 ln -sf /etc/nginx/sites-available/hostq /etc/nginx/sites-enabled/hostq
 rm -f /etc/nginx/sites-enabled/default /etc/nginx/sites-enabled/hostq-go
@@ -234,7 +236,7 @@ log "Firewall configured"
 header "Setup complete"
 SERVER_IP=$(curl -fsS ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')
 echo ""
-echo -e "${GREEN}hostQ Go is running at: http://${SERVER_IP}${NC}"
+echo -e "${GREEN}hostQ is running at: http://${SERVER_IP}${NC}"
 echo -e "${GREEN}Direct setup URL: http://${SERVER_IP}:${PANEL_PUBLIC_PORT}${NC}"
 if [[ -n "$ADMIN_PASS" ]]; then
   echo ""
@@ -249,5 +251,5 @@ echo "Useful commands:"
 echo "  systemctl status hostq-panel --no-pager -l"
 echo "  journalctl -u hostq-panel -f"
 echo "  sudo hostq-update"
-echo "  sudo hostq-update v0.3.0"
+echo "  sudo hostq-update v0.3.1"
 echo "  mysql_secure_installation"

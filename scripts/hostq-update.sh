@@ -1,7 +1,7 @@
 #!/bin/bash
-# hostQ Go SSH updater. Usage:
+# hostQ SSH updater. Usage:
 #   sudo hostq-update           # update to latest GitHub tag
-#   sudo hostq-update v0.3.0     # update to a specific tag
+#   sudo hostq-update v0.3.1     # update to a specific tag
 
 set -euo pipefail
 
@@ -24,11 +24,11 @@ if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9]+)?$ ]]; then
 fi
 
 if ! command -v go >/dev/null 2>&1; then
-  echo "Go is required for hostQ Go updates. Install Go first, or run setup.sh." >&2
+  echo "The native build toolchain is required for hostQ updates. Run install.sh first." >&2
   exit 1
 fi
 
-echo "hostQ Go updater"
+echo "hostQ updater"
 echo "Repository: $REPO"
 echo "Target:     $TAG"
 echo ""
@@ -51,12 +51,12 @@ rsync -a --delete --exclude .env.local "$UNPACK"/ "$PANEL_DIR"/
 
 cd "$PANEL_DIR"
 go mod download
-go build -trimpath -ldflags="-s -w" -o /usr/local/bin/hostq-panel ./cmd/hostq-panel
+go build -trimpath -ldflags="-s -w" -o /usr/local/bin/hostq-panel .
 install -m 0750 -o root -g root "$PANEL_DIR/scripts/hostq-update.sh" /usr/local/bin/hostq-update
 systemctl daemon-reload
 systemctl restart hostq-panel
 systemctl reload nginx || true
 rm -rf "$UNPACK" "$ARCHIVE"
 
-echo "Updated hostQ Go to ${TAG}."
+echo "Updated hostQ to ${TAG}."
 echo "Backup: ${BACKUP}"

@@ -14,7 +14,7 @@ func repoRoot(t *testing.T) string {
 	if !ok {
 		t.Fatal("cannot resolve caller")
 	}
-	return filepath.Clean(filepath.Join(filepath.Dir(file), "..", ".."))
+	return filepath.Dir(file)
 }
 
 func TestLayoutTemplateParses(t *testing.T) {
@@ -31,26 +31,25 @@ func readRepoFile(t *testing.T, parts ...string) string {
 	return string(data)
 }
 
-func TestGoOnlyDeploymentScripts(t *testing.T) {
-	setup := readRepoFile(t, "setup.sh")
+func TestDeploymentScripts(t *testing.T) {
+	setup := readRepoFile(t, "install.sh")
 	update := readRepoFile(t, "scripts", "hostq-update.sh")
-	installer := readRepoFile(t, "scripts", "install-go-panel.sh")
 
-	for name, content := range map[string]string{"setup.sh": setup, "hostq-update.sh": update, "install-go-panel.sh": installer} {
+	for name, content := range map[string]string{"install.sh": setup, "hostq-update.sh": update} {
 		if !strings.Contains(content, "go build") {
-			t.Fatalf("%s must build the Go panel", name)
+			t.Fatalf("%s must build the panel", name)
 		}
 	}
-	if !strings.Contains(setup, "hostq-panel.service") || !strings.Contains(installer, "hostq-panel.service") {
-		t.Fatal("setup/install scripts must install hostq-panel.service")
+	if !strings.Contains(setup, "hostq-panel.service") {
+		t.Fatal("install script must install hostq-panel.service")
 	}
 	if !strings.Contains(update, "systemctl restart hostq-panel") {
-		t.Fatal("hostq-update must restart the Go service")
+		t.Fatal("hostq-update must restart the panel service")
 	}
 }
 
-func TestGoPanelIncludesCoreHostingModules(t *testing.T) {
-	source := readRepoFile(t, "cmd", "hostq-panel", "main.go")
+func TestPanelIncludesCoreHostingModules(t *testing.T) {
+	source := readRepoFile(t, "main.go")
 	required := []string{
 		"func (a *App) wordpress",
 		"func (a *App) php",
@@ -59,12 +58,12 @@ func TestGoPanelIncludesCoreHostingModules(t *testing.T) {
 		"DROP DATABASE IF EXISTS",
 		"removeBrokenNginxSSL",
 		"blockedFileName",
-		"hostq_go_session",
+		"hostq_session",
 		"bcrypt.CompareHashAndPassword",
 	}
 	for _, needle := range required {
 		if !strings.Contains(source, needle) {
-			t.Fatalf("Go panel missing %q", needle)
+			t.Fatalf("panel missing %q", needle)
 		}
 	}
 }

@@ -1,6 +1,6 @@
-# hostQ Go Production Hardening
+# hostQ Production Hardening
 
-hostQ runs as one Go service behind Nginx.
+hostQ runs as one native service behind Nginx.
 
 ## Supported Base OS
 
@@ -11,14 +11,14 @@ hostQ runs as one Go service behind Nginx.
 ## Network
 
 - Allow only `22/tcp`, `80/tcp`, `443/tcp`, and FTP ports you intentionally use.
-- `setup.sh` also opens `PANEL_PUBLIC_PORT`; the default is `8090`.
+- `install.sh` also opens `PANEL_PUBLIC_PORT`; the default is `8090`.
 - Close or restrict `8090` after HTTPS/domain access is working.
 - Nginx should proxy panel traffic to `127.0.0.1:8091`.
 - Use Cloudflare SSL mode **Full** or **Full strict** after origin SSL is installed.
 
 ## Accounts And Sessions
 
-- `setup.sh` generates the first admin username/password over SSH.
+- `install.sh` generates the first admin username/password over SSH.
 - Credentials are stored in `/etc/hostq/admin.json` with a bcrypt password hash.
 - The panel uses signed, HTTP-only, same-site cookies.
 - Change the generated password after first login.
@@ -32,16 +32,16 @@ hostQ runs as one Go service behind Nginx.
 ## Services
 
 - The panel controls only a narrow service allowlist.
-- No generic shell endpoint is exposed by the Go panel.
+- No generic shell endpoint is exposed by the panel.
 
 ## Backups And Updates
 
 - Site backups are written under `/var/backups/hostq`.
-- `hostq-update` downloads GitHub tag tarballs, creates a backup, rebuilds the Go binary, and restarts `hostq-panel`.
+- `hostq-update` downloads GitHub tag tarballs, creates a backup, rebuilds the panel, and restarts `hostq-panel`.
 
 ```bash
 sudo hostq-update
-sudo hostq-update v0.3.0
+sudo hostq-update v0.3.1
 ```
 
 ## Validation
@@ -49,6 +49,6 @@ sudo hostq-update v0.3.0
 Before publishing a release:
 
 ```bash
-go test ./cmd/hostq-panel
-go build ./cmd/hostq-panel
+go test ./...
+go build .
 ```
