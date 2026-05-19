@@ -15,7 +15,12 @@ import (
 func (a *App) dashboard(w http.ResponseWriter, _ *http.Request) {
 	sites := a.listSites()
 	services := a.listServices()
-	a.render(w, "dashboard", map[string]any{"Title": "Dashboard", "Sites": sites, "Services": services})
+	a.render(w, "dashboard", map[string]any{
+		"Title":    "Dashboard",
+		"Sites":    sites,
+		"Services": services,
+		"Stats":    a.systemStats(),
+	})
 }
 
 func (a *App) sites(w http.ResponseWriter, r *http.Request) {
