@@ -4,9 +4,57 @@ import { verifyToken } from '@/lib/auth';
 import { mysqlIdentifier, mysqlString, runCommand, runMysql, shellQuote } from '@/lib/exec';
 import { audit, clientIp } from '@/lib/security';
 import { canManageSite, domainFromWebPath } from '@/lib/authz';
+import fs from 'fs';
+
+const WEB_ROOT = process.env.WEB_ROOT || '/var/www';
+const NGINX_AVAILABLE = '/etc/nginx/sites-available';
+const NGINX_ENABLED = '/etc/nginx/sites-enabled';
 
 function validEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function siteDocRoot(domain: string) {
+  return `${WEB_ROOT}/${domain}/htdocs`;
+}
+
+function existingNginxRoot(domain: string) {
+  try {
+    const content = fs.readFileSync(`${NGINX_AVAILABLE}/${domain}`, 'utf8');
+    const root = content.match(/root\s+(.+);/)?.[1]?.trim();
+    return root && root.startsWith(WEB_ROOT) ? root : '';
+  } catch {
+    return '';
+  }
+}
+
+function nginxWordPressVhost(domain: string, docRoot: string, phpVersion = '8.4') {
+  return `# hostQ managed - ${domain}
+server {
+    listen 80;
+    server_name ${domain} www.${domain};
+    root ${docRoot};
+    index index.php index.html index.htm;
+
+    access_log /var/log/nginx/${domain}.access.log;
+    error_log  /var/log/nginx/${domain}.error.log;
+
+    location / {
+        try_files $uri $uri/ /index.php?$args;
+    }
+
+    location ~ \\.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/run/php/php${phpVersion}-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+        include fastcgi_params;
+    }
+
+    location ~ /\\. {
+        deny all;
+    }
+}
+`;
 }
 
 async function auth() {
@@ -19,9 +67,8 @@ export async function GET() {
   const actor = await auth();
   if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const webRoot = process.env.WEB_ROOT || '/var/www/html';
   const wpCli = await runCommand('command -v wp || test -x /usr/local/bin/wp', 5000);
-  const r = await runCommand(`find ${shellQuote(webRoot)} -path ${shellQuote(`${webRoot}/.hostq-trash`)} -prune -o -maxdepth 4 -name "wp-config.php" -print 2>/dev/null`);
+  const r = await runCommand(`find ${shellQuote(WEB_ROOT)} -path ${shellQuote(`${WEB_ROOT}/.hostq-trash`)} -prune -o -maxdepth 5 -name "wp-config.php" -print 2>/dev/null`);
 
   if (!wpCli.success) {
     return NextResponse.json({
@@ -40,10 +87,10 @@ export async function GET() {
 
   const paths = r.stdout.split('\n').filter(Boolean).map((p) => p.replace('/wp-config.php', ''));
   const installations = paths.filter((p) => {
-    const domain = domainFromWebPath(p, webRoot);
+    const domain = domainFromWebPath(p, WEB_ROOT);
     return !domain || canManageSite(actor, domain, 'view');
   }).map((p) => ({
-    domain: p.split('/').pop() || p,
+    domain: p.replace(WEB_ROOT, '').split('/').filter(Boolean)[0] || p.split('/').pop() || p,
     path: p,
     status: 'running',
     wpVersion: 'unknown',
@@ -73,8 +120,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Database name and user may only contain letters, numbers, and underscores' }, { status: 400 });
   }
 
-  const webRoot = process.env.WEB_ROOT || '/var/www/html';
-  const sitePath = `${webRoot}/${domain}`;
+  const sitePath = existingNginxRoot(domain) || siteDocRoot(domain);
   const qSitePath = shellQuote(sitePath);
   const logs: string[] = [];
   let failed = false;
@@ -93,6 +139,10 @@ export async function POST(request: Request) {
       cmd: `wp core install --path=${qSitePath} --url=${shellQuote(`http://${domain}`)} --title=${shellQuote(siteTitle || domain)} --admin_user=${shellQuote(adminUser || 'admin')} --admin_password=${shellQuote(adminPass || 'changeme123')} --admin_email=${shellQuote(adminEmail)} --allow-root 2>&1`,
     },
     { label: 'Set permissions', cmd: `chown -R www-data:www-data ${qSitePath} 2>/dev/null || true` },
+    {
+      label: 'Configure Nginx vhost',
+      cmd: `cat > ${shellQuote(`${NGINX_AVAILABLE}/${domain}`)} <<'EOF'\n${nginxWordPressVhost(domain, sitePath)}EOF\nln -sf ${shellQuote(`${NGINX_AVAILABLE}/${domain}`)} ${shellQuote(`${NGINX_ENABLED}/${domain}`)}\nnginx -t && systemctl reload nginx`,
+    },
   ];
 
   for (const step of steps) {
@@ -138,17 +188,16 @@ export async function DELETE(request: Request) {
   if (!actor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { path: sitePath, dbName, deleteFiles = false, deleteDatabase = false } = await request.json();
-  const webRoot = process.env.WEB_ROOT || '/var/www/html';
-  if (!sitePath || !String(sitePath).startsWith(webRoot)) {
+  if (!sitePath || !String(sitePath).startsWith(WEB_ROOT)) {
     return NextResponse.json({ error: 'Invalid WordPress path' }, { status: 400 });
   }
-  const domain = domainFromWebPath(sitePath, webRoot);
+  const domain = domainFromWebPath(sitePath, WEB_ROOT);
   if (domain && !canManageSite(actor, domain, 'danger')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const logs: string[] = [];
   if (deleteFiles) {
-    const trashPath = `${webRoot}/.hostq-trash/${Date.now()}-${String(sitePath).split('/').pop()}`;
-    const r = await runCommand(`mkdir -p ${shellQuote(`${webRoot}/.hostq-trash`)} && mv ${shellQuote(sitePath)} ${shellQuote(trashPath)}`, 30000);
+    const trashPath = `${WEB_ROOT}/.hostq-trash/${Date.now()}-${String(sitePath).split('/').pop()}`;
+    const r = await runCommand(`mkdir -p ${shellQuote(`${WEB_ROOT}/.hostq-trash`)} && mv ${shellQuote(sitePath)} ${shellQuote(trashPath)}`, 30000);
     logs.push(r.success ? `Soft-deleted files to ${trashPath}` : `Failed moving files: ${r.stderr || r.stdout || r.error}`);
   }
   if (deleteDatabase && dbName) {

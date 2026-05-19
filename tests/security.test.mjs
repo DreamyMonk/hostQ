@@ -12,6 +12,8 @@ assert.match(files, /process\.platform === 'linux' \? '\/var\/www'/, 'file manag
 assert.match(files, /BLOCKED_EXTS/, 'file manager must block secret extensions');
 assert.match(files, /file\.soft_delete/, 'file manager deletes must be soft deletes');
 assert.match(files, /path\.isAbsolute\(normalized\)/, 'file manager must accept absolute paths under /var/www without prefixing root twice');
+assert.match(files, /action === 'copy'/, 'file manager must support copying files and folders');
+assert.match(files, /action === 'chmod'/, 'file manager must support permission changes');
 assert.doesNotMatch(files, /fs\.rm\(/, 'file manager must not hard-delete with fs.rm');
 
 const auth = readFileSync('src/lib/auth.ts', 'utf8');
@@ -61,6 +63,11 @@ assert.match(wordpress, /\.hostq-trash/, 'WordPress scanner must ignore soft-del
 assert.match(wordpress, /wp core download --path=\$\{qSitePath\} --force/, 'WordPress install must tolerate retrying over partial files');
 assert.match(wordpress, /wp config create --path=\$\{qSitePath\}.*--force/, 'WordPress config creation must tolerate retrying partial installs');
 assert.match(wordpress, /ALTER USER/, 'WordPress retry must reset existing database user passwords');
+assert.match(wordpress, /siteDocRoot/, 'WordPress installs must use the site document root layout');
+assert.match(wordpress, /Configure Nginx vhost/, 'WordPress installs must configure the webserver vhost');
+
+const domains = readFileSync('src/app/api/domains/route.ts', 'utf8');
+assert.match(domains, /\/htdocs/, 'new sites must use htdocs document roots');
 
 const sshUpdate = readFileSync('scripts/hostq-update.sh', 'utf8');
 assert.match(sshUpdate, /api\.github\.com\/repos\/\$\{REPO\}\/releases\/latest/, 'SSH updater must be able to resolve latest release');

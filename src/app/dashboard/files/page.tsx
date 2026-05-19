@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback } from 'react';
 import {
   ChevronRight, Upload, Plus, Trash2,
   Edit3, Save, RefreshCw, Folder, FileText,
-  FileCode, Image as ImageIcon, ArrowLeft
+  FileCode, Image as ImageIcon, ArrowLeft, Copy, MoveRight, KeyRound
 } from 'lucide-react';
 
 interface FileItem {
@@ -51,6 +51,14 @@ export default function FilesPage() {
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [showNewFile, setShowNewFile]     = useState(false);
   const [showRename, setShowRename]       = useState(false);
+  const [showCopyMove, setShowCopyMove]   = useState(false);
+  const [copyMoveAction, setCopyMoveAction] = useState<'copy' | 'move'>('copy');
+  const [copyMoveTarget, setCopyMoveTarget] = useState('');
+  const [copyMoveDestination, setCopyMoveDestination] = useState('/');
+  const [showChmod, setShowChmod] = useState(false);
+  const [chmodTarget, setChmodTarget] = useState('');
+  const [chmodMode, setChmodMode] = useState('755');
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; path: string; item: FileItem } | null>(null);
   const [msg, setMsg] = useState<{ type: 'success'|'error'; text: string } | null>(null);
   const [uploading, setUploading] = useState(false);
 
@@ -135,6 +143,28 @@ export default function FilesPage() {
     else showMsg('error', d.error);
   };
 
+  const copyMoveItem = async () => {
+    if (!copyMoveTarget.trim() || !copyMoveDestination.trim()) return;
+    const r = await fetch('/api/files', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: copyMoveAction, path: copyMoveTarget, destination: copyMoveDestination }),
+    });
+    const d = await r.json();
+    if (d.success) { showMsg('success', d.message); loadDir(currentPath); setShowCopyMove(false); }
+    else showMsg('error', d.error);
+  };
+
+  const chmodItem = async () => {
+    if (!chmodTarget.trim() || !chmodMode.trim()) return;
+    const r = await fetch('/api/files', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'chmod', path: chmodTarget, mode: chmodMode }),
+    });
+    const d = await r.json();
+    if (d.success) { showMsg('success', d.message); loadDir(currentPath); setShowChmod(false); }
+    else showMsg('error', d.error);
+  };
+
   const deleteItems = async () => {
     if (!selected.length || !confirm(`Delete ${selected.length} item(s)?`)) return;
     for (const p of selected) {
@@ -204,7 +234,7 @@ export default function FilesPage() {
   }
 
   return (
-    <div className="fade-in">
+    <div className="fade-in" onClick={() => setContextMenu(null)}>
       {/* Header */}
       <div className="page-header" style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
         <div>
@@ -286,7 +316,10 @@ export default function FilesPage() {
                 const p = itemPath(item);
                 const isSel = selected.includes(p);
                 return (
-                  <tr key={item.name} style={{ background: isSel ? 'rgba(59,130,246,0.05)' : '' }}>
+                  <tr key={item.name} style={{ background: isSel ? 'rgba(59,130,246,0.05)' : '' }} onContextMenu={event => {
+                    event.preventDefault();
+                    setContextMenu({ x: event.clientX, y: event.clientY, path: p, item });
+                  }}>
                     <td><input type="checkbox" checked={isSel} onChange={() => toggleSelect(p)} /></td>
                     <td>
                       <button onClick={() => openFile(item, p)} style={{
@@ -308,6 +341,21 @@ export default function FilesPage() {
                         }} className="btn btn-ghost btn-sm" style={{ padding:'4px 8px' }}>
                           <Edit3 size={12}/>
                         </button>
+                        <button title="Copy" onClick={() => {
+                          setCopyMoveAction('copy'); setCopyMoveTarget(p); setCopyMoveDestination(currentPath); setShowCopyMove(true);
+                        }} className="btn btn-ghost btn-sm" style={{ padding:'4px 8px' }}>
+                          <Copy size={12}/>
+                        </button>
+                        <button title="Move" onClick={() => {
+                          setCopyMoveAction('move'); setCopyMoveTarget(p); setCopyMoveDestination(currentPath); setShowCopyMove(true);
+                        }} className="btn btn-ghost btn-sm" style={{ padding:'4px 8px' }}>
+                          <MoveRight size={12}/>
+                        </button>
+                        <button title="Permissions" onClick={() => {
+                          setChmodTarget(p); setChmodMode(item.type === 'dir' ? '755' : '644'); setShowChmod(true);
+                        }} className="btn btn-ghost btn-sm" style={{ padding:'4px 8px' }}>
+                          <KeyRound size={12}/>
+                        </button>
                         <button id={`delete-${item.name}`} title="Delete" onClick={async () => {
                           if (!confirm(`Delete "${item.name}"?`)) return;
                           await fetch('/api/files', {
@@ -328,6 +376,21 @@ export default function FilesPage() {
           </table>
         )}
       </div>
+
+      {contextMenu && (
+        <div style={{ position:'fixed', left:contextMenu.x, top:contextMenu.y, zIndex:1200, background:'#fff', border:'1px solid var(--border-subtle)', borderRadius:8, boxShadow:'0 12px 30px rgba(15,23,42,0.16)', padding:6, minWidth:170 }} onClick={event => event.stopPropagation()}>
+          {[
+            { label:'Rename', icon:<Edit3 size={13}/>, run:() => { setRenameTarget(contextMenu.path); setRenameTo(contextMenu.item.name); setShowRename(true); } },
+            { label:'Copy', icon:<Copy size={13}/>, run:() => { setCopyMoveAction('copy'); setCopyMoveTarget(contextMenu.path); setCopyMoveDestination(currentPath); setShowCopyMove(true); } },
+            { label:'Move', icon:<MoveRight size={13}/>, run:() => { setCopyMoveAction('move'); setCopyMoveTarget(contextMenu.path); setCopyMoveDestination(currentPath); setShowCopyMove(true); } },
+            { label:'Permissions', icon:<KeyRound size={13}/>, run:() => { setChmodTarget(contextMenu.path); setChmodMode(contextMenu.item.type === 'dir' ? '755' : '644'); setShowChmod(true); } },
+          ].map(action => (
+            <button key={action.label} onClick={() => { action.run(); setContextMenu(null); }} style={{ width:'100%', display:'flex', gap:8, alignItems:'center', border:0, background:'transparent', padding:'8px 10px', cursor:'pointer', borderRadius:6, textAlign:'left' }}>
+              {action.icon}{action.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Dialogs */}
       {showNewFolder && (
@@ -364,6 +427,34 @@ export default function FilesPage() {
             <div style={{ display:'flex', gap:8, marginTop:14, justifyContent:'flex-end' }}>
               <button onClick={() => setShowRename(false)} className="btn btn-ghost btn-sm">Cancel</button>
               <button id="rename-confirm-btn" onClick={renameItem} className="btn btn-primary btn-sm">Rename</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCopyMove && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000 }}>
+          <div className="glass-card" style={{ padding:24, width:420 }}>
+            <div style={{ fontWeight:700, marginBottom:16 }}>{copyMoveAction === 'copy' ? 'Copy' : 'Move'} Item</div>
+            <div className="mono" style={{ fontSize:12, color:'var(--text-muted)', marginBottom:10, overflowWrap:'anywhere' }}>{copyMoveTarget}</div>
+            <input className="input" value={copyMoveDestination} onChange={e => setCopyMoveDestination(e.target.value)} placeholder="/example.com/htdocs" autoFocus onKeyDown={e => e.key === 'Enter' && copyMoveItem()} />
+            <div style={{ display:'flex', gap:8, marginTop:14, justifyContent:'flex-end' }}>
+              <button onClick={() => setShowCopyMove(false)} className="btn btn-ghost btn-sm">Cancel</button>
+              <button onClick={copyMoveItem} className="btn btn-primary btn-sm">{copyMoveAction === 'copy' ? 'Copy' : 'Move'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showChmod && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000 }}>
+          <div className="glass-card" style={{ padding:24, width:360 }}>
+            <div style={{ fontWeight:700, marginBottom:16 }}>Permissions</div>
+            <div className="mono" style={{ fontSize:12, color:'var(--text-muted)', marginBottom:10, overflowWrap:'anywhere' }}>{chmodTarget}</div>
+            <input className="input mono" value={chmodMode} onChange={e => setChmodMode(e.target.value)} placeholder="755" autoFocus onKeyDown={e => e.key === 'Enter' && chmodItem()} />
+            <div style={{ display:'flex', gap:8, marginTop:14, justifyContent:'flex-end' }}>
+              <button onClick={() => setShowChmod(false)} className="btn btn-ghost btn-sm">Cancel</button>
+              <button onClick={chmodItem} className="btn btn-primary btn-sm">Apply</button>
             </div>
           </div>
         </div>

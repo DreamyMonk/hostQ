@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  const target = path.join(WEB_ROOT, domain, 'public_html');
+  const target = path.join(WEB_ROOT, domain, 'htdocs');
   const restorePoint = `/var/backups/hostq/pre-restore-${domain}-${Date.now()}.tar.gz`;
   const backupCurrent = await runCommand(`mkdir -p ${shellQuote(path.dirname(restorePoint))} && tar -czf ${shellQuote(restorePoint)} -C ${shellQuote(target)} . 2>&1`, 120000);
   const restore = backupCurrent.success

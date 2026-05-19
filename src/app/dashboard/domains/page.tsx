@@ -403,10 +403,10 @@ export default function DomainsPage() {
               <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '8px 12px', background: 'var(--bg-base)', borderRadius: 6 }}>
                 📁 Document root: <span className="mono" style={{ color: '#f59e0b' }}>
                   {tab === 'subdomain' && form.domain && form.parentDomain
-                    ? `/var/www/${form.parentDomain}/public_html/${form.domain}`
+                    ? `/var/www/${form.parentDomain}/htdocs/${form.domain}`
                     : form.domain
-                      ? `/var/www/${form.domain}/public_html`
-                      : '/var/www/[domain]/public_html'}
+                      ? `/var/www/${form.domain}/htdocs`
+                      : '/var/www/[domain]/htdocs'}
                 </span>
               </div>
 

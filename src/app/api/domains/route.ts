@@ -115,10 +115,10 @@ async function listDomains(): Promise<{ domain: string; type: 'domain'|'subdomai
   // Check if on Linux (no real configs on Windows dev)
   if (process.platform !== 'linux') {
     return [
-      { domain: 'example.com',      type: 'domain',    docRoot: '/var/www/example.com/public_html', enabled: true,  server: 'nginx', ssl: true  },
-      { domain: 'shop.example.com', type: 'subdomain', docRoot: '/var/www/example.com/public_html/shop', enabled: true, server: 'nginx', ssl: true },
-      { domain: 'blog.mysite.com',  type: 'subdomain', docRoot: '/var/www/mysite.com/public_html/blog', enabled: false, server: 'nginx', ssl: false },
-      { domain: 'mysite.com',       type: 'domain',    docRoot: '/var/www/mysite.com/public_html', enabled: true, server: 'nginx', ssl: false },
+      { domain: 'example.com',      type: 'domain',    docRoot: '/var/www/example.com/htdocs', enabled: true,  server: 'nginx', ssl: true  },
+      { domain: 'shop.example.com', type: 'subdomain', docRoot: '/var/www/example.com/htdocs/shop', enabled: true, server: 'nginx', ssl: true },
+      { domain: 'blog.mysite.com',  type: 'subdomain', docRoot: '/var/www/mysite.com/htdocs/blog', enabled: false, server: 'nginx', ssl: false },
+      { domain: 'mysite.com',       type: 'domain',    docRoot: '/var/www/mysite.com/htdocs', enabled: true, server: 'nginx', ssl: false },
     ];
   }
 
@@ -187,8 +187,8 @@ export async function POST(request: NextRequest) {
   }
 
   const docRoot = type === 'subdomain' && parentDomain
-    ? `${WEB_ROOT}/${parentDomain}/public_html/${domain.split('.')[0]}`
-    : `${WEB_ROOT}/${domain}/public_html`;
+    ? `${WEB_ROOT}/${parentDomain}/htdocs/${domain.split('.')[0]}`
+    : `${WEB_ROOT}/${domain}/htdocs`;
 
   const logs: string[] = [];
 

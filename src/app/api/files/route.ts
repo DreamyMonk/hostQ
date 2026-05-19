@@ -17,6 +17,7 @@ const mkdir  = promisify(fs.mkdir);
 const rename = promisify(fs.rename);
 const readFile  = promisify(fs.readFile);
 const writeFile = promisify(fs.writeFile);
+const chmod = promisify(fs.chmod);
 
 async function auth() {
   const cookieStore = await cookies();
@@ -167,7 +168,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { action, path: reqPath, name, content } = body;
+  const { action, path: reqPath, name, content, destination, mode } = body;
   const full  = safePath(reqPath);
   if (blockedPath(full)) return blockedResponse();
   const domain = domainFromWebPath(full, ROOT);
@@ -198,6 +199,31 @@ export async function POST(request: NextRequest) {
       await writeFile(full, content, 'utf8');
       audit({ actor: actor.username, action: 'file.save', target: full, ip: clientIp(request) });
       return NextResponse.json({ success: true, message: 'File saved' });
+    }
+
+    if (action === 'copy' || action === 'move') {
+      const destDir = safePath(destination || '/');
+      const domainTo = domainFromWebPath(destDir, ROOT);
+      if (blockedPath(destDir)) return blockedResponse();
+      if (domainTo && !canManageSite(actor, domainTo, 'files')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      const target = path.join(destDir, path.basename(full));
+      if (blockedPath(target)) return blockedResponse();
+      if (action === 'copy') {
+        await fs.promises.cp(full, target, { recursive: true, errorOnExist: false });
+        audit({ actor: actor.username, action: 'file.copy', target: full, ip: clientIp(request), details: { target } });
+        return NextResponse.json({ success: true, message: `Copied to ${target}` });
+      }
+      await rename(full, target);
+      audit({ actor: actor.username, action: 'file.move', target: full, ip: clientIp(request), details: { target } });
+      return NextResponse.json({ success: true, message: `Moved to ${target}` });
+    }
+
+    if (action === 'chmod') {
+      const cleanMode = String(mode || '').trim();
+      if (!/^[0-7]{3,4}$/.test(cleanMode)) return NextResponse.json({ error: 'Invalid permission mode' }, { status: 400 });
+      await chmod(full, parseInt(cleanMode, 8));
+      audit({ actor: actor.username, action: 'file.chmod', target: full, ip: clientIp(request), details: { mode: cleanMode } });
+      return NextResponse.json({ success: true, message: `Permissions changed to ${cleanMode}` });
     }
 
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });

@@ -35,7 +35,22 @@ export default function WordPressPage() {
   };
 
   useEffect(() => {
-    const id = setTimeout(() => { void load(); }, 0);
+    const id = setTimeout(() => {
+      const params = new URLSearchParams(window.location.search);
+      const domain = params.get('domain');
+      if (domain) {
+        const slug = domain.replace(/[^a-z0-9]/gi, '_').toLowerCase().substring(0, 16);
+        setForm(f => ({
+          ...f,
+          domain,
+          dbName: `wp_${slug}`,
+          dbUser: `wp_${slug}`.substring(0, 16),
+          dbPassword: `Wp${Math.random().toString(36).slice(2,10)}!`,
+        }));
+        setShowForm(true);
+      }
+      void load();
+    }, 0);
     return () => clearTimeout(id);
   }, []);
 
