@@ -27,7 +27,7 @@ hostQ runs as one native service behind Nginx.
 
 - File manager paths are locked under `/var/www`.
 - `.env`, private keys, PEM/P12/PFX files, and common SSH key names are blocked by default.
-- Deletes are soft deletes into `.hostq-trash`.
+- Deletes are permanent and require a browser confirmation prompt.
 
 ## Services
 

@@ -49,7 +49,20 @@ func TestDeploymentScripts(t *testing.T) {
 }
 
 func TestPanelIncludesCoreHostingModules(t *testing.T) {
-	source := readRepoFile(t, "main.go")
+	files, err := filepath.Glob(filepath.Join(repoRoot(t), "*.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var b strings.Builder
+	for _, file := range files {
+		data, err := os.ReadFile(file)
+		if err != nil {
+			t.Fatalf("read %s: %v", file, err)
+		}
+		b.Write(data)
+		b.WriteByte('\n')
+	}
+	source := b.String()
 	required := []string{
 		"func (a *App) wordpress",
 		"func (a *App) php",

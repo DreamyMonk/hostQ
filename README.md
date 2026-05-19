@@ -22,7 +22,7 @@ Minimum VPS:
 | Auth | SSH-generated admin credentials, bcrypt password hash, signed HTTP-only sessions |
 | Sites | Add a site, then open one site manager for files, database, SSL, WordPress, PHP, FTP, cache, backups, and delete |
 | WordPress | WP-CLI install and discovery inside each site manager |
-| Files | Per-site file manager under `/var/www/<domain>/htdocs`, create folder/file, chmod, move/copy flow, soft-delete, secret blocking |
+| Files | Per-site file manager under `/var/www/<domain>/htdocs`, create folder/file, chmod, move/copy flow, hard delete with confirmation, secret blocking |
 | Databases | Per-site MariaDB/MySQL database and generated user/password |
 | PHP | PHP-FPM 8.2, 8.3, 8.4, 8.5 service status and per-site switch |
 | SSL | Let's Encrypt install/renew/delete and stale Nginx SSL repair |
@@ -115,6 +115,8 @@ proxy_pass http://127.0.0.1:8091;
 ```bash
 go run .
 ```
+
+The panel is organized as a small modular service: `main.go` wires the server, while `sites.go`, `files.go`, `databases.go`, `wordpress.go`, `ssl.go`, `php.go`, and `services.go` own the hosting features.
 
 Validation:
 
