@@ -113,6 +113,42 @@ Terraform provisions the Vultr VPS, firewall rules, SSH key, and optional DNS re
 
 See [infra/README.md](./infra/README.md).
 
+## Lightweight Go Runtime Preview
+
+The current production panel remains the Next.js app while the lightweight Go runtime is being ported module by module. The Go panel is designed for lower RAM usage on 1GB VPS plans and uses server-rendered HTML instead of React.
+
+Install the Go preview beside the existing panel:
+
+```bash
+cd /opt/hostq
+sudo bash scripts/install-go-panel.sh
+```
+
+It runs as:
+
+```text
+systemd service: hostq-panel
+backend: 127.0.0.1:8091
+preview URL: http://SERVER_IP:8092
+```
+
+The Go preview currently includes:
+
+- Login using the existing `/etc/hostq/admin.json`
+- Dashboard
+- Sites list and simple site creation
+- File browser locked to `/var/www`
+- Service start/stop/restart for a narrow allowlist
+- Go audit log at `/etc/hostq/audit-go.log`
+
+The migration target is:
+
+```text
+Go panel + systemd + SQLite/JSON metadata + hostq-helper
+```
+
+The Next.js panel will stay available until the Go panel reaches feature parity.
+
 ## Updating
 
 From the panel:

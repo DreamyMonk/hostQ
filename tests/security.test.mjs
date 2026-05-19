@@ -87,6 +87,17 @@ assert.match(ansible, /bash setup\.sh/, 'Ansible must run hostQ setup');
 assert.match(ansible, /hostq-update/, 'Ansible must support hostQ tagged updates');
 assert.match(ansible, /\/swapfile/, 'Ansible must create swap for 1GB VPS deployments');
 
+const goPanel = readFileSync('cmd/hostq-panel/main.go', 'utf8');
+assert.match(goPanel, /ListenAndServe/, 'Go panel must run as an HTTP service');
+assert.match(goPanel, /bcrypt\.CompareHashAndPassword/, 'Go panel must read existing bcrypt admin credentials');
+assert.match(goPanel, /hostq_go_session/, 'Go panel must use signed sessions');
+assert.match(goPanel, /allowedServiceAction/, 'Go panel service actions must use an allowlist');
+assert.match(goPanel, /WEB_ROOT/, 'Go panel file browser must stay under the configured web root');
+
+const goInstaller = readFileSync('scripts/install-go-panel.sh', 'utf8');
+assert.match(goInstaller, /go build/, 'Go installer must build the lightweight panel');
+assert.match(goInstaller, /hostq-panel\.service/, 'Go installer must install a systemd service');
+
 const sshUpdate = readFileSync('scripts/hostq-update.sh', 'utf8');
 assert.match(sshUpdate, /api\.github\.com\/repos\/\$\{REPO\}\/releases\/latest/, 'SSH updater must be able to resolve latest release');
 assert.match(sshUpdate, /panel\.update/, 'SSH updater must call the narrow helper update task');
