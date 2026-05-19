@@ -51,10 +51,48 @@ func (a *App) siteManager(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/sites", http.StatusSeeOther)
 		return
 	}
-	a.render(w, "site", map[string]any{
-		"Title": "Manage " + site.Domain,
-		"Site":  site,
-	})
+	tab := strings.TrimSpace(r.URL.Query().Get("tab"))
+	if tab == "" {
+		tab = "overview"
+	}
+	data := map[string]any{
+		"Title":    "Manage " + site.Domain,
+		"Site":     site,
+		"Tab":      tab,
+		"Output":   r.URL.Query().Get("output"),
+		"Created":  r.URL.Query().Get("created"),
+		"User":     r.URL.Query().Get("user"),
+		"Password": r.URL.Query().Get("password"),
+		"DBUser":   r.URL.Query().Get("dbuser"),
+		"DBPass":   r.URL.Query().Get("dbpass"),
+		"DBName":   r.URL.Query().Get("db"),
+	}
+	switch tab {
+	case "database":
+		data["Databases"] = a.listDatabasesForSite(site.Domain)
+		data["DBPrefix"] = dbPrefixForSite(site.Domain)
+	case "wordpress":
+		installs := a.listWordPress()
+		filtered := []WordPressInfo{}
+		for _, w := range installs {
+			if w.Domain == site.Domain {
+				filtered = append(filtered, w)
+			}
+		}
+		data["Installs"] = filtered
+		if len(filtered) > 0 {
+			data["WPManage"] = &filtered[0]
+			data["WPUsers"] = a.listWPUsers(filtered[0].Path)
+		}
+	case "ssl":
+		data["Certificates"] = a.listCertificates()
+	case "backups":
+		data["Backups"] = a.listBackups(site.Domain)
+		data["Policy"] = a.backupPolicy(site.Domain)
+	case "php":
+		data["PHP"] = a.listPHP()
+	}
+	a.render(w, "site", data)
 }
 
 func (a *App) siteAction(w http.ResponseWriter, r *http.Request) {

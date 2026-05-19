@@ -63,7 +63,14 @@ type AuditEntry struct {
 }
 
 type DatabaseInfo struct {
-	Name string
+	Name  string
+	Users []DBUser
+	Size  string
+}
+
+type DBUser struct {
+	Login string
+	Host  string
 }
 
 type CertInfo struct {

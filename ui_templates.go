@@ -204,6 +204,13 @@ tbody tr:hover{background:#f8fafc}
 pre.mono{background:#0b1220;color:#e2e8f0;padding:14px;border-radius:8px;overflow:auto;font-size:12px;white-space:pre-wrap}
 hr.sep{border:none;border-top:1px solid var(--card-line);margin:14px 0}
 
+/* tabbed site manager */
+.tabs{display:flex;gap:2px;background:#fff;border:1px solid var(--card-line);border-radius:10px;padding:6px;margin-bottom:14px;overflow-x:auto;flex-wrap:wrap;box-shadow:var(--shadow)}
+.tabs a{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:7px;color:#475569;font-weight:600;font-size:13.5px;white-space:nowrap;transition:background .15s,color .15s}
+.tabs a:hover{background:#f1f5f9;color:#0f172a}
+.tabs a.active{background:linear-gradient(135deg,#2563eb,#06b6d4);color:#fff;box-shadow:0 4px 12px rgba(37,99,235,.25)}
+.tabs a.active svg{color:#fff}
+
 @media (max-width:880px){
   .shell{grid-template-columns:1fr}
   aside.side{position:relative;height:auto}
@@ -224,16 +231,18 @@ hr.sep{border:none;border-top:1px solid var(--card-line);margin:14px 0}
       <a href="/" class="{{if eq .View "dashboard"}}active{{end}}">{{icon "layout"}}<span>Dashboard</span></a>
       <a href="/sites" class="{{if or (eq .View "sites") (eq .View "site")}}active{{end}}">{{icon "globe"}}<span>Sites</span></a>
       <a href="/files?path=/" class="{{if eq .View "files"}}active{{end}}">{{icon "folder"}}<span>File Manager</span></a>
-      <a href="/databases" class="{{if eq .View "databases"}}active{{end}}">{{icon "database"}}<span>Databases</span></a>
-      <a href="/wordpress" class="{{if eq .View "wordpress"}}active{{end}}">{{icon "wordpress"}}<span>WordPress</span></a>
     </nav>
     <div class="navgroup">Server</div>
     <nav class="nav">
-      <a href="/php" class="{{if eq .View "php"}}active{{end}}">{{icon "cpu"}}<span>PHP Manager</span></a>
-      <a href="/ssl" class="{{if eq .View "ssl"}}active{{end}}">{{icon "shield"}}<span>SSL</span></a>
       <a href="/services" class="{{if eq .View "services"}}active{{end}}">{{icon "server"}}<span>Services</span></a>
       <a href="/cron" class="{{if eq .View "cron"}}active{{end}}">{{icon "clock"}}<span>Cron</span></a>
-      <a href="/backups?site=" onclick="return false" style="opacity:.6;cursor:default" title="Open from a site">{{icon "archive"}}<span>Backups</span></a>
+      <a href="/php" class="{{if eq .View "php"}}active{{end}}">{{icon "cpu"}}<span>PHP Versions</span></a>
+    </nav>
+    <div class="navgroup">Advanced</div>
+    <nav class="nav">
+      <a href="/databases" class="{{if eq .View "databases"}}active{{end}}">{{icon "database"}}<span>All Databases</span></a>
+      <a href="/wordpress" class="{{if eq .View "wordpress"}}active{{end}}">{{icon "wordpress"}}<span>All WordPress</span></a>
+      <a href="/ssl" class="{{if eq .View "ssl"}}active{{end}}">{{icon "shield"}}<span>All Certificates</span></a>
     </nav>
     <div class="navgroup">Admin</div>
     <nav class="nav">
@@ -388,37 +397,276 @@ document.addEventListener('click',function(e){
   </div>
   <div class="actions">
     {{if .Site.Enabled}}<span class="badge ok">{{icon "check"}} enabled</span>{{else}}<span class="badge bad">disabled</span>{{end}}
+    {{if .Site.SSL}}<span class="badge ok">{{icon "shield"}} SSL</span>{{end}}
+    {{if .Site.Cache}}<span class="badge info">cache</span>{{end}}
+    <span class="badge">PHP {{.Site.PHPVersion}}</span>
+    <a class="btn" href="http{{if .Site.SSL}}s{{end}}://{{.Site.Domain}}" target="_blank">{{icon "globe"}} Visit</a>
     <a class="btn" href="/sites">{{icon "chevronUp"}} Back</a>
   </div>
 </div>
-<div class="grid">
-  <a class="card" href="/files?path=/{{.Site.Domain}}/htdocs"><h2>{{icon "folderOpen"}} Files</h2><p class="muted">Browse, upload, edit permissions and manage htdocs.</p></a>
-  <a class="card" href="/databases?site={{.Site.Domain}}"><h2>{{icon "database"}} Database</h2><p class="muted">Create or manage MariaDB databases.</p></a>
-  <a class="card" href="/ssl?site={{.Site.Domain}}"><h2>{{icon "shield"}} SSL</h2><p class="muted">Install, renew or repair Let's Encrypt certificates.</p></a>
-  <a class="card" href="/wordpress?site={{.Site.Domain}}"><h2>{{icon "wordpress"}} WordPress</h2><p class="muted">Install or discover WP installations.</p></a>
-  <a class="card" href="/backups?site={{.Site.Domain}}"><h2>{{icon "archive"}} Backups</h2><p class="muted">Manual & automatic backups, restore and download.</p></a>
-  <a class="card" href="/php"><h2>{{icon "cpu"}} PHP</h2><p class="muted">Currently PHP {{.Site.PHPVersion}}.</p></a>
+
+<div class="tabs">
+  <a href="/site?domain={{.Site.Domain}}&tab=overview"  class="{{if eq .Tab "overview"}}active{{end}}">{{icon "layout"}} Overview</a>
+  <a href="/site?domain={{.Site.Domain}}&tab=database"  class="{{if eq .Tab "database"}}active{{end}}">{{icon "database"}} Database</a>
+  <a href="/site?domain={{.Site.Domain}}&tab=wordpress" class="{{if eq .Tab "wordpress"}}active{{end}}">{{icon "wordpress"}} WordPress</a>
+  <a href="/site?domain={{.Site.Domain}}&tab=ssl"       class="{{if eq .Tab "ssl"}}active{{end}}">{{icon "shield"}} SSL</a>
+  <a href="/site?domain={{.Site.Domain}}&tab=php"       class="{{if eq .Tab "php"}}active{{end}}">{{icon "cpu"}} PHP</a>
+  <a href="/files?path=/{{.Site.Domain}}/htdocs">{{icon "folderOpen"}} Files</a>
+  <a href="/site?domain={{.Site.Domain}}&tab=backups"   class="{{if eq .Tab "backups"}}active{{end}}">{{icon "archive"}} Backups</a>
 </div>
-<div class="card">
-  <h3>Site controls</h3>
-  <div class="actions">
-    <form method="post" action="/site-action"><input type="hidden" name="domain" value="{{.Site.Domain}}">
-      {{if .Site.Enabled}}<button class="btn" name="action" value="disable">{{icon "power"}} Disable site</button>
-      {{else}}<button class="btn primary" name="action" value="enable">{{icon "power"}} Enable site</button>{{end}}
-    </form>
-    <form method="post" action="/site-action"><input type="hidden" name="domain" value="{{.Site.Domain}}">
-      {{if .Site.Cache}}<button class="btn" name="action" value="cache-off">Cache: off</button>
-      {{else}}<button class="btn" name="action" value="cache-on">Cache: on</button>{{end}}
-    </form>
-    <form method="post" action="/site-action"><input type="hidden" name="domain" value="{{.Site.Domain}}">
-      <button class="btn" name="action" value="permissions">{{icon "shield"}} Fix permissions</button>
-    </form>
-    <form method="post" action="/site-action" data-confirm="Permanently delete this site, its document root, and Nginx vhost?">
-      <input type="hidden" name="domain" value="{{.Site.Domain}}">
-      <button class="btn danger" name="action" value="delete">{{icon "trash"}} Delete site</button>
+
+{{if .Output}}<div class="alert info">{{icon "info"}} {{.Output}}</div>{{end}}
+
+{{if eq .Tab "overview"}}
+  <div class="grid">
+    <div class="stat"><div class="label">{{icon "cpu"}} PHP version</div><div class="val">{{.Site.PHPVersion}}</div><div class="sub">FastCGI Process Manager</div></div>
+    <div class="stat"><div class="label">{{icon "shield"}} SSL</div><div class="val">{{if .Site.SSL}}<span class="ok">on</span>{{else}}<span class="bad">off</span>{{end}}</div><div class="sub">Let's Encrypt</div></div>
+    <div class="stat"><div class="label">{{icon "activity"}} Cache</div><div class="val">{{if .Site.Cache}}<span class="ok">on</span>{{else}}off{{end}}</div><div class="sub">Nginx fastcgi cache</div></div>
+    <div class="stat"><div class="label">{{icon "globe"}} Status</div><div class="val">{{if .Site.Enabled}}<span class="ok">live</span>{{else}}<span class="bad">disabled</span>{{end}}</div><div class="sub">{{.Site.Domain}}</div></div>
+  </div>
+  <div class="card">
+    <h3>Site controls</h3>
+    <div class="actions">
+      <form method="post" action="/site-action"><input type="hidden" name="domain" value="{{.Site.Domain}}">
+        {{if .Site.Enabled}}<button class="btn" name="action" value="disable">{{icon "power"}} Disable site</button>
+        {{else}}<button class="btn primary" name="action" value="enable">{{icon "power"}} Enable site</button>{{end}}
+      </form>
+      <form method="post" action="/site-action"><input type="hidden" name="domain" value="{{.Site.Domain}}">
+        {{if .Site.Cache}}<button class="btn" name="action" value="cache-off">Cache: off</button>
+        {{else}}<button class="btn" name="action" value="cache-on">Cache: on</button>{{end}}
+      </form>
+      <form method="post" action="/site-action"><input type="hidden" name="domain" value="{{.Site.Domain}}">
+        <button class="btn" name="action" value="permissions">{{icon "shield"}} Fix permissions</button>
+      </form>
+      <a class="btn" href="/files?path=/{{.Site.Domain}}/htdocs">{{icon "folderOpen"}} Open files</a>
+      <a class="btn" href="/phpmyadmin/" target="_blank">{{icon "database"}} phpMyAdmin</a>
+      <form method="post" action="/site-action" data-confirm="Permanently delete this site, its document root, and Nginx vhost?">
+        <input type="hidden" name="domain" value="{{.Site.Domain}}">
+        <button class="btn danger" name="action" value="delete">{{icon "trash"}} Delete site</button>
+      </form>
+    </div>
+  </div>
+{{end}}
+
+{{if eq .Tab "database"}}
+  {{if .Created}}<div class="alert ok">{{icon "check"}}
+    <div><strong>Database created:</strong> <span class="mono">{{.Created}}</span> · <strong>User:</strong> <span class="mono">{{.User}}</span> · <strong>Password:</strong> <span class="mono">{{.Password}}</span><div class="muted" style="font-weight:500">Save this password — shown only once.</div></div>
+  </div>{{end}}
+  {{if .DBUser}}<div class="alert ok">{{icon "key"}} <div><strong>DB user:</strong> <span class="mono">{{.DBUser}}</span> · <strong>Password:</strong> <span class="mono">{{.DBPass}}</span>{{if .DBName}} · <strong>Database:</strong> <span class="mono">{{.DBName}}</span>{{end}}<div class="muted" style="font-weight:500">Shown only once.</div></div></div>{{end}}
+  <div class="card">
+    <h3>Create database for {{.Site.Domain}}</h3>
+    <form method="post" action="/databases">
+      <input type="hidden" name="site" value="{{.Site.Domain}}">
+      <div class="row">
+        <div class="field"><label>Suffix (will become <span class="mono">{{.DBPrefix}}_&lt;suffix&gt;</span>)</label><input class="input" name="name" placeholder="main" required></div>
+        <button class="btn primary" name="action" value="create" style="align-self:flex-end">{{icon "plus"}} Create database</button>
+      </div>
+      <p class="muted">A database, matching user, and 24-char password are generated atomically. All databases for this site share the <span class="mono">{{.DBPrefix}}_</span> prefix so the dashboard can scope them per-site.</p>
     </form>
   </div>
-</div>
+  {{range .Databases}}
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <h3 style="margin:0">{{icon "database"}} <span class="mono">{{.Name}}</span></h3>
+      <div class="actions">
+        <a class="btn mini" href="/phpmyadmin/?db={{.Name}}" target="_blank">{{icon "terminal"}} phpMyAdmin</a>
+        <form method="post" action="/databases" data-confirm="Drop database {{.Name}}? This deletes all tables and the matching user.">
+          <input type="hidden" name="site" value="{{$.Site.Domain}}">
+          <input type="hidden" name="target" value="{{.Name}}">
+          <button class="btn mini danger" name="action" value="delete">{{icon "trash"}} Drop</button>
+        </form>
+      </div>
+    </div>
+    <hr class="sep">
+    <h4 class="muted" style="margin:0 0 8px">Users with access</h4>
+    <table>
+      <thead><tr><th>User</th><th>Host</th><th class="right-col">Actions</th></tr></thead>
+      <tbody>
+        {{range .Users}}<tr>
+          <td class="mono"><strong>{{.Login}}</strong></td>
+          <td class="muted mono">{{.Host}}</td>
+          <td class="right-col"><div class="actions" style="justify-content:flex-end">
+            <form method="post" action="/databases" style="display:inline-flex;gap:6px;flex-wrap:wrap">
+              <input type="hidden" name="site" value="{{$.Site.Domain}}">
+              <input type="hidden" name="user" value="{{.Login}}">
+              <input class="input mini" name="password" type="text" placeholder="new password" minlength="8" required style="width:170px">
+              <button class="btn mini" name="action" value="user-password">{{icon "key"}} Reset password</button>
+            </form>
+            <form method="post" action="/databases" data-confirm="Drop user {{.Login}} and revoke access?">
+              <input type="hidden" name="site" value="{{$.Site.Domain}}">
+              <input type="hidden" name="user" value="{{.Login}}">
+              <input type="hidden" name="target" value="{{$.Site.Domain}}">
+              <button class="btn mini danger" name="action" value="user-delete">{{icon "trash"}}</button>
+            </form>
+          </div></td>
+        </tr>{{else}}<tr><td colspan="3" class="muted">No users yet — add one below.</td></tr>{{end}}
+      </tbody>
+    </table>
+    <hr class="sep">
+    <h4 class="muted" style="margin:0 0 8px">Add user to <span class="mono">{{.Name}}</span></h4>
+    <form method="post" action="/databases">
+      <input type="hidden" name="site" value="{{$.Site.Domain}}">
+      <input type="hidden" name="target" value="{{.Name}}">
+      <div class="row">
+        <div class="field"><label>Username (letters, digits, _; max 32)</label><input class="input mono" name="user" placeholder="app_user" required></div>
+        <div class="field"><label>Password (8+ chars, leave blank to auto-generate)</label><input class="input mono" name="password" type="text" placeholder="leave empty for random"></div>
+        <button class="btn primary" name="action" value="user-create" style="align-self:flex-end">{{icon "plus"}} Add user</button>
+      </div>
+    </form>
+  </div>
+  {{else}}
+    <div class="card muted">No databases for this site yet. Create one above — the suffix becomes part of the name (e.g. <span class="mono">{{.DBPrefix}}_main</span>).</div>
+  {{end}}
+{{end}}
+
+{{if eq .Tab "wordpress"}}
+  {{if .WPManage}}
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+        <div><h2 style="margin:0">{{icon "wordpress"}} WordPress detected</h2><p class="muted mono" style="margin:4px 0 0">{{.WPManage.Path}} · WP {{if .WPManage.Version}}{{.WPManage.Version}}{{else}}unknown{{end}} · {{.WPManage.SiteURL}}</p></div>
+        <a class="btn primary" href="/wordpress?manage={{.Site.Domain}}">{{icon "settings"}} Full WordPress manager →</a>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <h3>{{icon "refresh"}} Quick: update core</h3>
+        <form method="post" action="/wordpress"><input type="hidden" name="domain" value="{{.Site.Domain}}">
+          <button class="btn primary" name="action" value="update-core">Update WordPress</button>
+        </form>
+      </div>
+      <div class="card">
+        <h3>{{icon "activity"}} Quick: flush cache</h3>
+        <form method="post" action="/wordpress"><input type="hidden" name="domain" value="{{.Site.Domain}}">
+          <button class="btn" name="action" value="flush-cache">Flush cache + rewrites</button>
+        </form>
+      </div>
+    </div>
+    <div class="card">
+      <h3>{{icon "users"}} Users</h3>
+      <table><thead><tr><th>ID</th><th>Login</th><th>Email</th><th>Roles</th></tr></thead><tbody>
+        {{range .WPUsers}}<tr><td class="mono">{{.ID}}</td><td><strong>{{.Login}}</strong></td><td class="muted">{{.Email}}</td><td><span class="badge">{{.Roles}}</span></td></tr>
+        {{else}}<tr><td colspan="4" class="muted">No users returned.</td></tr>{{end}}
+      </tbody></table>
+      <p class="muted" style="margin-top:10px">For per-user password resets, URL changes, and delete — open the <a href="/wordpress?manage={{.Site.Domain}}" style="color:#2563eb;font-weight:700">full manager</a>.</p>
+    </div>
+  {{else}}
+    <div class="card">
+      <h3>Install WordPress on {{.Site.Domain}}</h3>
+      <form method="post" action="/wordpress">
+        <input type="hidden" name="action" value="install">
+        <div class="row">
+          <div class="field"><label>Domain</label><input class="input" name="domain" value="{{.Site.Domain}}" required readonly></div>
+          <div class="field"><label>Site title</label><input class="input" name="title" required></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Admin username</label><input class="input" name="admin_user" required></div>
+          <div class="field"><label>Admin password</label><input class="input" name="admin_pass" type="text" required></div>
+          <div class="field"><label>Admin email</label><input class="input" name="admin_email" type="email" required></div>
+        </div>
+        <button class="btn primary">{{icon "plus"}} Install WordPress</button>
+        <p class="muted" style="margin-top:8px">Creates the DB, downloads WP core, runs <span class="mono">wp config create</span> + <span class="mono">wp core install</span>, fixes file ownership.</p>
+      </form>
+    </div>
+  {{end}}
+{{end}}
+
+{{if eq .Tab "ssl"}}
+  <div class="card">
+    <h3>{{icon "shield"}} Issue / renew certificate</h3>
+    <form method="post" action="/ssl">
+      <div class="row">
+        <div class="field"><label>Domain</label><input class="input" name="domain" value="{{.Site.Domain}}" required></div>
+        <div class="field"><label>Admin email</label><input class="input" name="email" type="email" placeholder="admin@{{.Site.Domain}}"></div>
+      </div>
+      <div class="actions">
+        <button class="btn primary" name="action" value="issue">{{icon "shield"}} Install SSL</button>
+        <button class="btn" name="action" value="renew">{{icon "refresh"}} Renew</button>
+        <button class="btn danger" name="action" value="delete" data-confirm="Delete certificate?">{{icon "trash"}} Delete cert</button>
+      </div>
+      <p class="muted" style="margin-top:8px">If this domain sits behind Cloudflare proxy, switch the DNS record to <strong>grey-cloud (DNS only)</strong> before issuing, then flip back to orange once the cert is installed.</p>
+    </form>
+  </div>
+  <div class="card" style="padding:0">
+    <table>
+      <thead><tr><th>Certificate</th><th>Expiry</th><th>Status</th><th>Days left</th></tr></thead>
+      <tbody>
+        {{range .Certificates}}<tr>
+          <td class="mono"><strong>{{.Domain}}</strong></td>
+          <td>{{.Expiry}}</td>
+          <td>{{if eq .Status "valid"}}<span class="badge ok">{{icon "check"}} valid</span>{{else if eq .Status "expiring"}}<span class="badge warn">{{icon "alert"}} expiring</span>{{else}}<span class="badge bad">{{icon "alert"}} critical</span>{{end}}</td>
+          <td>{{.Days}}d</td>
+        </tr>{{else}}<tr><td class="muted" colspan="4">No certificates issued yet.</td></tr>{{end}}
+      </tbody>
+    </table>
+  </div>
+{{end}}
+
+{{if eq .Tab "php"}}
+  <div class="grid">
+    {{range .PHP}}<div class="stat">
+      <div class="label">{{icon "cpu"}} PHP {{.Version}}</div>
+      <div class="val">{{if eq .Status "active"}}<span class="ok">active</span>{{else}}<span class="bad">{{.Status}}</span>{{end}}</div>
+      <div class="sub mono">{{.Service}}</div>
+    </div>{{end}}
+  </div>
+  <div class="card">
+    <h3>Switch PHP for {{.Site.Domain}}</h3>
+    <form method="post" action="/php">
+      <input type="hidden" name="domain" value="{{.Site.Domain}}">
+      <div class="row">
+        <select class="input" name="version">
+          <option {{if eq .Site.PHPVersion "8.4"}}selected{{end}}>8.4</option>
+          <option {{if eq .Site.PHPVersion "8.3"}}selected{{end}}>8.3</option>
+          <option {{if eq .Site.PHPVersion "8.2"}}selected{{end}}>8.2</option>
+          <option {{if eq .Site.PHPVersion "8.5"}}selected{{end}}>8.5</option>
+        </select>
+        <button class="btn primary">{{icon "refresh"}} Apply (rewrites vhost, preserves SSL)</button>
+      </div>
+      <p class="muted" style="margin-top:8px">Currently using <strong>PHP {{.Site.PHPVersion}}</strong>. The vhost is rewritten and nginx reloaded.</p>
+    </form>
+  </div>
+{{end}}
+
+{{if eq .Tab "backups"}}
+  <div class="grid-2">
+    <div class="card">
+      <h2>{{icon "archive"}} Manual backup</h2>
+      <p class="muted">Creates a zip with site files and database.sql when a site database exists.</p>
+      <form method="post" action="/backups"><input type="hidden" name="domain" value="{{.Site.Domain}}">
+        <button class="btn primary" name="action" value="create">{{icon "plus"}} Create backup now</button>
+      </form>
+    </div>
+    <div class="card">
+      <h2>{{icon "clock"}} Automatic backup</h2>
+      <form method="post" action="/backups"><input type="hidden" name="domain" value="{{.Site.Domain}}">
+        <div class="row">
+          <div class="field"><label>Frequency</label><select class="input" name="frequency"><option value="daily">daily</option><option value="weekly">weekly</option><option value="monthly">monthly</option></select></div>
+          <div class="field"><label>Hour</label><input class="input" name="hour" value="{{.Policy.Hour}}"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Keep</label><input class="input" name="keep" value="{{.Policy.Keep}}"></div>
+          <div class="field"><label>Max load</label><input class="input" name="max_load" value="{{.Policy.MaxLoad}}"></div>
+        </div>
+        <button class="btn primary" name="action" value="policy">{{icon "check"}} Save policy</button>
+      </form>
+    </div>
+  </div>
+  <div class="card" style="padding:0">
+    <table>
+      <thead><tr><th>Backup</th><th>Created</th><th>Size</th><th class="right-col">Actions</th></tr></thead>
+      <tbody>
+        {{range .Backups}}<tr>
+          <td class="mono">{{.Name}}</td><td>{{.Created}}</td><td>{{.Size}}</td>
+          <td class="right-col"><div class="actions" style="justify-content:flex-end">
+            <a class="btn mini primary" href="/backups?site={{.Domain}}&download={{.Name}}">{{icon "download"}}</a>
+            <form method="post" action="/backups" data-confirm="Restore full site?"><input type="hidden" name="domain" value="{{.Domain}}"><input type="hidden" name="name" value="{{.Name}}"><input type="hidden" name="mode" value="full"><button class="btn mini" name="action" value="restore">Full</button></form>
+            <form method="post" action="/backups" data-confirm="Permanently delete?"><input type="hidden" name="domain" value="{{.Domain}}"><input type="hidden" name="name" value="{{.Name}}"><button class="btn mini danger" name="action" value="delete">{{icon "trash"}}</button></form>
+          </div></td>
+        </tr>{{else}}<tr><td colspan="4" class="muted">No backups yet.</td></tr>{{end}}
+      </tbody>
+    </table>
+  </div>
+{{end}}
 {{end}}
 
 {{define "backups"}}
