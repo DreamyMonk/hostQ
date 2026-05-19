@@ -63,7 +63,14 @@ type AuditEntry struct {
 }
 
 type DatabaseInfo struct {
-	Name string
+	Name  string
+	Users []DBUser
+	Size  string
+}
+
+type DBUser struct {
+	Login string
+	Host  string
 }
 
 type CertInfo struct {
@@ -74,9 +81,18 @@ type CertInfo struct {
 }
 
 type WordPressInfo struct {
-	Domain string
-	Path   string
-	Status string
+	Domain  string
+	Path    string
+	Status  string
+	Version string
+	SiteURL string
+}
+
+type WordPressUser struct {
+	ID    string
+	Login string
+	Email string
+	Roles string
 }
 
 type PHPInfo struct {
