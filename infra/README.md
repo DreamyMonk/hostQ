@@ -61,13 +61,13 @@ The hostQ installer prints the first admin username and generated password in SS
 ## 3. Update hostQ Later
 
 ```bash
-ansible-playbook -i inventory.ini playbook.yml --tags update -e hostq_version=v0.3.4
+ansible-playbook -i inventory.ini playbook.yml --tags update -e hostq_version=v0.3.5
 ```
 
 Or SSH directly:
 
 ```bash
-sudo hostq-update v0.3.4
+sudo hostq-update v0.3.5
 ```
 
 ## Production Notes

@@ -81,6 +81,15 @@ type BackupPolicy struct {
 	LastRun   string `json:"lastRun"`
 }
 
+type CronJob struct {
+	ID       string
+	Name     string
+	Schedule string
+	User     string
+	Command  string
+	Source   string
+}
+
 type App struct {
 	cfg Config
 	tpl *template.Template

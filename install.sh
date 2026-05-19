@@ -37,7 +37,7 @@ export DEBIAN_FRONTEND=noninteractive
 header "Updating system"
 apt-get update -qq
 apt-get upgrade -y -qq
-apt-get install -y -qq ca-certificates curl gnupg lsb-release software-properties-common unzip rsync git build-essential openssl
+apt-get install -y -qq ca-certificates curl gnupg lsb-release software-properties-common unzip rsync git build-essential openssl cron
 log "System updated"
 
 header "Installing build toolchain"
@@ -192,6 +192,8 @@ systemctl daemon-reload
 systemctl enable --now hostq-panel
 log "hostQ service started"
 
+touch /etc/cron.d/hostq-user-jobs
+chmod 0644 /etc/cron.d/hostq-user-jobs
 cat > /etc/cron.d/hostq-backups <<EOF
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -259,5 +261,5 @@ echo "Useful commands:"
 echo "  systemctl status hostq-panel --no-pager -l"
 echo "  journalctl -u hostq-panel -f"
 echo "  sudo hostq-update"
-echo "  sudo hostq-update v0.3.4"
+echo "  sudo hostq-update v0.3.5"
 echo "  mysql_secure_installation"

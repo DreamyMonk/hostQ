@@ -27,6 +27,7 @@ Minimum VPS:
 | PHP | PHP-FPM 8.2, 8.3, 8.4, 8.5 service status and per-site switch |
 | SSL | Let's Encrypt install/renew/delete and stale Nginx SSL repair |
 | Backups | Per-site manual zip backup, download, restore full/files/database, automatic daily/weekly/monthly retention |
+| Cron | Cron Manager for hostQ-managed scheduled commands and the built-in backup runner |
 | Services | Narrow allowlist for Nginx, MariaDB, Redis, PHP-FPM, Pure-FTPd |
 | Updates | SSH updater that downloads a GitHub tag, backs up, rebuilds the panel, restarts systemd |
 
@@ -77,7 +78,7 @@ Use a real domain and HTTPS for production. Port `8090` is intended as direct se
 
 ```bash
 sudo hostq-update
-sudo hostq-update v0.3.4
+sudo hostq-update v0.3.5
 ```
 
 Updates create a backup first:

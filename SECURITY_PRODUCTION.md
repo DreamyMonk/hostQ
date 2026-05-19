@@ -33,6 +33,7 @@ hostQ runs as one native service behind Nginx.
 
 - The panel controls only a narrow service allowlist.
 - No generic shell endpoint is exposed by the panel.
+- Cron Manager writes only `/etc/cron.d/hostq-user-jobs`; review commands before adding them because cron runs without an interactive shell prompt.
 
 ## Backups And Updates
 
@@ -43,7 +44,7 @@ hostQ runs as one native service behind Nginx.
 
 ```bash
 sudo hostq-update
-sudo hostq-update v0.3.4
+sudo hostq-update v0.3.5
 ```
 
 ## Validation

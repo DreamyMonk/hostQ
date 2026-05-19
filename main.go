@@ -49,6 +49,7 @@ func main() {
 	mux.HandleFunc("/php", app.requireAuth(app.php))
 	mux.HandleFunc("/ssl", app.requireAuth(app.ssl))
 	mux.HandleFunc("/services", app.requireAuth(app.services))
+	mux.HandleFunc("/cron", app.requireAuth(app.cron))
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("ok")) })
 
 	log.Printf("hostQ panel listening on http://%s", app.cfg.Addr)
