@@ -105,6 +105,11 @@ assert.match(goPanel, /fileAction/, 'Go panel must support file manager actions'
 assert.match(goPanel, /blockedFileName/, 'Go panel file manager must block secret files');
 assert.match(goPanel, /SHOW DATABASES/, 'Go panel must include a database inventory view');
 assert.match(goPanel, /hostQ fastcgi cache/, 'Go panel site actions must preserve cache state');
+assert.match(goPanel, /CREATE DATABASE IF NOT EXISTS/, 'Go panel must create MariaDB databases');
+assert.match(goPanel, /DROP DATABASE IF EXISTS/, 'Go panel must delete MariaDB databases');
+assert.match(goPanel, /certbot.*--nginx/s, 'Go panel must install Let\'s Encrypt SSL with certbot');
+assert.match(goPanel, /removeBrokenNginxSSL/, 'Go panel must repair stale Nginx SSL references before certbot');
+assert.match(goPanel, /certbot.*renew/s, 'Go panel must renew certificates');
 
 const goInstaller = readFileSync('scripts/install-go-panel.sh', 'utf8');
 assert.match(goInstaller, /go build/, 'Go installer must build the lightweight panel');

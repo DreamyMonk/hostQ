@@ -138,7 +138,8 @@ The Go preview currently includes:
 - Dashboard
 - Sites list, PHP site creation under `/var/www/domain/htdocs`, enable/disable, cache toggle, permissions repair, backup, and soft-delete
 - File manager locked to `/var/www` with create folder/file, chmod, and soft-delete actions
-- Database inventory for MariaDB/MySQL
+- MariaDB/MySQL database inventory, create, generated user/password, and delete
+- Let's Encrypt SSL inventory, install, renew, delete, and stale Nginx SSL repair
 - Service start/stop/restart for a narrow allowlist
 - Go audit log at `/etc/hostq/audit-go.log`
 
