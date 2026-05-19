@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -53,8 +54,8 @@ func (a *App) listWordPress() []WordPressInfo {
 			domain = parts[0]
 		}
 		info2 := WordPressInfo{Domain: domain, Path: root, Status: "installed"}
-		info2.Version = strings.TrimSpace(wpRun(root, "core", "version"))
-		info2.SiteURL = strings.TrimSpace(wpRun(root, "option", "get", "siteurl"))
+		info2.Version = wpValue(root, "core", "version")
+		info2.SiteURL = wpValue(root, "option", "get", "siteurl")
 		installs = append(installs, info2)
 		return nil
 	})
@@ -62,13 +63,54 @@ func (a *App) listWordPress() []WordPressInfo {
 	return installs
 }
 
-// wpRun executes a wp-cli command at the given path and returns combined output.
-// It is intentionally tolerant: errors return whatever stdout/stderr was captured.
+// wpRun executes a wp-cli command at the given path and returns combined
+// output with PHP/Zend warning noise filtered out. Used for logs shown to
+// the operator after an action.
 func wpRun(path string, args ...string) string {
 	full := append([]string{"--path=" + path, "--allow-root", "--skip-themes", "--skip-plugins"}, args...)
 	cmd := exec.Command("wp", full...)
 	out, _ := cmd.CombinedOutput()
-	return string(out)
+	return cleanWPOutput(string(out))
+}
+
+// wpValue runs wp-cli capturing stdout only and returns it trimmed. Stderr
+// noise (PHP warnings like "Cannot load Zend OPcache") is discarded so the
+// result is safe to display inline as a value.
+func wpValue(path string, args ...string) string {
+	full := append([]string{"--path=" + path, "--allow-root", "--skip-themes", "--skip-plugins"}, args...)
+	cmd := exec.Command("wp", full...)
+	var stdout bytes.Buffer
+	cmd.Stdout = &stdout
+	_ = cmd.Run()
+	return strings.TrimSpace(cleanWPOutput(stdout.String()))
+}
+
+// cleanWPOutput drops the PHP/Zend warning + notice lines that some hosts
+// emit on every CLI invocation. They pollute version checks and search-replace
+// previews; nobody wants to see them in the panel.
+func cleanWPOutput(s string) string {
+	lines := strings.Split(s, "\n")
+	kept := make([]string, 0, len(lines))
+	for _, line := range lines {
+		l := strings.TrimSpace(line)
+		if l == "" {
+			continue
+		}
+		low := strings.ToLower(l)
+		if strings.HasPrefix(low, "php warning") ||
+			strings.HasPrefix(low, "php notice") ||
+			strings.HasPrefix(low, "php deprecated") ||
+			strings.HasPrefix(low, "warning:") ||
+			strings.HasPrefix(low, "notice:") ||
+			strings.HasPrefix(low, "deprecated:") ||
+			strings.HasPrefix(low, "cannot load") ||
+			strings.HasPrefix(low, "stack trace:") ||
+			strings.HasPrefix(low, "#") && strings.Contains(low, "include(") {
+			continue
+		}
+		kept = append(kept, line)
+	}
+	return strings.Join(kept, "\n")
 }
 
 func (a *App) listWPUsers(path string) []WordPressUser {

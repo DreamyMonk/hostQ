@@ -213,6 +213,40 @@ tbody tr:hover{background:#fbfcfe}
 pre.mono{background:#0b1220;color:#e2e8f0;padding:14px;border-radius:8px;overflow:auto;font-size:12px;white-space:pre-wrap}
 hr.sep{border:none;border-top:1px solid var(--card-line);margin:14px 0}
 
+/* site-head — sticky-ish header for /site */
+.site-head{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;margin:0 0 16px}
+.site-head-main{display:flex;align-items:center;gap:12px;min-width:0}
+.site-head-main h1{margin:0;font-size:22px;font-weight:800;letter-spacing:-.02em}
+.site-head-main p{margin:2px 0 0;font-size:12px}
+.site-back{width:34px;height:34px;border-radius:8px;border:1px solid var(--card-line);background:#fff;display:grid;place-items:center;color:#475569;flex:none;transition:background .12s,color .12s}
+.site-back:hover{background:#f4f6fb;color:#0b1220}
+.site-back svg{transform:rotate(-90deg);width:14px;height:14px}
+.site-head-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+
+/* per-card toolbar (between tab + cards) */
+.toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 12px;padding:0 2px;flex-wrap:wrap}
+.toolbar .muted{font-size:12.5px}
+
+/* credentials banner — replaces alert.ok for created-once secrets */
+.card.credentials{display:flex;align-items:flex-start;gap:12px;border:1px solid #cfeacb;background:linear-gradient(180deg,#f5fbf4,#fff);color:#14532d}
+.card.credentials svg{color:#16a34a;margin-top:3px}
+.mono.pill{background:#0b1220;color:#fff;padding:2px 8px;border-radius:6px;font-size:12px}
+
+/* per-database card */
+.db-card{padding:14px 16px}
+.db-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px}
+.db-title{font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px;color:#0b1220}
+.db-title svg{color:#2563eb;width:16px;height:16px}
+table.flat{border:none;border-radius:0;background:transparent;margin-top:4px}
+table.flat th{background:transparent;padding:8px 0;border-bottom:1px solid var(--card-line);font-size:10.5px}
+table.flat td{padding:10px 0;background:transparent}
+table.flat tbody tr:hover{background:transparent}
+
+/* empty state */
+.card.empty{display:flex;align-items:center;gap:14px;padding:22px}
+.empty-ic{width:42px;height:42px;border-radius:10px;background:#eff5ff;color:#2563eb;display:grid;place-items:center;flex:none}
+.empty-ic svg{width:20px;height:20px}
+
 /* tabbed site manager */
 .tabs{display:flex;gap:2px;background:#fff;border:1px solid var(--card-line);border-radius:10px;padding:5px;margin-bottom:14px;overflow-x:auto;flex-wrap:wrap;box-shadow:var(--shadow)}
 .tabs a{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:7px;color:#475569;font-weight:600;font-size:13px;white-space:nowrap;transition:background .12s,color .12s}
@@ -448,18 +482,20 @@ document.addEventListener('keydown',function(e){
 {{end}}
 
 {{define "site"}}
-<div class="page-head">
-  <div>
-    <h1>{{.Site.Domain}}</h1>
-    <p class="muted mono">{{.Site.Root}}</p>
+<div class="site-head">
+  <div class="site-head-main">
+    <a class="site-back" href="/sites" title="All sites">{{icon "chevronUp"}}</a>
+    <div>
+      <h1>{{.Site.Domain}}</h1>
+      <p class="muted mono">{{.Site.Root}}</p>
+    </div>
   </div>
-  <div class="actions">
-    {{if .Site.Enabled}}<span class="badge ok">{{icon "check"}} enabled</span>{{else}}<span class="badge bad">disabled</span>{{end}}
+  <div class="site-head-meta">
+    <span class="badge {{if .Site.Enabled}}ok{{else}}bad{{end}}">{{if .Site.Enabled}}{{icon "check"}} live{{else}}{{icon "x"}} disabled{{end}}</span>
     {{if .Site.SSL}}<span class="badge ok">{{icon "shield"}} SSL</span>{{end}}
     {{if .Site.Cache}}<span class="badge info">cache</span>{{end}}
     <span class="badge">PHP {{.Site.PHPVersion}}</span>
-    <a class="btn" href="http{{if .Site.SSL}}s{{end}}://{{.Site.Domain}}" target="_blank">{{icon "globe"}} Visit</a>
-    <a class="btn" href="/sites">{{icon "chevronUp"}} Back</a>
+    <a class="btn" href="http{{if .Site.SSL}}s{{end}}://{{.Site.Domain}}" target="_blank">{{icon "globe"}} Visit site</a>
   </div>
 </div>
 
@@ -505,27 +541,25 @@ document.addEventListener('keydown',function(e){
 {{end}}
 
 {{if eq .Tab "database"}}
-  {{if .Created}}<div class="alert ok">{{icon "check"}}
-    <div><strong>Database created:</strong> <span class="mono">{{.Created}}</span> · <strong>User:</strong> <span class="mono">{{.User}}</span> · <strong>Password:</strong> <span class="mono">{{.Password}}</span><div class="muted" style="font-weight:500">Save this password — shown only once.</div></div>
+  {{if .Created}}<div class="card credentials">{{icon "key"}}
+    <div><strong>Database ready</strong> <span class="mono pill">{{.Created}}</span> · user <span class="mono pill">{{.User}}</span> · password <span class="mono pill">{{.Password}}</span><div class="muted" style="font-weight:500;margin-top:4px">Save this password — it is shown only once.</div></div>
   </div>{{end}}
-  {{if .DBUser}}<div class="alert ok">{{icon "key"}} <div><strong>DB user:</strong> <span class="mono">{{.DBUser}}</span> · <strong>Password:</strong> <span class="mono">{{.DBPass}}</span>{{if .DBName}} · <strong>Database:</strong> <span class="mono">{{.DBName}}</span>{{end}}<div class="muted" style="font-weight:500">Shown only once.</div></div></div>{{end}}
-  <div class="card">
-    <h3>Create database for {{.Site.Domain}}</h3>
-    <form method="post" action="/databases">
-      <input type="hidden" name="site" value="{{.Site.Domain}}">
-      <div class="row">
-        <div class="field"><label>Suffix (will become <span class="mono">{{.DBPrefix}}_&lt;suffix&gt;</span>)</label><input class="input" name="name" placeholder="main" required></div>
-        <button class="btn primary" name="action" value="create" style="align-self:flex-end">{{icon "plus"}} Create database</button>
-      </div>
-      <p class="muted">A database, matching user, and 24-char password are generated atomically. All databases for this site share the <span class="mono">{{.DBPrefix}}_</span> prefix so the dashboard can scope them per-site.</p>
-    </form>
+  {{if .DBUser}}<div class="card credentials">{{icon "key"}}
+    <div><strong>User ready</strong> <span class="mono pill">{{.DBUser}}</span> · password <span class="mono pill">{{.DBPass}}</span>{{if .DBName}} · on <span class="mono pill">{{.DBName}}</span>{{end}}<div class="muted" style="font-weight:500;margin-top:4px">Shown only once.</div></div>
+  </div>{{end}}
+
+  <div class="toolbar">
+    <div class="muted">{{len .Databases}} database{{if ne (len .Databases) 1}}s{{end}} on <strong>{{.Site.Domain}}</strong></div>
+    <button class="btn primary" onclick="openModal('m-newdb')">{{icon "plus"}} New database</button>
   </div>
+
   {{range .Databases}}
-  <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-      <h3 style="margin:0">{{icon "database"}} <span class="mono">{{.Name}}</span></h3>
+  <div class="card db-card">
+    <div class="db-head">
+      <div class="db-title">{{icon "database"}} <span class="mono">{{.Name}}</span></div>
       <div class="actions">
         <a class="btn mini" href="/phpmyadmin/?db={{.Name}}" target="_blank">{{icon "terminal"}} phpMyAdmin</a>
+        <button class="btn mini" onclick="openAddUser('{{.Name}}')">{{icon "plus"}} Add user</button>
         <form method="post" action="/databases" data-confirm="Drop database {{.Name}}? This deletes all tables and the matching user.">
           <input type="hidden" name="site" value="{{$.Site.Domain}}">
           <input type="hidden" name="target" value="{{.Name}}">
@@ -533,46 +567,71 @@ document.addEventListener('keydown',function(e){
         </form>
       </div>
     </div>
-    <hr class="sep">
-    <h4 class="muted" style="margin:0 0 8px">Users with access</h4>
-    <table>
+    {{if .Users}}<table class="flat">
       <thead><tr><th>User</th><th>Host</th><th class="right-col">Actions</th></tr></thead>
       <tbody>
         {{range .Users}}<tr>
           <td class="mono"><strong>{{.Login}}</strong></td>
           <td class="muted mono">{{.Host}}</td>
           <td class="right-col"><div class="actions" style="justify-content:flex-end">
-            <form method="post" action="/databases" style="display:inline-flex;gap:6px;flex-wrap:wrap">
-              <input type="hidden" name="site" value="{{$.Site.Domain}}">
-              <input type="hidden" name="user" value="{{.Login}}">
-              <input class="input mini" name="password" type="text" placeholder="new password" minlength="8" required style="width:170px">
-              <button class="btn mini" name="action" value="user-password">{{icon "key"}} Reset password</button>
-            </form>
-            <form method="post" action="/databases" data-confirm="Drop user {{.Login}} and revoke access?">
+            <button class="btn mini" onclick="openResetUser('{{.Login}}')">{{icon "key"}} Reset password</button>
+            <form method="post" action="/databases" data-confirm="Drop user {{.Login}} and revoke access?" style="display:inline">
               <input type="hidden" name="site" value="{{$.Site.Domain}}">
               <input type="hidden" name="user" value="{{.Login}}">
               <input type="hidden" name="target" value="{{$.Site.Domain}}">
               <button class="btn mini danger" name="action" value="user-delete">{{icon "trash"}}</button>
             </form>
           </div></td>
-        </tr>{{else}}<tr><td colspan="3" class="muted">No users yet — add one below.</td></tr>{{end}}
+        </tr>{{end}}
       </tbody>
     </table>
-    <hr class="sep">
-    <h4 class="muted" style="margin:0 0 8px">Add user to <span class="mono">{{.Name}}</span></h4>
-    <form method="post" action="/databases">
-      <input type="hidden" name="site" value="{{$.Site.Domain}}">
-      <input type="hidden" name="target" value="{{.Name}}">
-      <div class="row">
-        <div class="field"><label>Username (letters, digits, _; max 32)</label><input class="input mono" name="user" placeholder="app_user" required></div>
-        <div class="field"><label>Password (8+ chars, leave blank to auto-generate)</label><input class="input mono" name="password" type="text" placeholder="leave empty for random"></div>
-        <button class="btn primary" name="action" value="user-create" style="align-self:flex-end">{{icon "plus"}} Add user</button>
-      </div>
-    </form>
+    {{else}}<p class="muted" style="margin:6px 0 0">No users yet — add one with the button above.</p>{{end}}
   </div>
   {{else}}
-    <div class="card muted">No databases for this site yet. Create one above — the suffix becomes part of the name (e.g. <span class="mono">{{.DBPrefix}}_main</span>).</div>
+    <div class="card empty">
+      <div class="empty-ic">{{icon "database"}}</div>
+      <div><h3 style="margin:0 0 4px;color:#0b1220">No databases yet</h3><p class="muted" style="margin:0">Click <strong>New database</strong> above. The suffix becomes part of the name, e.g. <span class="mono">{{.DBPrefix}}_main</span>.</p></div>
+    </div>
   {{end}}
+
+  <!-- modals -->
+  <div class="modal-bg" id="m-newdb"><div class="modal">
+    <h3>{{icon "plus"}} New database</h3>
+    <p class="muted">Creates a database and a matching user with a 24-char password. Auto-prefixed with <span class="mono">{{.DBPrefix}}_</span>.</p>
+    <form method="post" action="/databases">
+      <input type="hidden" name="site" value="{{.Site.Domain}}">
+      <div class="field"><label>Suffix</label><input class="input mono" name="name" placeholder="main" required autofocus></div>
+      <div class="modal-foot"><button type="button" class="btn" onclick="closeModal('m-newdb')">Cancel</button><button class="btn primary" name="action" value="create">{{icon "check"}} Create</button></div>
+    </form>
+  </div></div>
+
+  <div class="modal-bg" id="m-adduser"><div class="modal">
+    <h3>{{icon "plus"}} Add user</h3>
+    <p class="muted">User will receive full privileges on <span class="mono" id="mu-db"></span>.</p>
+    <form method="post" action="/databases">
+      <input type="hidden" name="site" value="{{.Site.Domain}}">
+      <input type="hidden" name="target" id="mu-target">
+      <div class="field"><label>Username (letters, digits, _; max 32)</label><input class="input mono" name="user" placeholder="app_user" required></div>
+      <div class="field"><label>Password</label><input class="input mono" name="password" type="text" placeholder="leave empty to auto-generate"></div>
+      <div class="modal-foot"><button type="button" class="btn" onclick="closeModal('m-adduser')">Cancel</button><button class="btn primary" name="action" value="user-create">{{icon "check"}} Add user</button></div>
+    </form>
+  </div></div>
+
+  <div class="modal-bg" id="m-resetuser"><div class="modal">
+    <h3>{{icon "key"}} Reset password</h3>
+    <p class="muted">Sets a new password for user <span class="mono" id="ru-user-label"></span>.</p>
+    <form method="post" action="/databases">
+      <input type="hidden" name="site" value="{{.Site.Domain}}">
+      <input type="hidden" name="user" id="ru-user">
+      <div class="field"><label>New password (8+ chars)</label><input class="input mono" name="password" type="text" minlength="8" required></div>
+      <div class="modal-foot"><button type="button" class="btn" onclick="closeModal('m-resetuser')">Cancel</button><button class="btn primary" name="action" value="user-password">{{icon "check"}} Reset</button></div>
+    </form>
+  </div></div>
+
+  <script>
+  function openAddUser(db){ document.getElementById('mu-db').textContent=db; document.getElementById('mu-target').value=db; openModal('m-adduser'); }
+  function openResetUser(u){ document.getElementById('ru-user-label').textContent=u; document.getElementById('ru-user').value=u; openModal('m-resetuser'); }
+  </script>
 {{end}}
 
 {{if eq .Tab "wordpress"}}
