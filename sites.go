@@ -1,11 +1,8 @@
 package main
 
 import (
-	"archive/tar"
-	"compress/gzip"
 	"fmt"
 	"html/template"
-	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -13,7 +10,6 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"time"
 )
 
 func (a *App) dashboard(w http.ResponseWriter, _ *http.Request) {
@@ -85,7 +81,7 @@ func (a *App) siteAction(w http.ResponseWriter, r *http.Request) {
 		_ = exec.Command("find", filepath.Join(a.cfg.WebRoot, domain), "-type", "d", "-exec", "chmod", "755", "{}", ";").Run()
 		_ = exec.Command("find", filepath.Join(a.cfg.WebRoot, domain), "-type", "f", "-exec", "chmod", "644", "{}", ";").Run()
 	case "backup":
-		_ = a.backupSite(site)
+		_, _ = a.createSiteBackup(site)
 	case "delete":
 		_ = os.Remove(filepath.Join("/etc/nginx/sites-enabled", domain))
 		_ = os.Remove(filepath.Join(a.cfg.NginxSitesDir, domain))
@@ -106,47 +102,6 @@ func (a *App) findSite(domain string) (Site, bool) {
 		}
 	}
 	return Site{}, false
-}
-
-func (a *App) backupSite(site Site) error {
-	backupDir := "/var/backups/hostq"
-	if err := os.MkdirAll(backupDir, 0755); err != nil {
-		return err
-	}
-	target := filepath.Join(backupDir, fmt.Sprintf("%s-%s.tar.gz", site.Domain, time.Now().Format("2006-01-02-150405")))
-	file, err := os.Create(target)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-	gz := gzip.NewWriter(file)
-	defer gz.Close()
-	tw := tar.NewWriter(gz)
-	defer tw.Close()
-	return filepath.Walk(site.Root, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return nil
-		}
-		header, err := tar.FileInfoHeader(info, "")
-		if err != nil {
-			return nil
-		}
-		rel, _ := filepath.Rel(site.Root, path)
-		header.Name = rel
-		if err := tw.WriteHeader(header); err != nil {
-			return err
-		}
-		if info.IsDir() {
-			return nil
-		}
-		src, err := os.Open(path)
-		if err != nil {
-			return nil
-		}
-		defer src.Close()
-		_, err = io.Copy(tw, src)
-		return err
-	})
 }
 
 func (a *App) listSites() []Site {

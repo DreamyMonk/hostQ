@@ -36,12 +36,14 @@ hostQ runs as one native service behind Nginx.
 
 ## Backups And Updates
 
-- Site backups are written under `/var/backups/hostq`.
+- Site backups are written under `/var/backups/hostq/sites/<domain>`.
+- Automatic backups are controlled per site and run from `/etc/cron.d/hostq-backups`.
+- Restore supports full site, files only, or database only; archive paths are validated before extraction.
 - `hostq-update` downloads GitHub tag tarballs, creates a backup, rebuilds the panel, and restarts `hostq-panel`.
 
 ```bash
 sudo hostq-update
-sudo hostq-update v0.3.3
+sudo hostq-update v0.3.4
 ```
 
 ## Validation

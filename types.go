@@ -64,6 +64,23 @@ type Service struct {
 	Status  string
 }
 
+type BackupInfo struct {
+	Name    string
+	Domain  string
+	Path    string
+	Size    string
+	Created string
+}
+
+type BackupPolicy struct {
+	Domain    string `json:"domain"`
+	Frequency string `json:"frequency"`
+	Keep      int    `json:"keep"`
+	Hour      int    `json:"hour"`
+	MaxLoad   string `json:"maxLoad"`
+	LastRun   string `json:"lastRun"`
+}
+
 type App struct {
 	cfg Config
 	tpl *template.Template

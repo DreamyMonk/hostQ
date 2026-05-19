@@ -26,6 +26,7 @@ Minimum VPS:
 | Databases | Per-site MariaDB/MySQL database and generated user/password |
 | PHP | PHP-FPM 8.2, 8.3, 8.4, 8.5 service status and per-site switch |
 | SSL | Let's Encrypt install/renew/delete and stale Nginx SSL repair |
+| Backups | Per-site manual zip backup, download, restore full/files/database, automatic daily/weekly/monthly retention |
 | Services | Narrow allowlist for Nginx, MariaDB, Redis, PHP-FPM, Pure-FTPd |
 | Updates | SSH updater that downloads a GitHub tag, backs up, rebuilds the panel, restarts systemd |
 
@@ -51,6 +52,7 @@ The installer installs:
 - phpMyAdmin
 - `hostq-panel.service`
 - `hostq-update`
+- `/etc/cron.d/hostq-backups` for automatic per-site backups
 
 At the end of install, SSH prints the first admin login:
 
@@ -75,7 +77,7 @@ Use a real domain and HTTPS for production. Port `8090` is intended as direct se
 
 ```bash
 sudo hostq-update
-sudo hostq-update v0.3.3
+sudo hostq-update v0.3.4
 ```
 
 Updates create a backup first:

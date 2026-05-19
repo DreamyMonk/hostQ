@@ -1,7 +1,7 @@
 #!/bin/bash
 # hostQ SSH updater. Usage:
 #   sudo hostq-update           # update to latest GitHub tag
-#   sudo hostq-update v0.3.3     # update to a specific tag
+#   sudo hostq-update v0.3.4     # update to a specific tag
 
 set -euo pipefail
 

@@ -25,6 +25,12 @@ func main() {
 		}
 		return
 	}
+	if len(os.Args) > 1 && os.Args[1] == "run-backups" {
+		if err := app.runScheduledBackups(); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
 	app.tpl = template.Must(template.New("hostq").Funcs(template.FuncMap{
 		"now": time.Now,
 	}).Parse(layoutTemplate))
@@ -36,6 +42,7 @@ func main() {
 	mux.HandleFunc("/sites", app.requireAuth(app.sites))
 	mux.HandleFunc("/site", app.requireAuth(app.siteManager))
 	mux.HandleFunc("/site-action", app.requireAuth(app.siteAction))
+	mux.HandleFunc("/backups", app.requireAuth(app.backups))
 	mux.HandleFunc("/files", app.requireAuth(app.files))
 	mux.HandleFunc("/databases", app.requireAuth(app.databases))
 	mux.HandleFunc("/wordpress", app.requireAuth(app.wordpress))

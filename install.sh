@@ -192,6 +192,14 @@ systemctl daemon-reload
 systemctl enable --now hostq-panel
 log "hostQ service started"
 
+cat > /etc/cron.d/hostq-backups <<EOF
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+17 * * * * root /usr/local/bin/hostq-panel run-backups >/var/log/hostq-backups.log 2>&1
+EOF
+chmod 0644 /etc/cron.d/hostq-backups
+log "Automatic backup runner installed"
+
 systemctl disable --now hostq >/dev/null 2>&1 || true
 
 header "Configuring Nginx reverse proxy"
@@ -251,5 +259,5 @@ echo "Useful commands:"
 echo "  systemctl status hostq-panel --no-pager -l"
 echo "  journalctl -u hostq-panel -f"
 echo "  sudo hostq-update"
-echo "  sudo hostq-update v0.3.3"
+echo "  sudo hostq-update v0.3.4"
 echo "  mysql_secure_installation"
