@@ -60,10 +60,10 @@ type DatabaseInfo struct {
 }
 
 type CertInfo struct {
-	Domain  string
-	Expiry  string
-	Days    string
-	Status  string
+	Domain string
+	Expiry string
+	Days   int
+	Status string
 }
 
 type Service struct {
@@ -572,16 +572,50 @@ func (a *App) listCertificates() []CertInfo {
 		if len(name) == 0 {
 			continue
 		}
-		expiry := firstMatch(block, `Expiry Date: ([^\n]+)`)
-		days := firstMatch(block, `\(([^)]+)\)`)
-		status := "valid"
-		if strings.Contains(strings.ToLower(days), "invalid") {
-			status = "invalid"
-		}
+		expiry := strings.TrimSpace(firstMatch(block, `Expiry Date:\s*([^\n(]+)`))
+		days := daysLeftFromCertbot(block, expiry)
+		status := certStatus(days)
 		certs = append(certs, CertInfo{Domain: name[0], Expiry: expiry, Days: days, Status: status})
 	}
 	sort.Slice(certs, func(i, j int) bool { return certs[i].Domain < certs[j].Domain })
 	return certs
+}
+
+func daysLeftFromCertbot(block, expiry string) int {
+	if match := regexp.MustCompile(`(?i)\((?:VALID:\s*)?(\d+)\s+days?\)`).FindStringSubmatch(block); len(match) > 1 {
+		days, _ := strconv.Atoi(match[1])
+		return days
+	}
+	match := regexp.MustCompile(`(\d{4}-\d{2}-\d{2})(?:\s+(\d{2}:\d{2}:\d{2}))?`).FindStringSubmatch(expiry)
+	if len(match) < 2 {
+		return 0
+	}
+	stamp := match[1] + "T23:59:59Z"
+	if len(match) > 2 && match[2] != "" {
+		stamp = match[1] + "T" + match[2] + "Z"
+	}
+	expiresAt, err := time.Parse(time.RFC3339, stamp)
+	if err != nil {
+		return 0
+	}
+	days := int(time.Until(expiresAt).Hours() / 24)
+	if time.Until(expiresAt) > 0 && time.Until(expiresAt).Hours() > float64(days*24) {
+		days++
+	}
+	if days < 0 {
+		return 0
+	}
+	return days
+}
+
+func certStatus(days int) string {
+	if days < 7 {
+		return "critical"
+	}
+	if days < 30 {
+		return "expiring"
+	}
+	return "valid"
 }
 
 func (a *App) services(w http.ResponseWriter, r *http.Request) {
@@ -747,7 +781,7 @@ func (a *App) listSites() []Site {
 		_, enabledErr := os.Stat(filepath.Join("/etc/nginx/sites-enabled", entry.Name()))
 		sites = append(sites, Site{
 			Domain: domain, Root: root, Enabled: enabledErr == nil,
-			SSL: strings.Contains(text, "ssl_certificate") && a.certExists(domain),
+			SSL:   strings.Contains(text, "ssl_certificate") && a.certExists(domain),
 			Cache: strings.Contains(text, "hostQ fastcgi cache: on"),
 		})
 	}
@@ -825,6 +859,6 @@ body{margin:0;font-family:Inter,system-ui,Segoe UI,sans-serif;background:#f5f7fb
 {{define "sites"}}<div class="top"><h1>Sites</h1></div>{{if .Error}}<div class="card bad">{{.Error}}</div>{{end}}<div class="card"><form method="post"><div class="grid"><input class="input" name="domain" placeholder="example.com"><button class="btn primary">Add PHP Site</button></div><p class="muted">Each site uses /var/www/domain/htdocs so website files stay separate from logs, backups, and private data.</p></form></div><table><tr><th>Domain</th><th>Root</th><th>Status</th><th>Cache</th><th>Actions</th></tr>{{range .Sites}}<tr><td>{{.Domain}}</td><td class="muted mono">{{.Root}}</td><td>{{if .Enabled}}<span class="ok">enabled</span>{{else}}<span class="bad">disabled</span>{{end}}</td><td>{{if .Cache}}on{{else}}off{{end}}</td><td><div class="actions"><form method="post" action="/site-action"><input type="hidden" name="domain" value="{{.Domain}}">{{if .Enabled}}<button class="btn mini" name="action" value="disable">Disable</button>{{else}}<button class="btn mini" name="action" value="enable">Enable</button>{{end}}</form><form method="post" action="/site-action"><input type="hidden" name="domain" value="{{.Domain}}">{{if .Cache}}<button class="btn mini" name="action" value="cache-off">Cache off</button>{{else}}<button class="btn mini" name="action" value="cache-on">Cache on</button>{{end}}</form><form method="post" action="/site-action"><input type="hidden" name="domain" value="{{.Domain}}"><button class="btn mini" name="action" value="permissions">Fix permissions</button></form><form method="post" action="/site-action"><input type="hidden" name="domain" value="{{.Domain}}"><button class="btn mini" name="action" value="backup">Backup</button></form><form method="post" action="/site-action"><input type="hidden" name="domain" value="{{.Domain}}"><button class="btn mini danger" name="action" value="delete">Soft delete</button></form></div></td></tr>{{end}}</table>{{end}}
 {{define "files"}}<div class="top"><h1>Files</h1><span class="badge mono">{{.Path}}</span></div><div class="card"><form class="grid" method="post"><input type="hidden" name="path" value="{{.Path}}"><input class="input" name="name" placeholder="folder-or-file-name"><div class="actions"><button class="btn primary" name="action" value="mkdir">New folder</button><button class="btn" name="action" value="touch">New file</button></div></form><p class="muted">Secret files such as .env, private keys, and certificate bundles are hidden and blocked by default.</p></div><table><tr><th>Name</th><th>Type</th><th>Actions</th></tr>{{range .Items}}<tr><td>{{if eq .Kind "dir"}}<a href="/files?path={{.Path}}">{{.Name}}</a>{{else}}{{.Name}}{{end}}</td><td>{{.Kind}}</td><td><div class="actions"><form method="post"><input type="hidden" name="path" value="{{$.Path}}"><input type="hidden" name="target" value="{{.Path}}"><input class="input mini mono" name="mode" placeholder="755" style="width:80px"><button class="btn mini" name="action" value="chmod">Chmod</button></form><form method="post"><input type="hidden" name="path" value="{{$.Path}}"><input type="hidden" name="target" value="{{.Path}}"><button class="btn mini danger" name="action" value="delete">Soft delete</button></form></div></td></tr>{{end}}</table>{{end}}
 {{define "databases"}}<div class="top"><h1>Databases</h1><span class="badge">MariaDB/MySQL</span></div>{{if .Created}}<div class="card ok"><b>Database created:</b> <span class="mono">{{.Created}}</span><br><b>User:</b> <span class="mono">{{.User}}</span><br><b>Password:</b> <span class="mono">{{.Password}}</span><p class="muted">Save this password now. It is shown only once.</p></div>{{end}}<div class="card"><form method="post" class="grid"><input class="input" name="name" placeholder="project_name"><button class="btn primary" name="action" value="create">Create database</button></form></div><table><tr><th>Database</th><th>Actions</th></tr>{{range .Databases}}<tr><td class="mono">{{.Name}}</td><td><form method="post"><input type="hidden" name="target" value="{{.Name}}"><button class="btn mini danger" name="action" value="delete">Delete database</button></form></td></tr>{{else}}<tr><td class="muted" colspan="2">No user databases found, or mysql CLI is not available to the panel user.</td></tr>{{end}}</table>{{end}}
-{{define "ssl"}}<div class="top"><h1>SSL</h1><span class="badge">Let's Encrypt</span></div>{{if .Output}}<pre class="card mono" style="white-space:pre-wrap">{{.Output}}</pre>{{end}}<div class="card"><form method="post" class="grid"><input class="input" name="domain" placeholder="example.com"><input class="input" name="email" placeholder="admin@example.com"><button class="btn primary" name="action" value="issue">Install SSL</button><button class="btn" name="action" value="renew">Renew</button><button class="btn danger" name="action" value="delete">Delete cert</button></form><p class="muted">Install SSL repairs stale Nginx certificate references before running certbot, so missing /etc/letsencrypt files do not block reinstall.</p></div><table><tr><th>Certificate</th><th>Expiry</th><th>Status</th></tr>{{range .Certificates}}<tr><td class="mono">{{.Domain}}</td><td>{{.Expiry}}</td><td>{{.Status}} {{.Days}}</td></tr>{{else}}<tr><td class="muted" colspan="3">No certificates found, or certbot is not installed.</td></tr>{{end}}</table>{{end}}
+{{define "ssl"}}<div class="top"><h1>SSL</h1><span class="badge">Let's Encrypt</span></div>{{if .Output}}<pre class="card mono" style="white-space:pre-wrap">{{.Output}}</pre>{{end}}<div class="card"><form method="post" class="grid"><input class="input" name="domain" placeholder="example.com"><input class="input" name="email" placeholder="admin@example.com"><button class="btn primary" name="action" value="issue">Install SSL</button><button class="btn" name="action" value="renew">Renew</button><button class="btn danger" name="action" value="delete">Delete cert</button></form><p class="muted">Install SSL repairs stale Nginx certificate references before running certbot, so missing /etc/letsencrypt files do not block reinstall.</p></div><table><tr><th>Certificate</th><th>Expiry</th><th>Status</th><th>Days left</th></tr>{{range .Certificates}}<tr><td class="mono">{{.Domain}}</td><td>{{.Expiry}}</td><td>{{.Status}}</td><td>{{.Days}}d</td></tr>{{else}}<tr><td class="muted" colspan="4">No certificates found, or certbot is not installed.</td></tr>{{end}}</table>{{end}}
 {{define "services"}}<div class="top"><h1>Services</h1></div><table><tr><th>Name</th><th>Status</th><th>Actions</th></tr>{{range .Services}}<tr><td>{{.Name}}</td><td>{{.Status}}</td><td><form method="post" style="display:flex;gap:6px"><input type="hidden" name="id" value="{{.ID}}"><button class="btn" name="action" value="restart">Restart</button><button class="btn" name="action" value="start">Start</button><button class="btn danger" name="action" value="stop">Stop</button></form></td></tr>{{end}}</table>{{end}}
 `

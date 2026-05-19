@@ -68,6 +68,20 @@ function letsEncryptCertExists(domain: string) {
     fs.existsSync(`/etc/letsencrypt/live/${domain}/privkey.pem`);
 }
 
+function calculateDaysLeft(expiryText: string) {
+  const match = expiryText.match(/(\d{4}-\d{2}-\d{2})(?:\s+(\d{2}:\d{2}:\d{2}))?/);
+  if (!match) return 0;
+  const expiresAt = new Date(`${match[1]}T${match[2] || '23:59:59'}Z`).getTime();
+  if (Number.isNaN(expiresAt)) return 0;
+  return Math.max(0, Math.ceil((expiresAt - Date.now()) / 86400000));
+}
+
+function certStatus(daysLeft: number) {
+  if (daysLeft < 7) return 'critical';
+  if (daysLeft < 30) return 'expiring';
+  return 'valid';
+}
+
 async function removeBrokenNginxSslBlock(domain: string) {
   if (process.platform !== 'linux' || letsEncryptCertExists(domain)) return '';
   const configPath = path.join(NGINX_AVAILABLE, domain);
@@ -114,9 +128,10 @@ export async function GET() {
     const blocks = r.stdout.split('Certificate Name:').slice(1);
     for (const block of blocks) {
       const domain = block.match(/Domains: (.+)/)?.[1]?.split(' ')[0] || '';
-      const expiry = block.match(/Expiry Date: (.+?) /)?.[1] || '';
-      const daysLeft = parseInt(block.match(/\((\d+) days/)?.[1] || '0');
-      const status = daysLeft < 7 ? 'critical' : daysLeft < 30 ? 'expiring' : 'valid';
+      const expiry = block.match(/Expiry Date:\s*([^\n(]+)/)?.[1]?.trim() || '';
+      const certbotDays = block.match(/\((?:VALID:\s*)?(\d+)\s+days?\)/i)?.[1];
+      const daysLeft = certbotDays ? parseInt(certbotDays, 10) : calculateDaysLeft(expiry);
+      const status = certStatus(daysLeft);
       if (domain) certs.push({ domain, expiry, daysLeft, status, issuer: "Let's Encrypt" });
     }
   }

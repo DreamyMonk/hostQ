@@ -55,6 +55,8 @@ const ssl = readFileSync('src/app/api/ssl/route.ts', 'utf8');
 assert.match(ssl, /removeBrokenNginxSslBlock/, 'SSL installer must repair stale Nginx SSL references before certbot');
 assert.match(ssl, /broken-ssl-\$\{Date\.now\(\)\}\.bak/, 'SSL repair must back up the vhost before rewriting');
 assert.match(ssl, /letsEncryptCertExists/, 'SSL installer must verify certificate files before preserving SSL config');
+assert.match(ssl, /calculateDaysLeft/, 'SSL list must calculate days left from expiry when certbot text format varies');
+assert.match(ssl, /VALID:\\s\*/, 'SSL list must parse current certbot VALID days output');
 
 const panel = readFileSync('src/app/api/panel/route.ts', 'utf8');
 assert.match(panel, /canManagePanel/, 'panel host settings must be admin-only');
@@ -110,6 +112,7 @@ assert.match(goPanel, /DROP DATABASE IF EXISTS/, 'Go panel must delete MariaDB d
 assert.match(goPanel, /certbot.*--nginx/s, 'Go panel must install Let\'s Encrypt SSL with certbot');
 assert.match(goPanel, /removeBrokenNginxSSL/, 'Go panel must repair stale Nginx SSL references before certbot');
 assert.match(goPanel, /certbot.*renew/s, 'Go panel must renew certificates');
+assert.match(goPanel, /daysLeftFromCertbot/, 'Go panel SSL list must calculate days left reliably');
 
 const goInstaller = readFileSync('scripts/install-go-panel.sh', 'utf8');
 assert.match(goInstaller, /go build/, 'Go installer must build the lightweight panel');
