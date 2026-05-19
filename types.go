@@ -74,9 +74,18 @@ type CertInfo struct {
 }
 
 type WordPressInfo struct {
-	Domain string
-	Path   string
-	Status string
+	Domain  string
+	Path    string
+	Status  string
+	Version string
+	SiteURL string
+}
+
+type WordPressUser struct {
+	ID    string
+	Login string
+	Email string
+	Roles string
 }
 
 type PHPInfo struct {

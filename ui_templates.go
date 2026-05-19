@@ -475,13 +475,75 @@ document.addEventListener('click',function(e){
 
 {{define "wordpress"}}
 <div class="page-head">
-  <div><h1>{{icon "wordpress"}} WordPress</h1><p>One-click installer powered by WP-CLI.</p></div>
+  <div><h1>{{icon "wordpress"}} WordPress</h1><p>Install and manage WordPress sites via WP-CLI.</p></div>
   <span class="badge info">WP-CLI</span>
 </div>
 {{if .Output}}<pre class="mono">{{.Output}}</pre>{{end}}
+
+{{if .Manage}}
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:8px">
+    <div>
+      <h2 style="margin:0">{{icon "wordpress"}} Manage {{.Manage.Domain}}</h2>
+      <p class="muted mono" style="margin:4px 0 0">{{.Manage.Path}} · WP {{if .Manage.Version}}{{.Manage.Version}}{{else}}unknown{{end}} · {{.Manage.SiteURL}}</p>
+    </div>
+    <a class="btn" href="/wordpress">{{icon "chevronUp"}} Back to list</a>
+  </div>
+</div>
+<div class="grid-2">
+  <div class="card">
+    <h3>{{icon "refresh"}} Update core</h3>
+    <p class="muted">Run <span class="mono">wp core update</span> + <span class="mono">update-db</span>.</p>
+    <form method="post"><input type="hidden" name="domain" value="{{.Manage.Domain}}">
+      <button class="btn primary" name="action" value="update-core">{{icon "refresh"}} Update WordPress</button>
+    </form>
+  </div>
+  <div class="card">
+    <h3>{{icon "activity"}} Flush cache & rewrite rules</h3>
+    <p class="muted">Run <span class="mono">wp cache flush</span> + <span class="mono">rewrite flush</span>.</p>
+    <form method="post"><input type="hidden" name="domain" value="{{.Manage.Domain}}">
+      <button class="btn" name="action" value="flush-cache">{{icon "refresh"}} Flush cache</button>
+    </form>
+  </div>
+  <div class="card">
+    <h3>{{icon "key"}} Reset user password</h3>
+    <form method="post"><input type="hidden" name="domain" value="{{.Manage.Domain}}">
+      <div class="field"><label>WordPress username</label><input class="input" name="user" placeholder="admin" required></div>
+      <div class="field"><label>New password (8+ characters)</label><input class="input" name="password" type="text" minlength="8" required></div>
+      <button class="btn primary" name="action" value="reset-pass">{{icon "key"}} Reset password</button>
+    </form>
+  </div>
+  <div class="card">
+    <h3>{{icon "globe"}} Change site URL</h3>
+    <p class="muted">Updates <span class="mono">siteurl</span> + <span class="mono">home</span> and search-replaces the old URL across the DB.</p>
+    <form method="post"><input type="hidden" name="domain" value="{{.Manage.Domain}}">
+      <div class="field"><label>New URL</label><input class="input" name="url" placeholder="https://{{.Manage.Domain}}" value="{{.Manage.SiteURL}}" required></div>
+      <button class="btn" name="action" value="change-url">{{icon "check"}} Apply new URL</button>
+    </form>
+  </div>
+</div>
+<div class="card">
+  <h3>{{icon "users"}} Users</h3>
+  <table>
+    <thead><tr><th>ID</th><th>Login</th><th>Email</th><th>Roles</th></tr></thead>
+    <tbody>
+      {{range .Users}}<tr><td class="mono">{{.ID}}</td><td><strong>{{.Login}}</strong></td><td class="muted">{{.Email}}</td><td><span class="badge">{{.Roles}}</span></td></tr>
+      {{else}}<tr><td colspan="4" class="muted">No users returned (WP-CLI may have failed for this install).</td></tr>{{end}}
+    </tbody>
+  </table>
+</div>
+<div class="card" style="border-color:#fecaca;background:#fff7f7">
+  <h3 class="bad">{{icon "alert"}} Danger zone</h3>
+  <p class="muted">Removes all files under <span class="mono">{{.Manage.Path}}</span> and drops the matching MariaDB database. The Nginx vhost and the parent site directory are kept so you can reuse the domain.</p>
+  <form method="post" data-confirm="DELETE the WordPress install at {{.Manage.Path}} and DROP its database? This cannot be undone.">
+    <input type="hidden" name="domain" value="{{.Manage.Domain}}">
+    <button class="btn danger" name="action" value="delete">{{icon "trash"}} Delete WordPress install</button>
+  </form>
+</div>
+{{else}}
 <div class="card">
   <h3>Install new WordPress site</h3>
-  <form method="post">
+  <form method="post"><input type="hidden" name="action" value="install">
     <div class="row">
       <div class="field"><label>Domain</label><input class="input" name="domain" placeholder="example.com" value="{{.Site}}" required></div>
       <div class="field"><label>Site title</label><input class="input" name="title" required></div>
@@ -496,13 +558,21 @@ document.addEventListener('click',function(e){
 </div>
 <div class="card" style="padding:0">
   <table>
-    <thead><tr><th>Domain</th><th>Path</th><th>Status</th></tr></thead>
+    <thead><tr><th>Domain</th><th>Path</th><th>WP version</th><th>Site URL</th><th>Status</th><th class="right-col">Manage</th></tr></thead>
     <tbody>
-      {{range .Installs}}<tr><td><strong>{{.Domain}}</strong></td><td class="mono muted">{{.Path}}</td><td><span class="badge ok">{{icon "check"}} {{.Status}}</span></td></tr>
-      {{else}}<tr><td colspan="3" class="muted">No WordPress installs detected under {{.}}/var/www.</td></tr>{{end}}
+      {{range .Installs}}<tr>
+        <td><strong>{{.Domain}}</strong></td>
+        <td class="mono muted">{{.Path}}</td>
+        <td>{{if .Version}}<span class="badge info">{{.Version}}</span>{{else}}<span class="muted">—</span>{{end}}</td>
+        <td class="mono muted">{{.SiteURL}}</td>
+        <td><span class="badge ok">{{icon "check"}} {{.Status}}</span></td>
+        <td class="right-col"><a class="btn mini primary" href="/wordpress?manage={{.Domain}}">{{icon "settings"}} Manage</a></td>
+      </tr>
+      {{else}}<tr><td colspan="6" class="muted">No WordPress installs detected under /var/www. Install one above to get started.</td></tr>{{end}}
     </tbody>
   </table>
 </div>
+{{end}}
 {{end}}
 
 {{define "files"}}
