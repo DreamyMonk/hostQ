@@ -24,6 +24,7 @@ echo "  - Nginx 1.24+ where available"
 echo "  - MariaDB 10.11 where available"
 echo "  - PHP 8.2, 8.3, 8.4, 8.5 FPM only"
 echo "  - Certbot, WP-CLI, Pure-FTPd, phpMyAdmin 5.2"
+echo "  - PHP OPcache enabled by default; Redis optional from Services"
 echo "  - PM2 with a 384 MB memory restart limit"
 echo ""
 read -r -p "Continue? [y/N] " confirm
@@ -72,6 +73,37 @@ for VER in 8.2 8.3 8.4 8.5; do
   fi
 done
 update-alternatives --set php /usr/bin/php8.4 >/dev/null 2>&1 || true
+
+header "Configuring PHP OPcache"
+for VER in 8.2 8.3 8.4 8.5; do
+  CONF="/etc/php/${VER}/mods-available/opcache.ini"
+  if [[ -f "$CONF" ]]; then
+    cat > "$CONF" <<'EOF'
+zend_extension=opcache.so
+opcache.enable=1
+opcache.enable_cli=0
+opcache.memory_consumption=96
+opcache.interned_strings_buffer=12
+opcache.max_accelerated_files=20000
+opcache.validate_timestamps=1
+opcache.revalidate_freq=2
+opcache.save_comments=1
+EOF
+    phpenmod -v "$VER" opcache >/dev/null 2>&1 || true
+    systemctl restart php${VER}-fpm >/dev/null 2>&1 || true
+  fi
+done
+log "PHP OPcache configured"
+
+header "Configuring optional Nginx FastCGI cache"
+mkdir -p /var/cache/nginx/hostq-fastcgi
+chown -R www-data:www-data /var/cache/nginx/hostq-fastcgi >/dev/null 2>&1 || true
+cat > /etc/nginx/conf.d/hostq-fastcgi-cache.conf <<'EOF'
+fastcgi_cache_path /var/cache/nginx/hostq-fastcgi levels=1:2 keys_zone=HOSTQ_FASTCGI:64m inactive=60m max_size=512m use_temp_path=off;
+fastcgi_cache_key "$scheme$request_method$host$request_uri";
+EOF
+nginx -t >/dev/null 2>&1 && systemctl reload nginx || true
+log "Nginx FastCGI cache zone ready"
 
 header "Installing hosting tools"
 apt-get install -y -qq certbot python3-certbot-nginx python3-certbot-apache pure-ftpd pure-ftpd-common

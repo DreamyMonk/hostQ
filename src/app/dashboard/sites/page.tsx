@@ -14,6 +14,7 @@ interface Site {
   enabled: boolean;
   server: string;
   ssl: boolean;
+  cache?: boolean;
 }
 
 interface SiteUser {
@@ -109,7 +110,7 @@ export default function SitesPage() {
     }
   };
 
-  const siteAction = async (site: Site, action: 'enable' | 'disable' | 'permissions') => {
+  const siteAction = async (site: Site, action: 'enable' | 'disable' | 'permissions' | 'cache_enable' | 'cache_disable') => {
     setBusy(true);
     try {
       const response = await fetch('/api/domains', {
@@ -121,7 +122,11 @@ export default function SitesPage() {
       if (data.success) {
         showMessage('success', data.message);
         load();
-        setSelected(current => current?.domain === site.domain ? { ...current, enabled: action === 'enable' ? true : action === 'disable' ? false : current.enabled } : current);
+        setSelected(current => current?.domain === site.domain ? {
+          ...current,
+          enabled: action === 'enable' ? true : action === 'disable' ? false : current.enabled,
+          cache: action === 'cache_enable' ? true : action === 'cache_disable' ? false : current.cache,
+        } : current);
       } else {
         showMessage('error', data.error || 'Action failed');
       }
@@ -411,6 +416,9 @@ export default function SitesPage() {
                 <Link href={`/dashboard/wordpress?domain=${encodeURIComponent(selected.domain)}`} className="btn btn-ghost" style={{ justifyContent: 'center' }}><Globe size={15} /> WordPress</Link>
                 <Link href="/dashboard/databases" className="btn btn-ghost" style={{ justifyContent: 'center' }}><Database size={15} /> Database</Link>
                 <Link href="/dashboard/php" className="btn btn-ghost" style={{ justifyContent: 'center' }}><FileCode2 size={15} /> PHP</Link>
+                <button onClick={() => siteAction(selected, selected.cache ? 'cache_disable' : 'cache_enable')} className="btn btn-ghost" disabled={busy || selected.server !== 'nginx'} style={{ justifyContent: 'center' }}>
+                  <Wrench size={15} /> {selected.cache ? 'Disable Cache' : 'Enable Cache'}
+                </button>
                 <button onClick={() => siteAction(selected, selected.enabled ? 'disable' : 'enable')} className="btn btn-ghost" disabled={busy} style={{ justifyContent: 'center' }}>
                   {selected.enabled ? <ToggleRight size={15} /> : <ToggleLeft size={15} />} {selected.enabled ? 'Disable' : 'Enable'}
                 </button>
@@ -424,6 +432,7 @@ export default function SitesPage() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
                   <div><div style={{ color: 'var(--text-muted)', fontSize: 11 }}>Server</div><strong>{selected.server}</strong></div>
                   <div><div style={{ color: 'var(--text-muted)', fontSize: 11 }}>SSL</div><strong>{selected.ssl ? 'Installed' : 'Not installed'}</strong></div>
+                  <div><div style={{ color: 'var(--text-muted)', fontSize: 11 }}>FastCGI Cache</div><strong>{selected.cache ? 'Enabled' : 'Disabled'}</strong></div>
                   <div><div style={{ color: 'var(--text-muted)', fontSize: 11 }}>Type</div><strong>{selected.type}</strong></div>
                   <div><div style={{ color: 'var(--text-muted)', fontSize: 11 }}>Root</div><strong className="mono" style={{ fontSize: 11 }}>{selected.docRoot}</strong></div>
                 </div>

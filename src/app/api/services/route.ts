@@ -137,6 +137,16 @@ const SERVICES: ServiceDef[] = [
     port: 21,
     category: 'tools',
   },
+  {
+    id: 'redis',
+    name: 'Redis Cache',
+    systemd: 'redis-server',
+    checkCmd: 'redis-server --version',
+    installCmd: 'apt-get install -y redis-server',
+    configCmd: 'redis-cli ping',
+    port: 6379,
+    category: 'tools',
+  },
 ];
 
 // ──────────────────────────────────────────────
@@ -150,7 +160,7 @@ async function checkService(svc: ServiceDef) {
       const demoStatus: Record<string, string> = {
       nginx: 'active', mysql: 'active', php84fpm: 'active',
       certbot: 'installed', wpcli: 'installed',
-      apache: 'inactive', php82fpm: 'inactive', php83fpm: 'inactive', php85fpm: 'inactive', phpmyadmin: 'installed', pureftpd: 'active',
+      apache: 'inactive', php82fpm: 'inactive', php83fpm: 'inactive', php85fpm: 'inactive', phpmyadmin: 'installed', pureftpd: 'active', redis: 'inactive',
     };
     return {
       id: svc.id, name: svc.name, category: svc.category,

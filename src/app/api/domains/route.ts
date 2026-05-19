@@ -7,6 +7,8 @@ import { canManagePanel, canManageSite } from '@/lib/authz';
 import fs from 'fs';
 import path from 'path';
 
+type SiteInfo = { domain: string; type: 'domain'|'subdomain'; docRoot: string; enabled: boolean; server: string; ssl: boolean; cache: boolean };
+
 async function auth() {
   const cookieStore = await cookies();
   const token = cookieStore.get('panel_token')?.value;
@@ -22,7 +24,7 @@ const SUPPORTED_SITE_TYPES = ['html', 'php', 'wordpress'] as const;
 // ──────────────────────────────────────────────
 // Nginx vhost template for a domain
 // ──────────────────────────────────────────────
-function nginxVhostTemplate(domain: string, docRoot: string, phpVersion: string, ssl: boolean): string {
+function nginxVhostTemplate(domain: string, docRoot: string, phpVersion: string, ssl: boolean, cache = false): string {
   const sslBlock = ssl ? `
     listen 443 ssl http2;
     ssl_certificate     /etc/letsencrypt/live/${domain}/fullchain.pem;
@@ -30,7 +32,20 @@ function nginxVhostTemplate(domain: string, docRoot: string, phpVersion: string,
     ssl_protocols       TLSv1.2 TLSv1.3;
     ssl_ciphers         HIGH:!aNULL:!MD5;` : '';
 
+  const cacheRules = cache ? `
+    set $hostq_skip_cache 0;
+    if ($request_method = POST) { set $hostq_skip_cache 1; }
+    if ($query_string != "") { set $hostq_skip_cache 1; }
+    if ($request_uri ~* "/wp-admin|/wp-login.php|/cart|/checkout|/my-account") { set $hostq_skip_cache 1; }` : '';
+  const cachePhp = cache ? `
+        fastcgi_cache HOSTQ_FASTCGI;
+        fastcgi_cache_valid 200 301 302 10m;
+        fastcgi_cache_bypass $hostq_skip_cache;
+        fastcgi_no_cache $hostq_skip_cache;
+        add_header X-hostQ-Cache $upstream_cache_status always;` : '';
+
   return `# hostQ managed - ${domain}
+# hostQ fastcgi cache: ${cache ? 'on' : 'off'}
 server {
     listen 80;${sslBlock}
     server_name ${domain} www.${domain};
@@ -38,7 +53,7 @@ server {
     index index.php index.html index.htm;
 
     access_log /var/log/nginx/${domain}.access.log;
-    error_log  /var/log/nginx/${domain}.error.log;
+    error_log  /var/log/nginx/${domain}.error.log;${cacheRules}
 
     location / {
         try_files \\$uri \\$uri/ /index.php?\\$query_string;
@@ -48,7 +63,7 @@ server {
         include snippets/fastcgi-php.conf;
         fastcgi_pass unix:/run/php/php${phpVersion}-fpm.sock;
         fastcgi_param SCRIPT_FILENAME \\$realpath_root\\$fastcgi_script_name;
-        include fastcgi_params;
+        include fastcgi_params;${cachePhp}
     }
 
     location ~ /\\.ht {
@@ -106,19 +121,28 @@ async function detectWebServer(): Promise<'nginx' | 'apache' | 'none'> {
   return 'none';
 }
 
+function parseNginxSite(domain: string) {
+  const configPath = path.join(NGINX_AVAILABLE, domain);
+  const content = fs.readFileSync(configPath, 'utf8');
+  const docRoot = content.match(/root (.+);/)?.[1]?.trim() || `${WEB_ROOT}/${domain}/htdocs`;
+  const phpVersion = content.match(/php(\d\.\d)-fpm/)?.[1] || '8.4';
+  const ssl = content.includes('ssl_certificate');
+  return { configPath, docRoot, phpVersion, ssl };
+}
+
 // ──────────────────────────────────────────────
 // List all managed domains from config files
 // ──────────────────────────────────────────────
-async function listDomains(): Promise<{ domain: string; type: 'domain'|'subdomain'; docRoot: string; enabled: boolean; server: string; ssl: boolean }[]> {
-  const domains: { domain: string; type: 'domain'|'subdomain'; docRoot: string; enabled: boolean; server: string; ssl: boolean }[] = [];
+async function listDomains(): Promise<SiteInfo[]> {
+  const domains: SiteInfo[] = [];
 
   // Check if on Linux (no real configs on Windows dev)
   if (process.platform !== 'linux') {
     return [
-      { domain: 'example.com',      type: 'domain',    docRoot: '/var/www/example.com/htdocs', enabled: true,  server: 'nginx', ssl: true  },
-      { domain: 'shop.example.com', type: 'subdomain', docRoot: '/var/www/example.com/htdocs/shop', enabled: true, server: 'nginx', ssl: true },
-      { domain: 'blog.mysite.com',  type: 'subdomain', docRoot: '/var/www/mysite.com/htdocs/blog', enabled: false, server: 'nginx', ssl: false },
-      { domain: 'mysite.com',       type: 'domain',    docRoot: '/var/www/mysite.com/htdocs', enabled: true, server: 'nginx', ssl: false },
+      { domain: 'example.com',      type: 'domain',    docRoot: '/var/www/example.com/htdocs', enabled: true,  server: 'nginx', ssl: true, cache: true },
+      { domain: 'shop.example.com', type: 'subdomain', docRoot: '/var/www/example.com/htdocs/shop', enabled: true, server: 'nginx', ssl: true, cache: false },
+      { domain: 'blog.mysite.com',  type: 'subdomain', docRoot: '/var/www/mysite.com/htdocs/blog', enabled: false, server: 'nginx', ssl: false, cache: false },
+      { domain: 'mysite.com',       type: 'domain',    docRoot: '/var/www/mysite.com/htdocs', enabled: true, server: 'nginx', ssl: false, cache: false },
     ];
   }
 
@@ -132,6 +156,7 @@ async function listDomains(): Promise<{ domain: string; type: 'domain'|'subdomai
         const domainMatch = content.match(/# (?:hostQ|HostPanel) managed - (.+)/);
         const rootMatch   = content.match(/root (.+);/);
         const sslMatch    = content.includes('ssl_certificate');
+        const cacheMatch  = content.includes('hostQ fastcgi cache: on');
         const enabled     = fs.existsSync(path.join(NGINX_ENABLED, file));
         if (domainMatch && rootMatch) {
           const domainName = domainMatch[1].trim();
@@ -143,6 +168,7 @@ async function listDomains(): Promise<{ domain: string; type: 'domain'|'subdomai
             enabled,
             server: 'nginx',
             ssl: sslMatch,
+            cache: cacheMatch,
           });
         }
       } catch { /* skip */ }
@@ -282,7 +308,7 @@ export async function PATCH(request: NextRequest) {
   if (!/^[a-zA-Z0-9][a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(domain)) {
     return NextResponse.json({ error: 'Invalid domain name' }, { status: 400 });
   }
-  if (!canManageSite(actor, domain, action === 'permissions' ? 'write' : 'danger')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!canManageSite(actor, domain, ['permissions', 'cache_enable', 'cache_disable'].includes(action) ? 'write' : 'danger')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   if (process.platform !== 'linux') {
     audit({ actor: actor.username, action: `site.${action}`, target: domain, ip: clientIp(request), details: { demo: true } });
@@ -296,6 +322,17 @@ export async function PATCH(request: NextRequest) {
     await runCommand(`find ${shellQuote(domainRoot)} -type f -exec chmod 644 {} \\; 2>/dev/null || true`);
     audit({ actor: actor.username, action: 'site.permissions', target: domain, ip: clientIp(request) });
     return NextResponse.json({ success: true, message: `${domain} permissions repaired` });
+  }
+
+  if (action === 'cache_enable' || action === 'cache_disable') {
+    if (server !== 'nginx') return NextResponse.json({ error: 'FastCGI cache is available for Nginx sites only' }, { status: 400 });
+    const { configPath, docRoot, phpVersion, ssl } = parseNginxSite(domain);
+    fs.writeFileSync(configPath, nginxVhostTemplate(domain, docRoot, phpVersion, ssl, action === 'cache_enable'));
+    const testR = await runCommand('nginx -t 2>&1');
+    if (!testR.success) return NextResponse.json({ error: testR.stderr || testR.stdout || 'Nginx config test failed' }, { status: 500 });
+    await runHelper('web.reload', { server: 'nginx' });
+    audit({ actor: actor.username, action: `site.${action}`, target: domain, ip: clientIp(request) });
+    return NextResponse.json({ success: true, message: `${domain} FastCGI cache ${action === 'cache_enable' ? 'enabled' : 'disabled'}` });
   }
 
   if (server === 'nginx') {

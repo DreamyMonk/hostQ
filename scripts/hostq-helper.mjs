@@ -10,6 +10,7 @@ const SERVICES = new Map([
   ['php83fpm', 'php8.3-fpm'],
   ['php82fpm', 'php8.2-fpm'],
   ['pureftpd', 'pure-ftpd'],
+  ['redis', 'redis-server'],
 ]);
 
 const INSTALLS = new Map([
@@ -23,6 +24,7 @@ const INSTALLS = new Map([
   ['certbot', ['apt-get install -y certbot python3-certbot-nginx python3-certbot-apache']],
   ['phpmyadmin', ['DEBIAN_FRONTEND=noninteractive apt-get install -y phpmyadmin']],
   ['pureftpd', ['apt-get install -y pure-ftpd pure-ftpd-common']],
+  ['redis', ['apt-get install -y redis-server']],
 ]);
 
 const UPDATE_REPO = 'DreamyMonk/hostQ';

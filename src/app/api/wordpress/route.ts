@@ -30,6 +30,7 @@ function existingNginxRoot(domain: string) {
 
 function nginxWordPressVhost(domain: string, docRoot: string, phpVersion = '8.4') {
   return `# hostQ managed - ${domain}
+# hostQ fastcgi cache: off
 server {
     listen 80;
     server_name ${domain} www.${domain};

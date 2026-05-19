@@ -36,6 +36,7 @@ Local development works on Windows, macOS, and Linux. Real hosting actions requi
 | WordPress | WP-CLI install, WordPress discovery, database setup, soft-delete |
 | Databases | MariaDB/MySQL databases, users, grants, drops, phpMyAdmin link |
 | PHP | PHP-FPM 8.2, 8.3, 8.4, and 8.5 management |
+| Cache | PHP OPcache by default, optional Redis service, optional per-site Nginx FastCGI cache |
 | SSL | Let's Encrypt via Certbot, renew/delete, manual PEM upload |
 | Services | Nginx, Apache, MariaDB, PHP-FPM, Certbot, WP-CLI, Pure-FTPd, phpMyAdmin |
 | Updates | Web updater and SSH CLI updater using GitHub releases |
@@ -207,6 +208,7 @@ Each site has a **Manage Site** panel with:
 - PHP shortcut
 - Enable/disable
 - File permissions and database scan
+- Optional Nginx FastCGI cache toggle
 - Sanitize files and repair permissions
 - Backup
 - Soft-delete options
@@ -227,6 +229,7 @@ Implemented controls:
 - Audit log hash chain and rotation
 - File manager restricted to `/var/www` on Linux
 - Secret-like files blocked or quarantined
+- Redis is optional and not required for 1GB VPS installs
 - Restore dry-run and confirmation flow
 - Privileged helper allowlist for sensitive tasks
 
