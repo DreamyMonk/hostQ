@@ -29,9 +29,37 @@ type Site struct {
 }
 
 type FileItem struct {
+	Name    string
+	Kind    string
+	Path    string
+	Size    string
+	Mode    string
+	ModTime string
+}
+
+type Crumb struct {
 	Name string
-	Kind string
 	Path string
+}
+
+type SystemStats struct {
+	LoadAvg     string
+	Uptime      string
+	MemUsed     string
+	MemTotal    string
+	MemPercent  int
+	DiskUsed    string
+	DiskTotal   string
+	DiskPercent int
+	Hostname    string
+	CPUCount    int
+}
+
+type AuditEntry struct {
+	Timestamp string
+	Action    string
+	Status    string
+	Target    string
 }
 
 type DatabaseInfo struct {

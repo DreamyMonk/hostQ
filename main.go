@@ -32,7 +32,11 @@ func main() {
 		return
 	}
 	app.tpl = template.Must(template.New("hostq").Funcs(template.FuncMap{
-		"now": time.Now,
+		"now":  time.Now,
+		"icon": icon,
+		"hasPrefix": func(s, prefix string) bool {
+			return strings.HasPrefix(s, prefix)
+		},
 	}).Parse(layoutTemplate))
 
 	mux := http.NewServeMux()
@@ -50,6 +54,8 @@ func main() {
 	mux.HandleFunc("/ssl", app.requireAuth(app.ssl))
 	mux.HandleFunc("/services", app.requireAuth(app.services))
 	mux.HandleFunc("/cron", app.requireAuth(app.cron))
+	mux.HandleFunc("/account", app.requireAuth(app.account))
+	mux.HandleFunc("/audit", app.requireAuth(app.auditLog))
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("ok")) })
 
 	log.Printf("hostQ panel listening on http://%s", app.cfg.Addr)
