@@ -51,6 +51,11 @@ const update = readFileSync('src/app/api/update/route.ts', 'utf8');
 assert.match(update, /confirm !== tag/, 'update API must require tag confirmation');
 assert.match(update, /runHelper\('panel.update'/, 'update API must use privileged helper');
 
+const ssl = readFileSync('src/app/api/ssl/route.ts', 'utf8');
+assert.match(ssl, /removeBrokenNginxSslBlock/, 'SSL installer must repair stale Nginx SSL references before certbot');
+assert.match(ssl, /broken-ssl-\$\{Date\.now\(\)\}\.bak/, 'SSL repair must back up the vhost before rewriting');
+assert.match(ssl, /letsEncryptCertExists/, 'SSL installer must verify certificate files before preserving SSL config');
+
 const panel = readFileSync('src/app/api/panel/route.ts', 'utf8');
 assert.match(panel, /canManagePanel/, 'panel host settings must be admin-only');
 assert.match(panel, /validPanelDomain/, 'panel host settings must validate domains');
@@ -74,6 +79,7 @@ assert.match(domains, /\/htdocs/, 'new sites must use htdocs document roots');
 assert.match(domains, /hostQ fastcgi cache: \$/, 'site vhosts must track FastCGI cache state');
 assert.match(domains, /cache_enable/, 'site API must support enabling FastCGI cache');
 assert.match(domains, /cache_disable/, 'site API must support disabling FastCGI cache');
+assert.match(domains, /letsEncryptCertExists/, 'site API must not preserve missing Let\'s Encrypt cert references');
 
 const services = readFileSync('src/app/api/services/route.ts', 'utf8');
 assert.match(services, /id: 'redis'/, 'services manager must expose optional Redis cache');

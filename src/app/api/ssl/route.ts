@@ -13,6 +13,81 @@ async function auth() {
   return token ? verifyToken(token) : null;
 }
 
+const WEB_ROOT = process.env.WEB_ROOT || '/var/www';
+const NGINX_AVAILABLE = '/etc/nginx/sites-available';
+
+function nginxVhostTemplate(domain: string, docRoot: string, phpVersion: string, ssl: boolean, cache = false): string {
+  const sslBlock = ssl ? `
+    listen 443 ssl http2;
+    ssl_certificate     /etc/letsencrypt/live/${domain}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${domain}/privkey.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         HIGH:!aNULL:!MD5;` : '';
+  const cachePhp = cache ? `
+        fastcgi_cache HOSTQ_FASTCGI;
+        fastcgi_cache_valid 200 301 302 10m;
+        add_header X-hostQ-Cache $upstream_cache_status always;` : '';
+
+  return `# hostQ managed - ${domain}
+# hostQ fastcgi cache: ${cache ? 'on' : 'off'}
+server {
+    listen 80;${sslBlock}
+    server_name ${domain} www.${domain};
+    root ${docRoot};
+    index index.php index.html index.htm;
+
+    access_log /var/log/nginx/${domain}.access.log;
+    error_log  /var/log/nginx/${domain}.error.log;
+
+    location / {
+        try_files \\$uri \\$uri/ /index.php?\\$query_string;
+    }
+
+    location ~ \\.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/run/php/php${phpVersion}-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME \\$realpath_root\\$fastcgi_script_name;
+        include fastcgi_params;${cachePhp}
+    }
+
+    location ~ /\\.ht {
+        deny all;
+    }
+}${ssl ? `
+
+server {
+    listen 80;
+    server_name ${domain} www.${domain};
+    return 301 https://\\$host\\$request_uri;
+}` : ''}
+`;
+}
+
+function letsEncryptCertExists(domain: string) {
+  return fs.existsSync(`/etc/letsencrypt/live/${domain}/fullchain.pem`) &&
+    fs.existsSync(`/etc/letsencrypt/live/${domain}/privkey.pem`);
+}
+
+async function removeBrokenNginxSslBlock(domain: string) {
+  if (process.platform !== 'linux' || letsEncryptCertExists(domain)) return '';
+  const configPath = path.join(NGINX_AVAILABLE, domain);
+  if (!fs.existsSync(configPath)) return '';
+
+  const content = fs.readFileSync(configPath, 'utf8');
+  if (!content.includes('/etc/letsencrypt/live/')) return '';
+
+  const docRoot = content.match(/root (.+);/)?.[1]?.trim() || `${WEB_ROOT}/${domain}/htdocs`;
+  const phpVersion = content.match(/php(\d\.\d)-fpm/)?.[1] || '8.4';
+  const cache = content.includes('hostQ fastcgi cache: on');
+  const backupPath = `${configPath}.broken-ssl-${Date.now()}.bak`;
+  fs.copyFileSync(configPath, backupPath);
+  fs.writeFileSync(configPath, nginxVhostTemplate(domain, docRoot, phpVersion, false, cache));
+  const reload = await runHelper('web.reload', { server: 'nginx' });
+  return reload.success
+    ? `Removed stale SSL references from ${configPath}. Backup: ${backupPath}\n`
+    : `Tried removing stale SSL references, but Nginx reload still failed: ${reload.stderr || reload.error || reload.stdout}\n`;
+}
+
 // GET - list all SSL certs
 export async function GET() {
   if (!await auth()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -100,6 +175,7 @@ export async function POST(request: Request) {
   if (!email) return NextResponse.json({ error: "Email required for Let's Encrypt" }, { status: 400 });
   const stagingFlag = staging ? '--staging' : '';
   const plugin = ['nginx', 'apache', 'standalone'].includes(webserver) ? webserver : 'nginx';
+  const repairLog = plugin === 'nginx' ? await removeBrokenNginxSslBlock(domain) : '';
   const cmd = `certbot --${plugin} -d ${shellQuote(domain)} --email ${shellQuote(email)} --agree-tos --non-interactive ${stagingFlag} 2>&1`;
   
   const r = await runCommand(cmd, 120000);
@@ -107,7 +183,7 @@ export async function POST(request: Request) {
   
   return NextResponse.json({
     success: r.success,
-    output: r.stdout || r.stderr,
+    output: `${repairLog}${r.stdout || r.stderr}`,
     message: r.success ? `SSL installed for ${domain}` : `Failed: ${r.error}`,
   });
 }

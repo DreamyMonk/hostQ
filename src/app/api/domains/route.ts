@@ -84,6 +84,11 @@ server {
 `;
 }
 
+function letsEncryptCertExists(domain: string) {
+  return fs.existsSync(`/etc/letsencrypt/live/${domain}/fullchain.pem`) &&
+    fs.existsSync(`/etc/letsencrypt/live/${domain}/privkey.pem`);
+}
+
 // ──────────────────────────────────────────────
 // Apache vhost template
 // ──────────────────────────────────────────────
@@ -126,7 +131,7 @@ function parseNginxSite(domain: string) {
   const content = fs.readFileSync(configPath, 'utf8');
   const docRoot = content.match(/root (.+);/)?.[1]?.trim() || `${WEB_ROOT}/${domain}/htdocs`;
   const phpVersion = content.match(/php(\d\.\d)-fpm/)?.[1] || '8.4';
-  const ssl = content.includes('ssl_certificate');
+  const ssl = content.includes('ssl_certificate') && letsEncryptCertExists(domain);
   return { configPath, docRoot, phpVersion, ssl };
 }
 
@@ -155,7 +160,7 @@ async function listDomains(): Promise<SiteInfo[]> {
         if (!content.includes('hostQ managed') && !content.includes('HostPanel managed')) continue;
         const domainMatch = content.match(/# (?:hostQ|HostPanel) managed - (.+)/);
         const rootMatch   = content.match(/root (.+);/);
-        const sslMatch    = content.includes('ssl_certificate');
+        const sslMatch    = content.includes('ssl_certificate') && letsEncryptCertExists(domainMatch?.[1]?.trim() || file);
         const cacheMatch  = content.includes('hostQ fastcgi cache: on');
         const enabled     = fs.existsSync(path.join(NGINX_ENABLED, file));
         if (domainMatch && rootMatch) {
