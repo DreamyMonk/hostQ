@@ -4,9 +4,9 @@ services:
     container_name: hostq
     restart: unless-stopped
     ports:
-      - "8091:8091"
+      - "8090:8090"
     environment:
-      - HOSTQ_ADDR=0.0.0.0:8091
+      - HOSTQ_ADDR=0.0.0.0:8090
       - HOSTQ_DATA_DIR=/data
       - WEB_ROOT=/var/www
       - JWT_SECRET=${JWT_SECRET:-change-this-secret}

@@ -20,7 +20,8 @@ if [[ $EUID -ne 0 ]]; then error "Run as root: sudo bash install.sh"; fi
 header "hostQ VPS Setup"
 echo "This script installs a lightweight hosting control panel:"
 echo "  - hostQ panel as a systemd service"
-echo "  - Nginx reverse proxy on ports 80 and 8090"
+echo "  - hostQ direct setup access on port 8090"
+echo "  - Nginx reverse proxy on port 80"
 echo "  - MariaDB"
 echo "  - PHP 8.2, 8.3, 8.4, 8.5 FPM where available"
 echo "  - Certbot, WP-CLI, Pure-FTPd, phpMyAdmin"
@@ -119,7 +120,8 @@ log "Certbot, WP-CLI, Pure-FTPd, and phpMyAdmin installed"
 header "Setting up hostQ panel"
 PANEL_DIR="/opt/hostq"
 PANEL_PUBLIC_PORT="${PANEL_PUBLIC_PORT:-8090}"
-PANEL_ADDR="${HOSTQ_ADDR:-127.0.0.1:8091}"
+PANEL_ADDR="${HOSTQ_ADDR:-0.0.0.0:${PANEL_PUBLIC_PORT}}"
+PANEL_UPSTREAM_ADDR="${HOSTQ_UPSTREAM_ADDR:-127.0.0.1:${PANEL_PUBLIC_PORT}}"
 mkdir -p "$PANEL_DIR" /etc/hostq
 chmod 700 /etc/hostq
 
@@ -196,13 +198,12 @@ header "Configuring Nginx reverse proxy"
 cat > /etc/nginx/sites-available/hostq <<'EOF'
 server {
     listen 80;
-    listen __PANEL_PUBLIC_PORT__;
     server_name _;
 
     client_max_body_size 64M;
 
     location / {
-        proxy_pass http://__PANEL_ADDR__;
+        proxy_pass http://__PANEL_UPSTREAM_ADDR__;
         proxy_http_version 1.1;
         proxy_read_timeout 60s;
         proxy_buffering off;
@@ -215,8 +216,7 @@ server {
     }
 }
 EOF
-sed -i "s/__PANEL_PUBLIC_PORT__/${PANEL_PUBLIC_PORT}/g" /etc/nginx/sites-available/hostq
-sed -i "s#__PANEL_ADDR__#${PANEL_ADDR}#g" /etc/nginx/sites-available/hostq
+sed -i "s#__PANEL_UPSTREAM_ADDR__#${PANEL_UPSTREAM_ADDR}#g" /etc/nginx/sites-available/hostq
 
 ln -sf /etc/nginx/sites-available/hostq /etc/nginx/sites-enabled/hostq
 rm -f /etc/nginx/sites-enabled/default /etc/nginx/sites-enabled/hostq-go
@@ -251,5 +251,5 @@ echo "Useful commands:"
 echo "  systemctl status hostq-panel --no-pager -l"
 echo "  journalctl -u hostq-panel -f"
 echo "  sudo hostq-update"
-echo "  sudo hostq-update v0.3.1"
+echo "  sudo hostq-update v0.3.3"
 echo "  mysql_secure_installation"

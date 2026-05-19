@@ -10,9 +10,9 @@ FROM alpine:3.20
 RUN adduser -D -u 10001 hostq
 WORKDIR /app
 COPY --from=builder /out/hostq-panel /usr/local/bin/hostq-panel
-ENV HOSTQ_ADDR=0.0.0.0:8091
+ENV HOSTQ_ADDR=0.0.0.0:8090
 ENV HOSTQ_DATA_DIR=/data
 ENV WEB_ROOT=/var/www
-EXPOSE 8091
+EXPOSE 8090
 VOLUME ["/data", "/var/www"]
 CMD ["/usr/local/bin/hostq-panel"]

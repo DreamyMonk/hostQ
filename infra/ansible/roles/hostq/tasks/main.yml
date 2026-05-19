@@ -108,7 +108,7 @@
     mode: "0600"
   loop:
     - { key: "WEB_ROOT", value: "{{ hostq_web_root }}" }
-    - { key: "HOSTQ_ADDR", value: "127.0.0.1:8091" }
+    - { key: "HOSTQ_ADDR", value: "0.0.0.0:{{ hostq_panel_public_port }}" }
     - { key: "PANEL_PUBLIC_PORT", value: "{{ hostq_panel_public_port }}" }
     - { key: "PANEL_DOMAIN", value: "{{ hostq_panel_domain }}" }
     - { key: "HOSTQ_ALLOW_INSECURE_HTTP", value: "{{ hostq_allow_insecure_http | ternary('true', 'false') }}" }

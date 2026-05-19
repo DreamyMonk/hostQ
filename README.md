@@ -75,7 +75,7 @@ Use a real domain and HTTPS for production. Port `8090` is intended as direct se
 
 ```bash
 sudo hostq-update
-sudo hostq-update v0.3.1
+sudo hostq-update v0.3.3
 ```
 
 Updates create a backup first:
@@ -98,8 +98,8 @@ sudo systemctl restart nginx hostq-panel
 sudo systemctl status hostq-panel --no-pager -l
 sudo journalctl -u hostq-panel -f
 sudo nginx -t
-sudo ss -ltnp | grep -E ':80|:443|:8090|:8091'
-curl -I http://127.0.0.1:8091
+sudo ss -ltnp | grep -E ':80|:443|:8090'
+curl -I http://127.0.0.1:8090
 ```
 
 ## Cloudflare
@@ -107,7 +107,7 @@ curl -I http://127.0.0.1:8091
 After origin SSL is installed, set Cloudflare SSL/TLS mode to **Full** or **Full strict**. If Cloudflare shows 502, check that Nginx proxies the panel vhost to:
 
 ```nginx
-proxy_pass http://127.0.0.1:8091;
+proxy_pass http://127.0.0.1:8090;
 ```
 
 ## Local Development

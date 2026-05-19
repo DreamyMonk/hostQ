@@ -12,7 +12,7 @@ import (
 func main() {
 	app := &App{
 		cfg: Config{
-			Addr:          env("HOSTQ_ADDR", "127.0.0.1:8091"),
+			Addr:          env("HOSTQ_ADDR", "127.0.0.1:8090"),
 			DataDir:       env("HOSTQ_DATA_DIR", "/etc/hostq"),
 			WebRoot:       env("WEB_ROOT", "/var/www"),
 			NginxSitesDir: env("HOSTQ_NGINX_AVAILABLE", "/etc/nginx/sites-available"),

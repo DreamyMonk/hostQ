@@ -11,9 +11,9 @@ hostQ runs as one native service behind Nginx.
 ## Network
 
 - Allow only `22/tcp`, `80/tcp`, `443/tcp`, and FTP ports you intentionally use.
-- `install.sh` also opens `PANEL_PUBLIC_PORT`; the default is `8090`.
+- hostQ listens on `PANEL_PUBLIC_PORT`; the default is `8090`.
 - Close or restrict `8090` after HTTPS/domain access is working.
-- Nginx should proxy panel traffic to `127.0.0.1:8091`.
+- Nginx should proxy panel traffic to `127.0.0.1:8090`.
 - Use Cloudflare SSL mode **Full** or **Full strict** after origin SSL is installed.
 
 ## Accounts And Sessions
@@ -41,7 +41,7 @@ hostQ runs as one native service behind Nginx.
 
 ```bash
 sudo hostq-update
-sudo hostq-update v0.3.1
+sudo hostq-update v0.3.3
 ```
 
 ## Validation
