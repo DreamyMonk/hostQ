@@ -1,12 +1,12 @@
 # hostQ Infrastructure
 
-This folder contains the recommended production deployment path:
+This folder contains optional provider-style automation for repeatable deployments:
 
 - Terraform provisions the VPS, firewall, SSH key, and optional DNS records.
 - Ansible hardens the OS and installs or updates hostQ.
 - hostQ manages sites, databases, SSL, files, PHP, WordPress, and updates after first boot.
 
-Docker is intentionally not used for production because hostQ controls host-level services such as Nginx, MariaDB, PHP-FPM, Certbot, Pure-FTPd, systemd, and `/var/www`.
+The primary hostQ deployment remains the cPanel/Plesk-style installer: clone the repo on a VPS and run `setup.sh`. Docker is intentionally not used for production because hostQ controls host-level services such as Nginx, MariaDB, PHP-FPM, Certbot, Pure-FTPd, systemd, and `/var/www`.
 
 ## Requirements
 
