@@ -1,6 +1,8 @@
 package main
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
@@ -10,6 +12,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -46,6 +49,12 @@ type Site struct {
 	Cache   bool
 }
 
+type FileItem struct {
+	Name string
+	Kind string
+	Path string
+}
+
 type Service struct {
 	ID      string
 	Name    string
@@ -79,7 +88,9 @@ func main() {
 	mux.HandleFunc("/login", app.login)
 	mux.HandleFunc("/logout", app.logout)
 	mux.HandleFunc("/sites", app.requireAuth(app.sites))
+	mux.HandleFunc("/site-action", app.requireAuth(app.siteAction))
 	mux.HandleFunc("/files", app.requireAuth(app.files))
+	mux.HandleFunc("/databases", app.requireAuth(app.databases))
 	mux.HandleFunc("/services", app.requireAuth(app.services))
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("ok")) })
 
@@ -233,25 +244,126 @@ func (a *App) sites(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) files(w http.ResponseWriter, r *http.Request) {
-	reqPath := filepath.Clean("/" + strings.TrimPrefix(r.URL.Query().Get("path"), "/"))
-	full := filepath.Join(a.cfg.WebRoot, reqPath)
-	if !strings.HasPrefix(full, filepath.Clean(a.cfg.WebRoot)) {
-		full = a.cfg.WebRoot
+	if r.Method == http.MethodPost {
+		a.fileAction(w, r)
+		return
 	}
+	reqPath := filepath.Clean("/" + strings.TrimPrefix(r.URL.Query().Get("path"), "/"))
+	full := a.safeWebPath(reqPath)
 	entries, _ := os.ReadDir(full)
-	type item struct{ Name, Kind, Path string }
-	items := []item{}
+	items := []FileItem{}
 	for _, entry := range entries {
-		if strings.HasPrefix(entry.Name(), ".env") || strings.Contains(entry.Name(), ".key") {
+		if blockedFileName(entry.Name()) {
 			continue
 		}
 		kind := "file"
 		if entry.IsDir() {
 			kind = "dir"
 		}
-		items = append(items, item{Name: entry.Name(), Kind: kind, Path: filepath.Join(reqPath, entry.Name())})
+		items = append(items, FileItem{Name: entry.Name(), Kind: kind, Path: filepath.Join(reqPath, entry.Name())})
 	}
 	a.render(w, "files", map[string]any{"Title": "Files", "Path": reqPath, "Items": items})
+}
+
+func (a *App) safeWebPath(reqPath string) string {
+	clean := filepath.Clean("/" + strings.TrimPrefix(reqPath, "/"))
+	full := filepath.Join(a.cfg.WebRoot, clean)
+	root := filepath.Clean(a.cfg.WebRoot)
+	if full != root && !strings.HasPrefix(full, root+string(os.PathSeparator)) {
+		return root
+	}
+	return full
+}
+
+func safeName(name string) string {
+	name = strings.TrimSpace(name)
+	name = strings.ReplaceAll(name, "/", "-")
+	name = strings.ReplaceAll(name, "\\", "-")
+	name = regexp.MustCompile(`[^a-zA-Z0-9._ -]+`).ReplaceAllString(name, "-")
+	return strings.Trim(name, ". ")
+}
+
+func blockedFileName(name string) bool {
+	lower := strings.ToLower(name)
+	return strings.HasPrefix(lower, ".env") ||
+		strings.Contains(lower, ".key") ||
+		strings.Contains(lower, "id_rsa") ||
+		strings.Contains(lower, "id_ed25519") ||
+		strings.HasSuffix(lower, ".pem") ||
+		strings.HasSuffix(lower, ".p12") ||
+		strings.HasSuffix(lower, ".pfx")
+}
+
+func (a *App) canMutateWebPath(path string) bool {
+	root := filepath.Clean(a.cfg.WebRoot)
+	clean := filepath.Clean(path)
+	if clean == root || !strings.HasPrefix(clean, root+string(os.PathSeparator)) {
+		return false
+	}
+	return !blockedFileName(filepath.Base(clean))
+}
+
+func (a *App) fileAction(w http.ResponseWriter, r *http.Request) {
+	basePath := r.FormValue("path")
+	full := a.safeWebPath(basePath)
+	action := r.FormValue("action")
+	name := safeName(r.FormValue("name"))
+	target := filepath.Join(full, name)
+	if name == "" && (action == "mkdir" || action == "touch") {
+		http.Redirect(w, r, "/files?path="+basePath, http.StatusSeeOther)
+		return
+	}
+	switch action {
+	case "mkdir":
+		if !a.canMutateWebPath(target) {
+			break
+		}
+		_ = os.MkdirAll(target, 0755)
+		a.audit("file.mkdir", "success", target)
+	case "touch":
+		if !a.canMutateWebPath(target) {
+			break
+		}
+		f, err := os.OpenFile(target, os.O_CREATE|os.O_EXCL, 0644)
+		if err == nil {
+			_ = f.Close()
+		}
+		a.audit("file.create", "success", target)
+	case "delete":
+		deletePath := a.safeWebPath(r.FormValue("target"))
+		if !a.canMutateWebPath(deletePath) {
+			break
+		}
+		trash := filepath.Join(a.cfg.WebRoot, ".hostq-trash")
+		_ = os.MkdirAll(trash, 0700)
+		_ = os.Rename(deletePath, filepath.Join(trash, fmt.Sprintf("%d-%s", time.Now().Unix(), filepath.Base(deletePath))))
+		a.audit("file.soft_delete", "success", deletePath)
+	case "chmod":
+		chmodPath := a.safeWebPath(r.FormValue("target"))
+		if !a.canMutateWebPath(chmodPath) {
+			break
+		}
+		mode := r.FormValue("mode")
+		if regexp.MustCompile(`^[0-7]{3,4}$`).MatchString(mode) {
+			parsed, _ := strconv.ParseUint(mode, 8, 32)
+			_ = os.Chmod(chmodPath, os.FileMode(parsed))
+			a.audit("file.chmod", "success", chmodPath)
+		}
+	}
+	http.Redirect(w, r, "/files?path="+basePath, http.StatusSeeOther)
+}
+
+func (a *App) databases(w http.ResponseWriter, _ *http.Request) {
+	out, _ := exec.Command("mysql", "-N", "-e", "SHOW DATABASES").Output()
+	dbs := []string{}
+	for _, line := range strings.Split(string(out), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || line == "information_schema" || line == "performance_schema" || line == "mysql" || line == "sys" {
+			continue
+		}
+		dbs = append(dbs, line)
+	}
+	a.render(w, "databases", map[string]any{"Title": "Databases", "Databases": dbs})
 }
 
 func (a *App) services(w http.ResponseWriter, r *http.Request) {
@@ -266,6 +378,101 @@ func (a *App) services(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.render(w, "services", map[string]any{"Title": "Services", "Services": a.listServices()})
+}
+
+func (a *App) siteAction(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/sites", http.StatusSeeOther)
+		return
+	}
+	domain := strings.TrimSpace(r.FormValue("domain"))
+	action := r.FormValue("action")
+	site, ok := a.findSite(domain)
+	if !ok {
+		http.Redirect(w, r, "/sites", http.StatusSeeOther)
+		return
+	}
+	switch action {
+	case "enable":
+		_ = os.Remove(filepath.Join("/etc/nginx/sites-enabled", domain))
+		_ = os.Symlink(filepath.Join(a.cfg.NginxSitesDir, domain), filepath.Join("/etc/nginx/sites-enabled", domain))
+		_ = exec.Command("systemctl", "reload", "nginx").Run()
+	case "disable":
+		_ = os.Remove(filepath.Join("/etc/nginx/sites-enabled", domain))
+		_ = exec.Command("systemctl", "reload", "nginx").Run()
+	case "cache-on":
+		a.writeNginxSite(site.Domain, site.Root, true)
+	case "cache-off":
+		a.writeNginxSite(site.Domain, site.Root, false)
+	case "permissions":
+		_ = exec.Command("chown", "-R", "www-data:www-data", filepath.Join(a.cfg.WebRoot, domain)).Run()
+		_ = exec.Command("find", filepath.Join(a.cfg.WebRoot, domain), "-type", "d", "-exec", "chmod", "755", "{}", ";").Run()
+		_ = exec.Command("find", filepath.Join(a.cfg.WebRoot, domain), "-type", "f", "-exec", "chmod", "644", "{}", ";").Run()
+	case "backup":
+		_ = a.backupSite(site)
+	case "delete":
+		_ = os.Remove(filepath.Join("/etc/nginx/sites-enabled", domain))
+		_ = os.Remove(filepath.Join(a.cfg.NginxSitesDir, domain))
+		siteBase := filepath.Dir(site.Root)
+		if a.canMutateWebPath(siteBase) {
+			trash := filepath.Join(a.cfg.WebRoot, ".hostq-trash")
+			_ = os.MkdirAll(trash, 0700)
+			_ = os.Rename(siteBase, filepath.Join(trash, fmt.Sprintf("%d-%s", time.Now().Unix(), filepath.Base(siteBase))))
+		}
+		_ = exec.Command("systemctl", "reload", "nginx").Run()
+	}
+	a.audit("site."+action, "success", domain)
+	http.Redirect(w, r, "/sites", http.StatusSeeOther)
+}
+
+func (a *App) findSite(domain string) (Site, bool) {
+	for _, site := range a.listSites() {
+		if site.Domain == domain {
+			return site, true
+		}
+	}
+	return Site{}, false
+}
+
+func (a *App) backupSite(site Site) error {
+	backupDir := "/var/backups/hostq"
+	if err := os.MkdirAll(backupDir, 0755); err != nil {
+		return err
+	}
+	target := filepath.Join(backupDir, fmt.Sprintf("%s-%s.tar.gz", site.Domain, time.Now().Format("2006-01-02-150405")))
+	file, err := os.Create(target)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	gz := gzip.NewWriter(file)
+	defer gz.Close()
+	tw := tar.NewWriter(gz)
+	defer tw.Close()
+	return filepath.Walk(site.Root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		header, err := tar.FileInfoHeader(info, "")
+		if err != nil {
+			return nil
+		}
+		rel, _ := filepath.Rel(site.Root, path)
+		header.Name = rel
+		if err := tw.WriteHeader(header); err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+		src, err := os.Open(path)
+		if err != nil {
+			return nil
+		}
+		defer src.Close()
+		_, err = io.Copy(tw, src)
+		return err
+	})
 }
 
 func serviceMap() map[string]string {
@@ -339,6 +546,13 @@ func firstMatch(text, expr string) string {
 }
 
 func (a *App) writeNginxSite(domain, root string, cache bool) {
+	cacheBlock := ""
+	if cache {
+		cacheBlock = `
+        fastcgi_cache HOSTQ_FASTCGI;
+        fastcgi_cache_valid 200 301 302 10m;
+        add_header X-hostQ-Cache $upstream_cache_status always;`
+	}
 	conf := fmt.Sprintf(`# hostQ managed - %s
 # hostQ fastcgi cache: %s
 server {
@@ -351,10 +565,10 @@ server {
         include snippets/fastcgi-php.conf;
         fastcgi_pass unix:/run/php/php8.4-fpm.sock;
         fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
-        include fastcgi_params;
+        include fastcgi_params;%s
     }
 }
-`, domain, map[bool]string{true: "on", false: "off"}[cache], domain, domain, root)
+`, domain, map[bool]string{true: "on", false: "off"}[cache], domain, domain, root, cacheBlock)
 	_ = os.WriteFile(filepath.Join(a.cfg.NginxSitesDir, domain), []byte(conf), 0644)
 	_ = os.Remove(filepath.Join("/etc/nginx/sites-enabled", domain))
 	_ = os.Symlink(filepath.Join(a.cfg.NginxSitesDir, domain), filepath.Join("/etc/nginx/sites-enabled", domain))
@@ -385,12 +599,13 @@ const layoutTemplate = `
 <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>hostQ Go - {{.Title}}</title>
 <style>
-body{margin:0;font-family:Inter,system-ui,Segoe UI,sans-serif;background:#f5f7fb;color:#111827}a{color:inherit;text-decoration:none}.shell{display:grid;grid-template-columns:230px 1fr;min-height:100vh}.side{background:#fff;border-right:1px solid #e5e7eb;padding:18px}.brand{font-size:22px;font-weight:850;margin-bottom:24px}.nav a{display:block;padding:10px 12px;border-radius:8px;margin-bottom:6px;color:#475467}.nav a:hover{background:#eef4ff;color:#2563eb}.main{padding:24px}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}.card{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:14px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}.btn{border:1px solid #cbd5e1;border-radius:7px;background:#fff;padding:8px 11px;font-weight:700;cursor:pointer}.primary{background:#2563eb;color:#fff;border-color:#2563eb}.danger{color:#dc2626}.input{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:7px;padding:10px}.muted{color:#667085;font-size:13px}.badge{display:inline-block;border:1px solid #cbd5e1;border-radius:999px;padding:3px 8px;font-size:12px}.ok{color:#15803d}.bad{color:#dc2626}table{width:100%;border-collapse:collapse;background:#fff}td,th{border-bottom:1px solid #e5e7eb;padding:10px;text-align:left;font-size:13px}.login{max-width:380px;margin:12vh auto}
-</style></head><body>{{if eq .View "login"}}{{template "login" .}}{{else}}<div class="shell"><aside class="side"><div class="brand">hostQ Go</div><nav class="nav"><a href="/">Dashboard</a><a href="/sites">Sites</a><a href="/files">Files</a><a href="/services">Services</a><a href="/logout">Logout</a></nav></aside><main class="main">{{if eq .View "dashboard"}}{{template "dashboard" .}}{{else if eq .View "sites"}}{{template "sites" .}}{{else if eq .View "files"}}{{template "files" .}}{{else if eq .View "services"}}{{template "services" .}}{{end}}</main></div>{{end}}</body></html>
+body{margin:0;font-family:Inter,system-ui,Segoe UI,sans-serif;background:#f5f7fb;color:#111827}a{color:inherit;text-decoration:none}.shell{display:grid;grid-template-columns:230px 1fr;min-height:100vh}.side{background:#fff;border-right:1px solid #e5e7eb;padding:18px}.brand{font-size:22px;font-weight:850;margin-bottom:24px}.nav a{display:block;padding:10px 12px;border-radius:8px;margin-bottom:6px;color:#475467}.nav a:hover{background:#eef4ff;color:#2563eb}.main{padding:24px}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}.card{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:14px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}.btn{border:1px solid #cbd5e1;border-radius:7px;background:#fff;padding:8px 11px;font-weight:700;cursor:pointer}.primary{background:#2563eb;color:#fff;border-color:#2563eb}.danger{color:#dc2626}.input{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:7px;padding:10px}.muted{color:#667085;font-size:13px}.badge{display:inline-block;border:1px solid #cbd5e1;border-radius:999px;padding:3px 8px;font-size:12px}.ok{color:#15803d}.bad{color:#dc2626}.actions{display:flex;gap:6px;flex-wrap:wrap}.inline{display:inline-flex;gap:6px;align-items:center}.mini{padding:6px 8px;font-size:12px}.mono{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}table{width:100%;border-collapse:collapse;background:#fff}td,th{border-bottom:1px solid #e5e7eb;padding:10px;text-align:left;font-size:13px}.login{max-width:380px;margin:12vh auto}
+</style></head><body>{{if eq .View "login"}}{{template "login" .}}{{else}}<div class="shell"><aside class="side"><div class="brand">hostQ Go</div><nav class="nav"><a href="/">Dashboard</a><a href="/sites">Sites</a><a href="/files">Files</a><a href="/databases">Databases</a><a href="/services">Services</a><a href="/logout">Logout</a></nav></aside><main class="main">{{if eq .View "dashboard"}}{{template "dashboard" .}}{{else if eq .View "sites"}}{{template "sites" .}}{{else if eq .View "files"}}{{template "files" .}}{{else if eq .View "databases"}}{{template "databases" .}}{{else if eq .View "services"}}{{template "services" .}}{{end}}</main></div>{{end}}</body></html>
 {{end}}
 {{define "login"}}<div class="login card"><h1>hostQ Go</h1><p class="muted">Lightweight control panel preview</p>{{if .Error}}<div class="card bad">{{.Error}}</div>{{end}}<form method="post"><p><input class="input" name="username" placeholder="Username" autocomplete="username"></p><p><input class="input" name="password" type="password" placeholder="Password" autocomplete="current-password"></p><button class="btn primary" type="submit">Sign in</button></form></div>{{end}}
 {{define "dashboard"}}<div class="top"><div><h1>Dashboard</h1><p class="muted">Go runtime preview for low-memory VPS deployments</p></div><span class="badge">{{now.Format "Jan 02 15:04"}}</span></div><div class="grid"><div class="card"><h2>{{len .Sites}}</h2><p class="muted">Sites</p></div><div class="card"><h2>{{len .Services}}</h2><p class="muted">Services tracked</p></div></div>{{end}}
-{{define "sites"}}<div class="top"><h1>Sites</h1></div>{{if .Error}}<div class="card bad">{{.Error}}</div>{{end}}<div class="card"><form method="post"><div class="grid"><input class="input" name="domain" placeholder="example.com"><button class="btn primary">Add PHP Site</button></div></form></div><table><tr><th>Domain</th><th>Root</th><th>Status</th><th>Cache</th></tr>{{range .Sites}}<tr><td>{{.Domain}}</td><td class="muted">{{.Root}}</td><td>{{if .Enabled}}<span class="ok">enabled</span>{{else}}<span class="bad">disabled</span>{{end}}</td><td>{{if .Cache}}on{{else}}off{{end}}</td></tr>{{end}}</table>{{end}}
-{{define "files"}}<div class="top"><h1>Files</h1><span class="badge">{{.Path}}</span></div><table><tr><th>Name</th><th>Type</th></tr>{{range .Items}}<tr><td>{{if eq .Kind "dir"}}<a href="/files?path={{.Path}}">{{.Name}}</a>{{else}}{{.Name}}{{end}}</td><td>{{.Kind}}</td></tr>{{end}}</table>{{end}}
+{{define "sites"}}<div class="top"><h1>Sites</h1></div>{{if .Error}}<div class="card bad">{{.Error}}</div>{{end}}<div class="card"><form method="post"><div class="grid"><input class="input" name="domain" placeholder="example.com"><button class="btn primary">Add PHP Site</button></div><p class="muted">Each site uses /var/www/domain/htdocs so website files stay separate from logs, backups, and private data.</p></form></div><table><tr><th>Domain</th><th>Root</th><th>Status</th><th>Cache</th><th>Actions</th></tr>{{range .Sites}}<tr><td>{{.Domain}}</td><td class="muted mono">{{.Root}}</td><td>{{if .Enabled}}<span class="ok">enabled</span>{{else}}<span class="bad">disabled</span>{{end}}</td><td>{{if .Cache}}on{{else}}off{{end}}</td><td><div class="actions"><form method="post" action="/site-action"><input type="hidden" name="domain" value="{{.Domain}}">{{if .Enabled}}<button class="btn mini" name="action" value="disable">Disable</button>{{else}}<button class="btn mini" name="action" value="enable">Enable</button>{{end}}</form><form method="post" action="/site-action"><input type="hidden" name="domain" value="{{.Domain}}">{{if .Cache}}<button class="btn mini" name="action" value="cache-off">Cache off</button>{{else}}<button class="btn mini" name="action" value="cache-on">Cache on</button>{{end}}</form><form method="post" action="/site-action"><input type="hidden" name="domain" value="{{.Domain}}"><button class="btn mini" name="action" value="permissions">Fix permissions</button></form><form method="post" action="/site-action"><input type="hidden" name="domain" value="{{.Domain}}"><button class="btn mini" name="action" value="backup">Backup</button></form><form method="post" action="/site-action"><input type="hidden" name="domain" value="{{.Domain}}"><button class="btn mini danger" name="action" value="delete">Soft delete</button></form></div></td></tr>{{end}}</table>{{end}}
+{{define "files"}}<div class="top"><h1>Files</h1><span class="badge mono">{{.Path}}</span></div><div class="card"><form class="grid" method="post"><input type="hidden" name="path" value="{{.Path}}"><input class="input" name="name" placeholder="folder-or-file-name"><div class="actions"><button class="btn primary" name="action" value="mkdir">New folder</button><button class="btn" name="action" value="touch">New file</button></div></form><p class="muted">Secret files such as .env, private keys, and certificate bundles are hidden and blocked by default.</p></div><table><tr><th>Name</th><th>Type</th><th>Actions</th></tr>{{range .Items}}<tr><td>{{if eq .Kind "dir"}}<a href="/files?path={{.Path}}">{{.Name}}</a>{{else}}{{.Name}}{{end}}</td><td>{{.Kind}}</td><td><div class="actions"><form method="post"><input type="hidden" name="path" value="{{$.Path}}"><input type="hidden" name="target" value="{{.Path}}"><input class="input mini mono" name="mode" placeholder="755" style="width:80px"><button class="btn mini" name="action" value="chmod">Chmod</button></form><form method="post"><input type="hidden" name="path" value="{{$.Path}}"><input type="hidden" name="target" value="{{.Path}}"><button class="btn mini danger" name="action" value="delete">Soft delete</button></form></div></td></tr>{{end}}</table>{{end}}
+{{define "databases"}}<div class="top"><h1>Databases</h1><span class="badge">MariaDB/MySQL</span></div><div class="card"><p class="muted">Read-only database inventory for the Go migration step. Create, user, import, export, and repair actions stay in the Node panel until the Go helper is complete.</p></div><table><tr><th>Database</th></tr>{{range .Databases}}<tr><td class="mono">{{.}}</td></tr>{{else}}<tr><td class="muted">No user databases found, or mysql CLI is not available to the panel user.</td></tr>{{end}}</table>{{end}}
 {{define "services"}}<div class="top"><h1>Services</h1></div><table><tr><th>Name</th><th>Status</th><th>Actions</th></tr>{{range .Services}}<tr><td>{{.Name}}</td><td>{{.Status}}</td><td><form method="post" style="display:flex;gap:6px"><input type="hidden" name="id" value="{{.ID}}"><button class="btn" name="action" value="restart">Restart</button><button class="btn" name="action" value="start">Start</button><button class="btn danger" name="action" value="stop">Stop</button></form></td></tr>{{end}}</table>{{end}}
 `

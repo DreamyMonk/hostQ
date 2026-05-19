@@ -136,8 +136,9 @@ The Go preview currently includes:
 
 - Login using the existing `/etc/hostq/admin.json`
 - Dashboard
-- Sites list and simple site creation
-- File browser locked to `/var/www`
+- Sites list, PHP site creation under `/var/www/domain/htdocs`, enable/disable, cache toggle, permissions repair, backup, and soft-delete
+- File manager locked to `/var/www` with create folder/file, chmod, and soft-delete actions
+- Database inventory for MariaDB/MySQL
 - Service start/stop/restart for a narrow allowlist
 - Go audit log at `/etc/hostq/audit-go.log`
 

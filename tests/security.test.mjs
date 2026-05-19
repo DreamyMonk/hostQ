@@ -93,6 +93,12 @@ assert.match(goPanel, /bcrypt\.CompareHashAndPassword/, 'Go panel must read exis
 assert.match(goPanel, /hostq_go_session/, 'Go panel must use signed sessions');
 assert.match(goPanel, /allowedServiceAction/, 'Go panel service actions must use an allowlist');
 assert.match(goPanel, /WEB_ROOT/, 'Go panel file browser must stay under the configured web root');
+assert.match(goPanel, /siteAction/, 'Go panel must expose site management actions');
+assert.match(goPanel, /backupSite/, 'Go panel must support site backups');
+assert.match(goPanel, /fileAction/, 'Go panel must support file manager actions');
+assert.match(goPanel, /blockedFileName/, 'Go panel file manager must block secret files');
+assert.match(goPanel, /SHOW DATABASES/, 'Go panel must include a database inventory view');
+assert.match(goPanel, /hostQ fastcgi cache/, 'Go panel site actions must preserve cache state');
 
 const goInstaller = readFileSync('scripts/install-go-panel.sh', 'utf8');
 assert.match(goInstaller, /go build/, 'Go installer must build the lightweight panel');

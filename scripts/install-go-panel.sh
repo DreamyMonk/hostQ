@@ -15,8 +15,12 @@ fi
 
 cd "$PANEL_DIR"
 
-apt-get update -qq
-apt-get install -y -qq golang-go
+if ! command -v go >/dev/null 2>&1; then
+  apt-get update -qq
+  apt-get install -y -qq golang-go
+fi
+
+go version
 
 go mod download
 go build -trimpath -ldflags="-s -w" -o /usr/local/bin/hostq-panel ./cmd/hostq-panel
