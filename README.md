@@ -61,6 +61,37 @@ To run the installer non-interactively (CI / cloud-init):
 sudo HOSTQ_ASSUME_YES=true bash install.sh
 ```
 
+### Already have `/opt/hostq` from a previous install?
+
+`git clone` refuses to write into a non-empty directory, so the quick-start above will fail with:
+
+```text
+fatal: destination path '/opt/hostq' already exists and is not an empty directory.
+```
+
+Pick one of the following depending on what you want:
+
+```bash
+# Easiest: use the packaged updater (preserves /etc/hostq and /var/www)
+sudo hostq-update
+
+# Or update in place from the repo
+cd /opt/hostq
+sudo git pull
+sudo bash install.sh
+
+# Or wipe and reinstall (DESTROYS /opt/hostq only; keeps sites + DBs)
+sudo systemctl stop hostq-panel
+sudo rm -rf /opt/hostq
+sudo git clone https://github.com/DreamyMonk/hostQ.git /opt/hostq
+cd /opt/hostq
+sudo bash install.sh
+```
+
+`/etc/hostq` (admin account, audit log, backup policies) and `/var/www`
+(site files) live outside `/opt/hostq`, so removing `/opt/hostq` does
+**not** delete your sites or credentials.
+
 The installer installs:
 
 - Native build toolchain
