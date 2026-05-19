@@ -1,0 +1,6 @@
+- name: Deploy hostQ
+  hosts: hostq
+  become: true
+  gather_facts: true
+  roles:
+    - hostq

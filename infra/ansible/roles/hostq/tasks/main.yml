@@ -1,0 +1,150 @@
+- name: Verify supported OS family
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.os_family == "Debian"
+      - ansible_facts.distribution in ["Ubuntu", "Debian"]
+    fail_msg: "hostQ production deploy supports Ubuntu 22.04/24.04 and Debian 12."
+
+- name: Install baseline packages
+  ansible.builtin.apt:
+    name: "{{ hostq_base_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  tags: [install, hardening]
+
+- name: Create swap file on 1GB VPS
+  when: hostq_create_swap | bool
+  block:
+    - name: Check swap file
+      ansible.builtin.stat:
+        path: /swapfile
+      register: hostq_swap
+
+    - name: Allocate swap file
+      ansible.builtin.command: "fallocate -l {{ hostq_swap_size }} /swapfile"
+      when: not hostq_swap.stat.exists
+      changed_when: true
+
+    - name: Secure swap file
+      ansible.builtin.file:
+        path: /swapfile
+        owner: root
+        group: root
+        mode: "0600"
+
+    - name: Format swap file
+      ansible.builtin.command: mkswap /swapfile
+      when: not hostq_swap.stat.exists
+      changed_when: true
+
+    - name: Enable swap file
+      ansible.builtin.command: swapon /swapfile
+      when: ansible_facts.swaptotal_mb | int == 0
+      changed_when: true
+      failed_when: false
+
+    - name: Persist swap file
+      ansible.builtin.lineinfile:
+        path: /etc/fstab
+        line: "/swapfile none swap sw 0 0"
+        state: present
+  tags: [install, hardening]
+
+- name: Harden SSH password login
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "^#?PasswordAuthentication"
+    line: "PasswordAuthentication no"
+    validate: "sshd -t -f %s"
+  notify: restart ssh
+  tags: [hardening]
+
+- name: Configure UFW default incoming deny
+  ansible.builtin.command: ufw default deny incoming
+  changed_when: false
+  tags: [hardening, firewall]
+
+- name: Configure UFW default outgoing allow
+  ansible.builtin.command: ufw default allow outgoing
+  changed_when: false
+  tags: [hardening, firewall]
+
+- name: Allow required TCP ports
+  ansible.builtin.command: "ufw allow {{ item }}/tcp"
+  changed_when: false
+  loop: "{{ hostq_ufw_allowed_tcp }}"
+  notify: reload ufw
+  tags: [hardening, firewall]
+
+- name: Enable UFW
+  ansible.builtin.command: ufw --force enable
+  changed_when: false
+  tags: [hardening, firewall]
+
+- name: Clone or update hostQ repository
+  ansible.builtin.git:
+    repo: "{{ hostq_repo }}"
+    dest: "{{ hostq_dir }}"
+    version: "{{ hostq_version }}"
+    force: true
+  tags: [install]
+
+- name: Ensure hostQ env file exists
+  ansible.builtin.copy:
+    src: "{{ hostq_dir }}/.env.example"
+    dest: "{{ hostq_dir }}/.env.local"
+    remote_src: true
+    force: false
+    mode: "0600"
+  tags: [install, config]
+
+- name: Configure hostQ environment
+  ansible.builtin.lineinfile:
+    path: "{{ hostq_dir }}/.env.local"
+    regexp: "^{{ item.key }}="
+    line: "{{ item.key }}={{ item.value }}"
+    create: true
+    mode: "0600"
+  loop:
+    - { key: "WEB_ROOT", value: "{{ hostq_web_root }}" }
+    - { key: "FILE_MANAGER_ROOT", value: "/var/www" }
+    - { key: "PANEL_PUBLIC_PORT", value: "{{ hostq_panel_public_port }}" }
+    - { key: "PANEL_DOMAIN", value: "{{ hostq_panel_domain }}" }
+    - { key: "PANEL_URL", value: "{{ (hostq_panel_domain | length > 0) | ternary('https://' ~ hostq_panel_domain, 'http://' ~ ansible_host ~ ':' ~ hostq_panel_public_port) }}" }
+    - { key: "HOSTQ_ALLOW_INSECURE_HTTP", value: "{{ hostq_allow_insecure_http | ternary('true', 'false') }}" }
+    - { key: "NODE_OPTIONS", value: "--max-old-space-size=384" }
+  no_log: false
+  tags: [install, config]
+
+- name: Run hostQ setup
+  ansible.builtin.command: bash setup.sh
+  args:
+    chdir: "{{ hostq_dir }}"
+  environment:
+    PANEL_PUBLIC_PORT: "{{ hostq_panel_public_port }}"
+  register: hostq_setup
+  changed_when: "'Setup complete' in hostq_setup.stdout"
+  tags: [install]
+
+- name: Show hostQ setup output
+  ansible.builtin.debug:
+    var: hostq_setup.stdout_lines
+  tags: [install]
+
+- name: Update hostQ to requested version through SSH updater
+  ansible.builtin.shell: |
+    set -e
+    printf 'y\n' | hostq-update {{ hostq_version }}
+  args:
+    executable: /bin/bash
+  when: hostq_version is match('^v[0-9]+\\.[0-9]+\\.[0-9]+')
+  register: hostq_update
+  changed_when: "'Updated hostQ' in hostq_update.stdout"
+  tags: [never, update]
+
+- name: Show hostQ update output
+  ansible.builtin.debug:
+    var: hostq_update.stdout_lines
+  when: hostq_update is defined
+  tags: [never, update]

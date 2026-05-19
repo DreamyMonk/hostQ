@@ -91,6 +91,25 @@ http://SERVER_IP:8090
 Use a domain and HTTPS for production. Port `8090` is intended as a direct setup/admin access port.
 The installer enables `HOSTQ_ALLOW_INSECURE_HTTP=true` so first login works on the direct IP setup port. After your domain and SSL are working, set it to `false` in `/opt/hostq/.env.local` and restart the panel.
 
+## Infrastructure Deployment
+
+For repeatable production deployments, use the included Terraform + Ansible flow:
+
+```bash
+cd infra/terraform/vultr
+cp terraform.tfvars.example terraform.tfvars
+terraform init
+terraform apply
+
+cd ../../ansible
+cp inventory.ini.example inventory.ini
+ansible-playbook -i inventory.ini playbook.yml
+```
+
+Terraform provisions the Vultr VPS, firewall rules, SSH key, and optional DNS records. Ansible hardens the server, creates swap for 1GB VPS plans, installs hostQ, and can update to a tagged release.
+
+See [infra/README.md](./infra/README.md).
+
 ## Updating
 
 From the panel:

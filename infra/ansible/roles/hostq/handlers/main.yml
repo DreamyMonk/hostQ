@@ -1,0 +1,15 @@
+- name: reload ufw
+  ansible.builtin.command: ufw reload
+  changed_when: false
+  failed_when: false
+
+- name: restart ssh
+  ansible.builtin.service:
+    name: ssh
+    state: restarted
+  failed_when: false
+
+- name: restart hostq
+  ansible.builtin.command: pm2 restart hostq
+  changed_when: true
+  failed_when: false

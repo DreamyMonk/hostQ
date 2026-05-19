@@ -1,0 +1,20 @@
+# Do not commit terraform.tfvars. Put secrets there or use environment variables.
+# export VULTR_API_KEY="..."
+
+project_name = "hostq"
+region       = "bom"
+plan         = "vc2-1c-1gb"
+os_id        = 1743
+
+ssh_public_key_path = "~/.ssh/id_ed25519.pub"
+
+# Strongly recommended: replace with your public IP /32.
+allowed_ssh_cidr   = "0.0.0.0/0"
+allowed_panel_cidr = "0.0.0.0/0"
+
+# Optional. Domain must already exist in Vultr DNS.
+domain          = ""
+panel_subdomain = "panel"
+
+enable_ipv6 = true
+backups     = "enabled"

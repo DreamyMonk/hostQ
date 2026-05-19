@@ -69,6 +69,15 @@ assert.match(wordpress, /Configure Nginx vhost/, 'WordPress installs must config
 const domains = readFileSync('src/app/api/domains/route.ts', 'utf8');
 assert.match(domains, /\/htdocs/, 'new sites must use htdocs document roots');
 
+const terraform = readFileSync('infra/terraform/vultr/main.tf', 'utf8');
+assert.match(terraform, /vultr_firewall_rule" "panel_setup"/, 'Terraform must open the hostQ setup panel port');
+assert.match(terraform, /vultr_instance" "hostq"/, 'Terraform must provision a hostQ VPS');
+
+const ansible = readFileSync('infra/ansible/roles/hostq/tasks/main.yml', 'utf8');
+assert.match(ansible, /bash setup\.sh/, 'Ansible must run hostQ setup');
+assert.match(ansible, /hostq-update/, 'Ansible must support hostQ tagged updates');
+assert.match(ansible, /\/swapfile/, 'Ansible must create swap for 1GB VPS deployments');
+
 const sshUpdate = readFileSync('scripts/hostq-update.sh', 'utf8');
 assert.match(sshUpdate, /api\.github\.com\/repos\/\$\{REPO\}\/releases\/latest/, 'SSH updater must be able to resolve latest release');
 assert.match(sshUpdate, /panel\.update/, 'SSH updater must call the narrow helper update task');

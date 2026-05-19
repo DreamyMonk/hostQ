@@ -1,0 +1,11 @@
+[hostq]
+hostq ansible_host=SERVER_IP ansible_user=root
+
+[hostq:vars]
+hostq_repo=https://github.com/DreamyMonk/hostQ.git
+hostq_dir=/opt/hostq
+hostq_version=main
+hostq_panel_public_port=8090
+hostq_web_root=/var/www
+hostq_panel_domain=
+hostq_allow_insecure_http=true
