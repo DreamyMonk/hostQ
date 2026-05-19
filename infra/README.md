@@ -61,18 +61,18 @@ The hostQ setup script prints the first admin username and generated password in
 ## 3. Update hostQ Later
 
 ```bash
-ansible-playbook -i inventory.ini playbook.yml --tags update -e hostq_version=v0.2.11
+ansible-playbook -i inventory.ini playbook.yml --tags update -e hostq_version=v0.3.0
 ```
 
 Or SSH directly:
 
 ```bash
-sudo hostq-update v0.2.11
+sudo hostq-update v0.3.0
 ```
 
 ## Production Notes
 
 - Point a real domain or subdomain to the VPS.
-- Open hostQ, then go to Admin -> Security -> Panel Host.
-- Set the panel domain, install SSL, then disable temporary HTTP setup mode.
+- Install SSL for the panel domain from the Go SSL manager.
+- After HTTPS works, restrict or close the direct setup port.
 - Keep ports `22`, `80`, `443`, and `8090` restricted to trusted IPs where possible.

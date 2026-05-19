@@ -1,7 +1,7 @@
 #!/bin/bash
 # hostQ Go SSH updater. Usage:
 #   sudo hostq-update           # update to latest GitHub tag
-#   sudo hostq-update v0.2.19    # update to a specific tag
+#   sudo hostq-update v0.3.0     # update to a specific tag
 
 set -euo pipefail
 
@@ -47,7 +47,7 @@ test -d "$PANEL_DIR"
 tar -czf "$BACKUP" -C "$PANEL_DIR" .
 curl -fsSL -o "$ARCHIVE" "https://codeload.github.com/${REPO}/tar.gz/refs/tags/${TAG}"
 tar -xzf "$ARCHIVE" -C "$UNPACK" --strip-components=1
-rsync -a --delete --exclude .env.local --exclude node_modules --exclude .next "$UNPACK"/ "$PANEL_DIR"/
+rsync -a --delete --exclude .env.local "$UNPACK"/ "$PANEL_DIR"/
 
 cd "$PANEL_DIR"
 go mod download

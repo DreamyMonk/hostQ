@@ -1,6 +1,6 @@
 #!/bin/bash
 # hostQ Go panel installer/reinstaller.
-# The Go panel is now the primary runtime; Node.js/PM2 are not required.
+# The Go panel is the primary runtime.
 
 set -euo pipefail
 
@@ -84,9 +84,5 @@ rm -f /etc/nginx/sites-enabled/hostq-go /etc/nginx/sites-enabled/default
 nginx -t
 systemctl reload nginx
 ufw allow "${PANEL_PUBLIC_PORT}/tcp" comment hostQ >/dev/null 2>&1 || true
-
-if command -v pm2 >/dev/null 2>&1; then
-  pm2 delete hostq >/dev/null 2>&1 || true
-fi
 
 echo "hostQ Go panel installed: http://SERVER_IP:${PANEL_PUBLIC_PORT}"

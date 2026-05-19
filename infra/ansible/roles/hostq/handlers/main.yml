@@ -10,6 +10,6 @@
   failed_when: false
 
 - name: restart hostq
-  ansible.builtin.command: pm2 restart hostq
-  changed_when: true
-  failed_when: false
+  ansible.builtin.service:
+    name: hostq-panel
+    state: restarted

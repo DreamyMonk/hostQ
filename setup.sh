@@ -26,8 +26,6 @@ echo "  - PHP 8.2, 8.3, 8.4, 8.5 FPM where available"
 echo "  - Certbot, WP-CLI, Pure-FTPd, phpMyAdmin"
 echo "  - PHP OPcache enabled by default; Redis optional from Services"
 echo ""
-echo "Node.js, npm, Next.js runtime, and PM2 are not installed or required."
-echo ""
 read -r -p "Continue? [y/N] " confirm
 [[ "$confirm" =~ ^[Yy]$ ]] || exit 0
 
@@ -124,8 +122,13 @@ mkdir -p "$PANEL_DIR" /etc/hostq
 chmod 700 /etc/hostq
 
 if [[ -f "./go.mod" ]]; then
-  rsync -a --delete --exclude node_modules --exclude .next ./ "$PANEL_DIR/"
-  log "Copied hostQ files to $PANEL_DIR"
+  SOURCE_DIR="$(pwd)"
+  if [[ "$SOURCE_DIR" != "$PANEL_DIR" ]]; then
+    rsync -a --delete ./ "$PANEL_DIR/"
+    log "Copied hostQ files to $PANEL_DIR"
+  else
+    log "Using hostQ files already in $PANEL_DIR"
+  fi
 else
   warn "Run this script from the hostQ directory"
 fi
@@ -185,9 +188,6 @@ systemctl daemon-reload
 systemctl enable --now hostq-panel
 log "hostQ Go service started"
 
-if command -v pm2 >/dev/null 2>&1; then
-  pm2 delete hostq >/dev/null 2>&1 || true
-fi
 systemctl disable --now hostq >/dev/null 2>&1 || true
 
 header "Configuring Nginx reverse proxy"
@@ -249,5 +249,5 @@ echo "Useful commands:"
 echo "  systemctl status hostq-panel --no-pager -l"
 echo "  journalctl -u hostq-panel -f"
 echo "  sudo hostq-update"
-echo "  sudo hostq-update v0.2.19"
+echo "  sudo hostq-update v0.3.0"
 echo "  mysql_secure_installation"

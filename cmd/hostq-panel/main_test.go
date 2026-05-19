@@ -1,0 +1,70 @@
+package main
+
+import (
+	"html/template"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"testing"
+)
+
+func repoRoot(t *testing.T) string {
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("cannot resolve caller")
+	}
+	return filepath.Clean(filepath.Join(filepath.Dir(file), "..", ".."))
+}
+
+func TestLayoutTemplateParses(t *testing.T) {
+	if _, err := template.New("hostq-test").Funcs(template.FuncMap{"now": func() any { return nil }}).Parse(layoutTemplate); err != nil {
+		t.Fatalf("layout template must parse: %v", err)
+	}
+}
+
+func readRepoFile(t *testing.T, parts ...string) string {
+	data, err := os.ReadFile(filepath.Join(append([]string{repoRoot(t)}, parts...)...))
+	if err != nil {
+		t.Fatalf("read %v: %v", parts, err)
+	}
+	return string(data)
+}
+
+func TestGoOnlyDeploymentScripts(t *testing.T) {
+	setup := readRepoFile(t, "setup.sh")
+	update := readRepoFile(t, "scripts", "hostq-update.sh")
+	installer := readRepoFile(t, "scripts", "install-go-panel.sh")
+
+	for name, content := range map[string]string{"setup.sh": setup, "hostq-update.sh": update, "install-go-panel.sh": installer} {
+		if !strings.Contains(content, "go build") {
+			t.Fatalf("%s must build the Go panel", name)
+		}
+	}
+	if !strings.Contains(setup, "hostq-panel.service") || !strings.Contains(installer, "hostq-panel.service") {
+		t.Fatal("setup/install scripts must install hostq-panel.service")
+	}
+	if !strings.Contains(update, "systemctl restart hostq-panel") {
+		t.Fatal("hostq-update must restart the Go service")
+	}
+}
+
+func TestGoPanelIncludesCoreHostingModules(t *testing.T) {
+	source := readRepoFile(t, "cmd", "hostq-panel", "main.go")
+	required := []string{
+		"func (a *App) wordpress",
+		"func (a *App) php",
+		"func (a *App) ssl",
+		"CREATE DATABASE IF NOT EXISTS",
+		"DROP DATABASE IF EXISTS",
+		"removeBrokenNginxSSL",
+		"blockedFileName",
+		"hostq_go_session",
+		"bcrypt.CompareHashAndPassword",
+	}
+	for _, needle := range required {
+		if !strings.Contains(source, needle) {
+			t.Fatalf("Go panel missing %q", needle)
+		}
+	}
+}

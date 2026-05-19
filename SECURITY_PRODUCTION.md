@@ -1,6 +1,6 @@
-# hostQ Production Hardening
+# hostQ Go Production Hardening
 
-hostQ should run behind HTTPS only. Use a real DNS name, install a certificate with Certbot, and keep `PANEL_URL` set to the HTTPS URL. Do not expose the Node.js port publicly.
+hostQ runs as one Go service behind Nginx.
 
 ## Supported Base OS
 
@@ -11,71 +11,44 @@ hostQ should run behind HTTPS only. Use a real DNS name, install a certificate w
 ## Network
 
 - Allow only `22/tcp`, `80/tcp`, `443/tcp`, and FTP ports you intentionally use.
-- `setup.sh` also opens `PANEL_PUBLIC_PORT` for direct setup access. The default is `8090`; close it or firewall it to trusted IPs after HTTPS/domain access is working.
-- `HOSTQ_ALLOW_INSECURE_HTTP=true` exists only for direct-IP first login. Set it to `false` after SSL is active so API routes and cookies require HTTPS.
-- Admin -> Security -> Panel Host can save the panel domain/subdomain, `PANEL_URL`, and temporary HTTP setup mode in `/opt/hostq/.env.local`.
-- Bind the Next.js app to `127.0.0.1`.
-- Put Nginx in front with `X-Forwarded-Proto` preserved.
-- Enable HSTS after HTTPS works.
+- `setup.sh` also opens `PANEL_PUBLIC_PORT`; the default is `8090`.
+- Close or restrict `8090` after HTTPS/domain access is working.
+- Nginx should proxy panel traffic to `127.0.0.1:8091`.
+- Use Cloudflare SSL mode **Full** or **Full strict** after origin SSL is installed.
 
 ## Accounts And Sessions
 
-- `setup.sh` generates the first admin username/password over SSH and writes `/etc/hostq/admin.json`.
-- TOTP is optional on first login. Enable it from Admin -> Security after changing the generated password.
-- User accounts are per-site and enforced by API RBAC.
-- Admin sessions can be viewed and revoked through `/api/sessions`.
-- Idle sessions expire using `SESSION_IDLE_TIMEOUT_MINUTES`.
-
-## Privileged Helper
-
-`scripts/hostq-helper.mjs` is the only place new privileged tasks should be added. Keep it narrow:
-
-- add one task at a time
-- validate every argument
-- prefer fixed command templates
-- never add a generic shell task
-
-After all privileged routes are migrated to helper tasks, set:
-
-```env
-HOSTQ_REQUIRE_HELPER=true
-HOSTQ_HELPER=/usr/local/sbin/hostq-helper
-```
+- `setup.sh` generates the first admin username/password over SSH.
+- Credentials are stored in `/etc/hostq/admin.json` with a bcrypt password hash.
+- The panel uses signed, HTTP-only, same-site cookies.
+- Change the generated password after first login.
 
 ## Files And Secrets
 
-- File manager is locked to `/var/www` on Linux.
-- `.env`, SSH keys, PEM/private-key/certificate containers are blocked by default.
-- Uploaded SSL private keys are stored under `/etc/ssl/hostq/<domain>/privkey.pem` with `0600`.
+- File manager paths are locked under `/var/www`.
+- `.env`, private keys, PEM/P12/PFX files, and common SSH key names are blocked by default.
+- Deletes are soft deletes into `.hostq-trash`.
 
-## Backups And Restore
+## Services
 
-- Site backup creates tarballs under `/var/backups/hostq`.
-- Restore requires a dry-run first and a confirmation string equal to the domain.
-- Restore rejects absolute paths, path traversal, and secret-like files.
-- A pre-restore backup is created before extraction.
+- The panel controls only a narrow service allowlist.
+- No generic shell endpoint is exposed by the Go panel.
 
-## Audit Logs
+## Backups And Updates
 
-- Audit log: `/etc/hostq/audit.log`
-- Entries include a hash chain. The audit API reports whether the chain is valid.
-- Logs rotate when the active file reaches 5 MB.
-- For high-trust environments, ship logs to remote append-only storage.
-
-## Updates
-
-- Run OS security updates weekly.
-- Rotate `JWT_SECRET` after a suspected compromise.
-- Keep Node.js LTS and supported PHP versions only.
-- Run `npm run lint`, `npm run build`, and `npm run security:test` before deploy.
-- Publish hostQ releases as GitHub tags like `v0.2.0`.
-- The panel updater downloads release tarballs from `DreamyMonk/hostQ`, creates `/var/backups/hostq/panel-*.tar.gz`, rebuilds, prunes dev dependencies, and restarts `hostq`.
-- Keep update actions inside `scripts/hostq-helper.mjs`; do not add a generic shell update endpoint.
-- SSH update command:
+- Site backups are written under `/var/backups/hostq`.
+- `hostq-update` downloads GitHub tag tarballs, creates a backup, rebuilds the Go binary, and restarts `hostq-panel`.
 
 ```bash
-sudo hostq-update          # latest GitHub release
-sudo hostq-update v0.2.2   # specific release tag
+sudo hostq-update
+sudo hostq-update v0.3.0
 ```
 
-- `hostq-update` calls `/usr/local/sbin/hostq-helper` with the narrow `panel.update` task.
+## Validation
+
+Before publishing a release:
+
+```bash
+go test ./cmd/hostq-panel
+go build ./cmd/hostq-panel
+```

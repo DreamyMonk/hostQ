@@ -1,29 +1,18 @@
-FROM node:20-alpine AS base
+FROM golang:1.22-alpine AS builder
 
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY cmd ./cmd
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/hostq-panel ./cmd/hostq-panel
+
+FROM alpine:3.20
+RUN adduser -D -u 10001 hostq
 WORKDIR /app
-COPY package*.json ./
-RUN npm ci --omit=dev
-
-FROM base AS builder
-RUN npm ci
-COPY . .
-RUN npm run build
-
-FROM node:20-alpine AS runner
-WORKDIR /app
-
-ENV NODE_ENV=production
-
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser  --system --uid 1001 nextjs
-
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/public ./public
-
-USER nextjs
-EXPOSE 3000
-ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
-
-CMD ["node", "server.js"]
+COPY --from=builder /out/hostq-panel /usr/local/bin/hostq-panel
+ENV HOSTQ_GO_ADDR=0.0.0.0:8091
+ENV HOSTQ_DATA_DIR=/data
+ENV WEB_ROOT=/var/www
+EXPOSE 8091
+VOLUME ["/data", "/var/www"]
+CMD ["/usr/local/bin/hostq-panel"]
