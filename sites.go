@@ -166,12 +166,7 @@ func (a *App) writeNginxSite(domain, root string, cache bool, phpVersion string)
         fastcgi_cache_valid 200 301 302 10m;
         add_header X-hostQ-Cache $upstream_cache_status always;`
 	}
-	conf := fmt.Sprintf(`# hostQ managed - %s
-# hostQ fastcgi cache: %s
-server {
-    listen 80;
-    server_name %s www.%s;
-    root %s;
+	siteBody := fmt.Sprintf(`    root %s;
     index index.php index.html;
     location / { try_files $uri $uri/ /index.php?$query_string; }
     location ~ \.php$ {
@@ -180,8 +175,52 @@ server {
         fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
         include fastcgi_params;%s
     }
+`, root, phpVersion, cacheBlock)
+
+	cacheLabel := "off"
+	if cache {
+		cacheLabel = "on"
+	}
+
+	// Preserve SSL across rewrites: if a Let's Encrypt cert exists for the
+	// domain, emit a 443 server block ourselves and 301 the 80 block. Prior
+	// versions only wrote port 80, so any panel action that called this
+	// helper (cache toggle, PHP switch, WordPress install) silently wiped
+	// the SSL config certbot had injected.
+	hasSSL := a.certExists(domain)
+	sslLabel := "off"
+	port80 := fmt.Sprintf(`server {
+    listen 80;
+    server_name %s www.%s;
+%s}
+`, domain, domain, siteBody)
+	port443 := ""
+	if hasSSL {
+		sslLabel = "on"
+		sslIncludes := ""
+		if _, err := os.Stat("/etc/letsencrypt/options-ssl-nginx.conf"); err == nil {
+			sslIncludes += "    include /etc/letsencrypt/options-ssl-nginx.conf;\n"
+		}
+		if _, err := os.Stat("/etc/letsencrypt/ssl-dhparams.pem"); err == nil {
+			sslIncludes += "    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;\n"
+		}
+		port80 = fmt.Sprintf(`server {
+    listen 80;
+    server_name %s www.%s;
+    return 301 https://$host$request_uri;
 }
-`, domain, map[bool]string{true: "on", false: "off"}[cache], domain, domain, root, phpVersion, cacheBlock)
+`, domain, domain)
+		port443 = fmt.Sprintf(`server {
+    listen 443 ssl http2;
+    server_name %s www.%s;
+    ssl_certificate /etc/letsencrypt/live/%s/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/%s/privkey.pem;
+%s%s}
+`, domain, domain, domain, domain, sslIncludes, siteBody)
+	}
+	conf := fmt.Sprintf("# hostQ managed - %s\n# hostQ fastcgi cache: %s\n# hostQ ssl: %s\n%s%s",
+		domain, cacheLabel, sslLabel, port80, port443)
+
 	_ = os.WriteFile(filepath.Join(a.cfg.NginxSitesDir, domain), []byte(conf), 0644)
 	_ = os.Remove(filepath.Join("/etc/nginx/sites-enabled", domain))
 	_ = os.Symlink(filepath.Join(a.cfg.NginxSitesDir, domain), filepath.Join("/etc/nginx/sites-enabled", domain))
