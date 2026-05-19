@@ -1,6 +1,6 @@
 # hostQ
 
-hostQ is a lightweight self-hosted hosting control panel for small VPS servers. It is built with Next.js 16 and manages common hosting tasks such as sites, Nginx vhosts, PHP-FPM versions, MariaDB databases, WordPress, files, SSL, FTP, backups, and updates.
+hostQ is a lightweight self-hosted hosting control panel for small VPS servers. The production panel now runs as a Go systemd service and manages common hosting tasks such as sites, Nginx vhosts, PHP-FPM versions, MariaDB databases, files, SSL, FTP, backups, and updates.
 
 ## Supported OS
 
@@ -39,7 +39,7 @@ Local development works on Windows, macOS, and Linux. Real hosting actions requi
 | Cache | PHP OPcache by default, optional Redis service, optional per-site Nginx FastCGI cache |
 | SSL | Let's Encrypt via Certbot, renew/delete, manual PEM upload |
 | Services | Nginx, Apache, MariaDB, PHP-FPM, Certbot, WP-CLI, Pure-FTPd, phpMyAdmin |
-| Updates | Web updater and SSH CLI updater using GitHub releases |
+| Updates | SSH CLI updater using GitHub tags |
 
 ## VPS Deployment
 
@@ -53,7 +53,8 @@ bash setup.sh
 
 The setup script installs:
 
-- Node.js 20
+- Go
+- hostQ Go panel systemd service
 - Nginx
 - MariaDB
 - PHP-FPM 8.2, 8.3, 8.4, 8.5 where available
@@ -61,9 +62,9 @@ The setup script installs:
 - WP-CLI
 - Pure-FTPd
 - phpMyAdmin
-- PM2
-- hostQ privileged helper
 - `hostq-update` SSH updater
+
+The production installer does not install Node.js, npm, PM2, or the Next.js runtime.
 
 At the end of setup, SSH prints the first admin login:
 
@@ -113,26 +114,19 @@ Terraform provisions the Vultr VPS, firewall rules, SSH key, and optional DNS re
 
 See [infra/README.md](./infra/README.md).
 
-## Lightweight Go Runtime Preview
+## Go Runtime
 
-The current production panel remains the Next.js app while the lightweight Go runtime is being ported module by module. The Go panel is designed for lower RAM usage on 1GB VPS plans and uses server-rendered HTML instead of React.
-
-Install the Go preview beside the existing panel:
-
-```bash
-cd /opt/hostq
-sudo bash scripts/install-go-panel.sh
-```
+The Go panel is the production runtime. It is designed for lower RAM usage on 1GB VPS plans and uses server-rendered HTML instead of React.
 
 It runs as:
 
 ```text
 systemd service: hostq-panel
 backend: 127.0.0.1:8091
-preview URL: http://SERVER_IP:8092
+public URLs: http://SERVER_IP and http://SERVER_IP:8090
 ```
 
-The Go preview currently includes:
+The Go panel currently includes:
 
 - Login using the existing `/etc/hostq/admin.json`
 - Dashboard
@@ -143,21 +137,7 @@ The Go preview currently includes:
 - Service start/stop/restart for a narrow allowlist
 - Go audit log at `/etc/hostq/audit-go.log`
 
-The migration target is:
-
-```text
-Go panel + systemd + SQLite/JSON metadata + hostq-helper
-```
-
-The Next.js panel will stay available until the Go panel reaches feature parity.
-
 ## Updating
-
-From the panel:
-
-- Go to **Admin -> Security -> Updates**
-- Click **Check**
-- Click **Update** when a release is available
 
 From SSH:
 
@@ -186,9 +166,10 @@ v0.2.3
 ## Local Development
 
 ```bash
-npm install
-npm run dev -- --port 8090
+go run ./cmd/hostq-panel
 ```
+
+The legacy Next.js UI source is still present for reference while the Go panel reaches feature parity, but it is not used by the production VPS installer.
 
 Open:
 
@@ -207,7 +188,7 @@ JWT_EXPIRY=24h
 SESSION_IDLE_TIMEOUT_MINUTES=30
 
 HOSTQ_REQUIRE_HELPER=false
-HOSTQ_HELPER=/usr/local/sbin/hostq-helper
+HOSTQ_GO_ADDR=127.0.0.1:8091
 
 DB_HOST=localhost
 DB_ROOT_USER=root
@@ -280,9 +261,8 @@ Read more in:
 Before release or deployment:
 
 ```bash
-npm run lint
-npm run security:test
-npm run build
+go test ./cmd/hostq-panel
+go build ./cmd/hostq-panel
 ```
 
 The production build may show a non-blocking Turbopack trace warning for runtime filesystem APIs such as site safety checks.

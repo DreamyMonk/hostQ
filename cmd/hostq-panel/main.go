@@ -90,6 +90,12 @@ func main() {
 			JWTSecret:     env("JWT_SECRET", "change_this_hostq_go_secret"),
 		},
 	}
+	if len(os.Args) > 1 && os.Args[1] == "init-admin" {
+		if err := app.initAdmin(); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
 	app.tpl = template.Must(template.New("hostq").Funcs(template.FuncMap{
 		"now": time.Now,
 	}).Parse(layoutTemplate))
@@ -115,6 +121,41 @@ func env(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func (a *App) initAdmin() error {
+	username := env("HOSTQ_ADMIN_USER", "admin")
+	password := env("HOSTQ_ADMIN_PASS", "")
+	if password == "" {
+		password = randomToken()[:20]
+	}
+	if err := os.MkdirAll(a.cfg.DataDir, 0700); err != nil {
+		return err
+	}
+	adminPath := filepath.Join(a.cfg.DataDir, "admin.json")
+	if _, err := os.Stat(adminPath); err == nil {
+		fmt.Println("Existing admin account found; not regenerating credentials.")
+		return nil
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), 12)
+	if err != nil {
+		return err
+	}
+	account := map[string]any{
+		"username":     username,
+		"passwordHash": string(hash),
+		"role":         "admin",
+		"otpEnabled":   false,
+		"createdAt":    time.Now().Format(time.RFC3339),
+	}
+	data, _ := json.MarshalIndent(account, "", "  ")
+	if err := os.WriteFile(adminPath, data, 0600); err != nil {
+		return err
+	}
+	fmt.Println("Initial hostQ admin login:")
+	fmt.Println("  Username:", username)
+	fmt.Println("  Password:", password)
+	return nil
 }
 
 func securityHeaders(next http.Handler) http.Handler {

@@ -1,5 +1,5 @@
 #!/bin/bash
-# hostQ - VPS setup script
+# hostQ - Go-first VPS setup script
 # Target: Ubuntu 22.04/24.04 or Debian 12, run as root.
 
 set -euo pipefail
@@ -18,14 +18,15 @@ header() { echo -e "\n${BLUE}=== $1 ===${NC}"; }
 if [[ $EUID -ne 0 ]]; then error "Run as root: sudo bash setup.sh"; fi
 
 header "hostQ VPS Setup"
-echo "This script installs a lightweight LEMP hosting stack:"
-echo "  - Node.js 20 LTS"
-echo "  - Nginx 1.24+ where available"
-echo "  - MariaDB 10.11 where available"
-echo "  - PHP 8.2, 8.3, 8.4, 8.5 FPM only"
-echo "  - Certbot, WP-CLI, Pure-FTPd, phpMyAdmin 5.2"
+echo "This script installs a lightweight Go hosting control panel:"
+echo "  - hostQ Go panel as a systemd service"
+echo "  - Nginx reverse proxy on ports 80 and 8090"
+echo "  - MariaDB"
+echo "  - PHP 8.2, 8.3, 8.4, 8.5 FPM where available"
+echo "  - Certbot, WP-CLI, Pure-FTPd, phpMyAdmin"
 echo "  - PHP OPcache enabled by default; Redis optional from Services"
-echo "  - PM2 with a 384 MB memory restart limit"
+echo ""
+echo "Node.js, npm, Next.js runtime, and PM2 are not installed or required."
 echo ""
 read -r -p "Continue? [y/N] " confirm
 [[ "$confirm" =~ ^[Yy]$ ]] || exit 0
@@ -35,15 +36,14 @@ export DEBIAN_FRONTEND=noninteractive
 header "Updating system"
 apt-get update -qq
 apt-get upgrade -y -qq
-apt-get install -y -qq ca-certificates curl gnupg lsb-release software-properties-common unzip rsync
+apt-get install -y -qq ca-certificates curl gnupg lsb-release software-properties-common unzip rsync git build-essential openssl
 log "System updated"
 
-header "Installing Node.js 20"
-if ! command -v node >/dev/null 2>&1; then
-  curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-  apt-get install -y -qq nodejs
+header "Installing Go"
+if ! command -v go >/dev/null 2>&1; then
+  apt-get install -y -qq golang-go
 fi
-log "Node.js $(node -v) installed"
+log "$(go version) installed"
 
 header "Installing Nginx"
 apt-get install -y -qq nginx
@@ -114,78 +114,81 @@ curl -fsSL -o /usr/local/bin/wp https://raw.githubusercontent.com/wp-cli/builds/
 chmod +x /usr/local/bin/wp
 
 apt-get install -y -qq phpmyadmin >/dev/null 2>&1 || warn "phpMyAdmin package install failed; install manually if needed"
-npm install -g pm2 -q
-pm2 startup systemd -u root --hp /root >/dev/null 2>&1 || true
-log "Certbot, WP-CLI, Pure-FTPd, phpMyAdmin, and PM2 installed"
+log "Certbot, WP-CLI, Pure-FTPd, and phpMyAdmin installed"
 
-header "Setting up hostQ"
+header "Setting up hostQ Go panel"
 PANEL_DIR="/opt/hostq"
 PANEL_PUBLIC_PORT="${PANEL_PUBLIC_PORT:-8090}"
-mkdir -p "$PANEL_DIR"
+GO_ADDR="${HOSTQ_GO_ADDR:-127.0.0.1:8091}"
+mkdir -p "$PANEL_DIR" /etc/hostq
+chmod 700 /etc/hostq
 
-if [[ -f "./package.json" ]]; then
+if [[ -f "./go.mod" ]]; then
   rsync -a --delete --exclude node_modules --exclude .next ./ "$PANEL_DIR/"
-  log "Copied panel files to $PANEL_DIR"
+  log "Copied hostQ files to $PANEL_DIR"
 else
   warn "Run this script from the hostQ directory"
 fi
 
-if [[ ! -f "$PANEL_DIR/.env.local" ]]; then
+if [[ ! -f "$PANEL_DIR/.env.local" && -f "$PANEL_DIR/.env.example" ]]; then
   cp "$PANEL_DIR/.env.example" "$PANEL_DIR/.env.local"
   warn "Created .env.local"
 fi
-if grep -q '^HOSTQ_ALLOW_INSECURE_HTTP=' "$PANEL_DIR/.env.local"; then
-  sed -i 's/^HOSTQ_ALLOW_INSECURE_HTTP=.*/HOSTQ_ALLOW_INSECURE_HTTP=true/' "$PANEL_DIR/.env.local"
-else
-  echo "HOSTQ_ALLOW_INSECURE_HTTP=true" >> "$PANEL_DIR/.env.local"
-fi
+touch "$PANEL_DIR/.env.local"
+grep -q '^HOSTQ_ALLOW_INSECURE_HTTP=' "$PANEL_DIR/.env.local" \
+  && sed -i 's/^HOSTQ_ALLOW_INSECURE_HTTP=.*/HOSTQ_ALLOW_INSECURE_HTTP=true/' "$PANEL_DIR/.env.local" \
+  || echo "HOSTQ_ALLOW_INSECURE_HTTP=true" >> "$PANEL_DIR/.env.local"
+grep -q '^HOSTQ_GO_ADDR=' "$PANEL_DIR/.env.local" \
+  && sed -i "s/^HOSTQ_GO_ADDR=.*/HOSTQ_GO_ADDR=${GO_ADDR}/" "$PANEL_DIR/.env.local" \
+  || echo "HOSTQ_GO_ADDR=${GO_ADDR}" >> "$PANEL_DIR/.env.local"
 
-mkdir -p /etc/hostq
-chmod 700 /etc/hostq
-install -m 0750 -o root -g root "$PANEL_DIR/scripts/hostq-helper.mjs" /usr/local/sbin/hostq-helper
 install -m 0750 -o root -g root "$PANEL_DIR/scripts/hostq-update.sh" /usr/local/bin/hostq-update
-cat > /etc/sudoers.d/hostq-helper <<'EOF'
-Defaults!/usr/local/sbin/hostq-helper !requiretty
-root ALL=(root) NOPASSWD: /usr/local/sbin/hostq-helper
-EOF
-chmod 0440 /etc/sudoers.d/hostq-helper
-log "Installed hostQ privileged helper allowlist and SSH updater"
 
 cd "$PANEL_DIR"
-npm ci
+go mod download
+go build -trimpath -ldflags="-s -w" -o /usr/local/bin/hostq-panel ./cmd/hostq-panel
+log "Built /usr/local/bin/hostq-panel"
 
 ADMIN_USER="admin"
 ADMIN_PASS="$(openssl rand -base64 24 | tr -d '/+=' | cut -c1-20)"
 if [[ ! -f /etc/hostq/admin.json ]]; then
-  HOSTQ_ADMIN_USER="$ADMIN_USER" HOSTQ_ADMIN_PASS="$ADMIN_PASS" node <<'NODE'
-const fs = require('fs');
-const bcrypt = require('bcryptjs');
-const username = process.env.HOSTQ_ADMIN_USER;
-const password = process.env.HOSTQ_ADMIN_PASS;
-fs.mkdirSync('/etc/hostq', { recursive: true, mode: 0o700 });
-fs.writeFileSync('/etc/hostq/admin.json', JSON.stringify({
-  username,
-  passwordHash: bcrypt.hashSync(password, 12),
-  role: 'admin',
-  otpEnabled: false,
-  createdAt: new Date().toISOString()
-}, null, 2), { mode: 0o600 });
-NODE
+  INIT_OUTPUT="$(HOSTQ_ADMIN_USER="$ADMIN_USER" HOSTQ_ADMIN_PASS="$ADMIN_PASS" /usr/local/bin/hostq-panel init-admin)"
   log "Generated hostQ admin credentials"
 else
+  INIT_OUTPUT="Existing admin account found; not regenerated."
   ADMIN_PASS=""
   warn "Existing /etc/hostq/admin.json found; admin credentials were not regenerated"
 fi
 
-export NODE_OPTIONS="--max-old-space-size=384"
-npm run build
-npm prune --omit=dev
-log "Panel built"
+cat > /etc/systemd/system/hostq-panel.service <<EOF
+[Unit]
+Description=hostQ Go hosting control panel
+After=network.target nginx.service mariadb.service
 
-pm2 delete hostq >/dev/null 2>&1 || true
-pm2 start npm --name hostq --max-memory-restart 384M -- start
-pm2 save
-log "Panel started with PM2"
+[Service]
+Type=simple
+Environment=HOSTQ_GO_ADDR=${GO_ADDR}
+Environment=HOSTQ_DATA_DIR=/etc/hostq
+Environment=WEB_ROOT=/var/www
+EnvironmentFile=-${PANEL_DIR}/.env.local
+ExecStart=/usr/local/bin/hostq-panel
+Restart=always
+RestartSec=3
+User=root
+WorkingDirectory=${PANEL_DIR}
+NoNewPrivileges=false
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl daemon-reload
+systemctl enable --now hostq-panel
+log "hostQ Go service started"
+
+if command -v pm2 >/dev/null 2>&1; then
+  pm2 delete hostq >/dev/null 2>&1 || true
+fi
+systemctl disable --now hostq >/dev/null 2>&1 || true
 
 header "Configuring Nginx reverse proxy"
 cat > /etc/nginx/sites-available/hostq <<'EOF'
@@ -197,7 +200,7 @@ server {
     client_max_body_size 64M;
 
     location / {
-        proxy_pass http://127.0.0.1:3000;
+        proxy_pass http://__GO_ADDR__;
         proxy_http_version 1.1;
         proxy_read_timeout 60s;
         proxy_buffering off;
@@ -211,9 +214,10 @@ server {
 }
 EOF
 sed -i "s/__PANEL_PUBLIC_PORT__/${PANEL_PUBLIC_PORT}/g" /etc/nginx/sites-available/hostq
+sed -i "s#__GO_ADDR__#${GO_ADDR}#g" /etc/nginx/sites-available/hostq
 
-ln -sf /etc/nginx/sites-available/hostq /etc/nginx/sites-enabled/
-rm -f /etc/nginx/sites-enabled/default
+ln -sf /etc/nginx/sites-available/hostq /etc/nginx/sites-enabled/hostq
+rm -f /etc/nginx/sites-enabled/default /etc/nginx/sites-enabled/hostq-go
 nginx -t
 systemctl reload nginx
 log "Nginx reverse proxy configured"
@@ -230,24 +234,20 @@ log "Firewall configured"
 header "Setup complete"
 SERVER_IP=$(curl -fsS ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')
 echo ""
-echo -e "${GREEN}hostQ is running at: http://${SERVER_IP}${NC}"
+echo -e "${GREEN}hostQ Go is running at: http://${SERVER_IP}${NC}"
 echo -e "${GREEN}Direct setup URL: http://${SERVER_IP}:${PANEL_PUBLIC_PORT}${NC}"
 if [[ -n "$ADMIN_PASS" ]]; then
   echo ""
-  echo -e "${YELLOW}Initial hostQ admin login:${NC}"
-  echo "  Username: $ADMIN_USER"
-  echo "  Password: $ADMIN_PASS"
+  echo -e "${YELLOW}${INIT_OUTPUT}${NC}"
   echo ""
   echo "Save this password now. It is shown only once."
-  echo "After login, change the password and enable 2FA from Admin > Security."
 else
   echo "Use the existing admin account in /etc/hostq/admin.json."
 fi
 echo ""
 echo "Useful commands:"
-echo "  pm2 status"
-echo "  pm2 logs hostq"
-echo "  pm2 restart hostq"
+echo "  systemctl status hostq-panel --no-pager -l"
+echo "  journalctl -u hostq-panel -f"
 echo "  sudo hostq-update"
-echo "  sudo hostq-update v0.2.2"
+echo "  sudo hostq-update v0.2.19"
 echo "  mysql_secure_installation"
