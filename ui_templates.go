@@ -641,38 +641,109 @@ document.addEventListener('keydown',function(e){
   <a href="/site?domain={{.Site.Domain}}&tab=ssl"       class="{{if eq .Tab "ssl"}}active{{end}}">{{icon "shield"}} SSL</a>
   <a href="/site?domain={{.Site.Domain}}&tab=php"       class="{{if eq .Tab "php"}}active{{end}}">{{icon "cpu"}} PHP</a>
   <a href="/files?path=/{{.Site.Domain}}/htdocs">{{icon "folderOpen"}} Files</a>
+  <a href="/site?domain={{.Site.Domain}}&tab=security"  class="{{if eq .Tab "security"}}active{{end}}">{{icon "shield"}} Security</a>
   <a href="/site?domain={{.Site.Domain}}&tab=backups"   class="{{if eq .Tab "backups"}}active{{end}}">{{icon "archive"}} Backups</a>
 </div>
 
 {{if eq .Tab "overview"}}
-  <div class="grid">
-    <div class="stat"><div class="label">{{icon "cpu"}} PHP version</div><div class="val">{{.Site.PHPVersion}}</div><div class="sub">FastCGI Process Manager</div></div>
-    <div class="stat"><div class="label">{{icon "shield"}} SSL</div><div class="val">{{if .Site.SSL}}<span class="ok">on</span>{{else}}<span class="bad">off</span>{{end}}</div><div class="sub">Let's Encrypt</div></div>
-    <div class="stat"><div class="label">{{icon "activity"}} Cache</div><div class="val">{{if .Site.Cache}}<span class="ok">on</span>{{else}}off{{end}}</div><div class="sub">Nginx fastcgi cache</div></div>
-    <div class="stat"><div class="label">{{icon "globe"}} Status</div><div class="val">{{if .Site.Enabled}}<span class="ok">live</span>{{else}}<span class="bad">disabled</span>{{end}}</div><div class="sub">{{.Site.Domain}}</div></div>
-  </div>
-  <div class="card">
-    <h3>Site controls</h3>
-    <div class="actions">
-      <form method="post" action="/site-action"><input type="hidden" name="domain" value="{{.Site.Domain}}">
-        {{if .Site.Enabled}}<button class="btn" name="action" value="disable">{{icon "power"}} Disable site</button>
-        {{else}}<button class="btn primary" name="action" value="enable">{{icon "power"}} Enable site</button>{{end}}
-      </form>
-      <form method="post" action="/site-action"><input type="hidden" name="domain" value="{{.Site.Domain}}">
-        {{if .Site.Cache}}<button class="btn" name="action" value="cache-off">Cache: off</button>
-        {{else}}<button class="btn" name="action" value="cache-on">Cache: on</button>{{end}}
-      </form>
-      <form method="post" action="/site-action"><input type="hidden" name="domain" value="{{.Site.Domain}}">
-        <button class="btn" name="action" value="permissions">{{icon "shield"}} Fix permissions</button>
-      </form>
-      <a class="btn" href="/files?path=/{{.Site.Domain}}/htdocs">{{icon "folderOpen"}} Open files</a>
-      <a class="btn" href="/phpmyadmin/" target="_blank">{{icon "database"}} phpMyAdmin</a>
-      <form method="post" action="/site-action" data-confirm="Permanently delete this site, its document root, and Nginx vhost?">
-        <input type="hidden" name="domain" value="{{.Site.Domain}}">
-        <button class="btn danger" name="action" value="delete">{{icon "trash"}} Delete site</button>
-      </form>
+  <div class="grid-2">
+    <div class="card">
+      <h3>Quick actions</h3>
+      <div class="actions">
+        <a class="btn" href="/files?path=/{{.Site.Domain}}/htdocs">{{icon "folderOpen"}} Files</a>
+        <a class="btn" href="/site?domain={{.Site.Domain}}&tab=database">{{icon "database"}} Database</a>
+        <a class="btn" href="/site?domain={{.Site.Domain}}&tab=wordpress">{{icon "wordpress"}} WordPress</a>
+        <a class="btn" href="/site?domain={{.Site.Domain}}&tab=ssl">{{icon "shield"}} SSL</a>
+        <a class="btn" href="/site?domain={{.Site.Domain}}&tab=security">{{icon "shield"}} Security scan</a>
+        <a class="btn" href="/site?domain={{.Site.Domain}}&tab=backups">{{icon "archive"}} Backups</a>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Site controls</h3>
+      <div class="actions">
+        <form method="post" action="/site-action"><input type="hidden" name="domain" value="{{.Site.Domain}}">
+          {{if .Site.Enabled}}<button class="btn" name="action" value="disable">{{icon "power"}} Disable</button>
+          {{else}}<button class="btn primary" name="action" value="enable">{{icon "power"}} Enable</button>{{end}}
+        </form>
+        <form method="post" action="/site-action"><input type="hidden" name="domain" value="{{.Site.Domain}}">
+          {{if .Site.Cache}}<button class="btn" name="action" value="cache-off">Cache: off</button>
+          {{else}}<button class="btn" name="action" value="cache-on">Cache: on</button>{{end}}
+        </form>
+        <form method="post" action="/site-action"><input type="hidden" name="domain" value="{{.Site.Domain}}">
+          <button class="btn" name="action" value="permissions">{{icon "shield"}} Fix permissions</button>
+        </form>
+        <form method="post" action="/site-action" data-confirm="Permanently delete this site, its document root, and Nginx vhost?">
+          <input type="hidden" name="domain" value="{{.Site.Domain}}">
+          <button class="btn danger" name="action" value="delete">{{icon "trash"}} Delete site</button>
+        </form>
+      </div>
     </div>
   </div>
+{{end}}
+
+{{if eq .Tab "security"}}
+  <div class="toolbar">
+    <div class="muted">{{if .Scan}}Last scan {{.Scan.When}} · {{.Scan.Scanned}} files · {{.Scan.Took}}{{else}}No scans yet. Run one to inspect this site for malware patterns.{{end}}</div>
+    <form method="post" action="/security" style="display:inline">
+      <input type="hidden" name="domain" value="{{.Site.Domain}}">
+      <button class="btn primary" name="action" value="scan">{{icon "shield"}} Run security scan</button>
+    </form>
+  </div>
+  {{if .Scan}}
+    <div class="grid">
+      <div class="stat"><div class="label">{{icon "alert"}} Critical</div><div class="val"><span class="bad">{{.Scan.Critical}}</span></div><div class="sub">RCE / known webshell</div></div>
+      <div class="stat"><div class="label">{{icon "alert"}} High</div><div class="val">{{.Scan.High}}</div><div class="sub">very suspicious patterns</div></div>
+      <div class="stat"><div class="label">{{icon "info"}} Medium</div><div class="val">{{.Scan.Medium}}</div><div class="sub">worth a look</div></div>
+      <div class="stat"><div class="label">{{icon "check"}} Scanned</div><div class="val">{{.Scan.Scanned}}</div><div class="sub">files in {{.Scan.Took}}</div></div>
+    </div>
+    {{if .Scan.Findings}}
+    <div class="card" style="padding:0">
+      <table>
+        <thead><tr><th>Severity</th><th>File</th><th>Rule</th><th>Match</th><th>Modified</th><th class="right-col">Actions</th></tr></thead>
+        <tbody>
+          {{range .Scan.Findings}}<tr>
+            <td>
+              {{if eq .Severity "critical"}}<span class="badge bad">{{icon "alert"}} critical</span>
+              {{else if eq .Severity "high"}}<span class="badge bad">{{icon "alert"}} high</span>
+              {{else if eq .Severity "medium"}}<span class="badge warn">{{icon "info"}} medium</span>
+              {{else}}<span class="badge">{{.Severity}}</span>{{end}}
+            </td>
+            <td class="mono" style="max-width:280px;overflow:hidden;text-overflow:ellipsis">{{.Path}}</td>
+            <td><span class="badge">{{.Rule}}</span><div class="muted" style="margin-top:3px;font-size:11.5px">{{.Detail}}</div></td>
+            <td class="mono muted" style="font-size:11.5px;max-width:340px;word-break:break-all">{{if .Match}}{{.Match}}{{else}}—{{end}}</td>
+            <td class="muted">{{.Modified}}</td>
+            <td class="right-col"><div class="actions" style="justify-content:flex-end">
+              <form method="post" action="/security" style="display:inline" data-confirm="Quarantine this file? It will be moved to /var/backups/hostq/quarantine/{{$.Site.Domain}}/...">
+                <input type="hidden" name="domain" value="{{$.Site.Domain}}">
+                <input type="hidden" name="abs" value="{{.AbsPath}}">
+                <button class="btn mini" name="action" value="quarantine">{{icon "archive"}} Quarantine</button>
+              </form>
+              <form method="post" action="/security" style="display:inline" data-confirm="Permanently delete this file?">
+                <input type="hidden" name="domain" value="{{$.Site.Domain}}">
+                <input type="hidden" name="abs" value="{{.AbsPath}}">
+                <button class="btn mini danger" name="action" value="delete">{{icon "trash"}}</button>
+              </form>
+            </div></td>
+          </tr>{{end}}
+        </tbody>
+      </table>
+    </div>
+    {{else}}
+      <div class="card empty">
+        <div class="empty-ic">{{icon "check"}}</div>
+        <div><h3 style="margin:0 0 4px;color:var(--ink)">Clean</h3><p class="muted" style="margin:0">No suspicious patterns found in {{.Scan.Scanned}} scanned files. Run again any time after a deploy or plugin install.</p></div>
+      </div>
+    {{end}}
+  {{else}}
+    <div class="card empty">
+      <div class="empty-ic">{{icon "shield"}}</div>
+      <div>
+        <h3 style="margin:0 0 4px;color:var(--ink)">No scans yet</h3>
+        <p class="muted" style="margin:0">The scanner walks every PHP / HTML / JS / .htaccess file under <span class="mono">{{.Site.Root}}</span> and checks them against a curated set of malware patterns (known webshells, eval-decode, RCE callbacks, hidden iframes, PHP in uploads, etc.).</p>
+        <p class="muted" style="margin:6px 0 0">Findings can be <strong>quarantined</strong> (moved to <span class="mono">/var/backups/hostq/quarantine/{{.Site.Domain}}/&lt;timestamp&gt;/</span>) or deleted from this page.</p>
+      </div>
+    </div>
+  {{end}}
 {{end}}
 
 {{if eq .Tab "database"}}

@@ -92,6 +92,10 @@ func (a *App) siteManager(w http.ResponseWriter, r *http.Request) {
 		data["Policy"] = a.backupPolicy(site.Domain)
 	case "php":
 		data["PHP"] = a.listPHP()
+	case "security":
+		if report, err := a.loadScanReport(site.Domain); err == nil {
+			data["Scan"] = report
+		}
 	}
 	a.render(w, "site", data)
 }
