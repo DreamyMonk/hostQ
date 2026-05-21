@@ -114,7 +114,70 @@ systemctl start pure-ftpd >/dev/null 2>&1 || true
 curl -fsSL -o /usr/local/bin/wp https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
 chmod +x /usr/local/bin/wp
 
-apt-get install -y -qq phpmyadmin >/dev/null 2>&1 || warn "phpMyAdmin package install failed; install manually if needed"
+# phpMyAdmin: pre-seed debconf so the install is fully non-interactive. The
+# debian package otherwise prompts for which web server to configure (nginx is
+# not in its list) and for dbconfig-common credentials, which is why
+# `apt-get install -y phpmyadmin` was silently failing.
+header "Installing phpMyAdmin"
+PMA_DB_PASS="$(openssl rand -base64 24 | tr -d '/+=' | cut -c1-24)"
+apt-get install -y -qq debconf-utils >/dev/null 2>&1 || true
+debconf-set-selections <<DEBCONF
+phpmyadmin phpmyadmin/dbconfig-install boolean true
+phpmyadmin phpmyadmin/app-password-confirm password ${PMA_DB_PASS}
+phpmyadmin phpmyadmin/mysql/admin-pass password ${PMA_DB_PASS}
+phpmyadmin phpmyadmin/mysql/app-pass password ${PMA_DB_PASS}
+phpmyadmin phpmyadmin/password-confirm password ${PMA_DB_PASS}
+phpmyadmin phpmyadmin/setup-password password ${PMA_DB_PASS}
+phpmyadmin phpmyadmin/reconfigure-webserver multiselect
+phpmyadmin phpmyadmin/mysql/admin-user string root
+DEBCONF
+if DEBIAN_FRONTEND=noninteractive apt-get install -y -qq phpmyadmin; then
+  log "phpMyAdmin package installed"
+else
+  warn "phpMyAdmin package install failed; you can rerun later with: sudo apt-get install -y phpmyadmin"
+fi
+
+# Pick a PHP-FPM socket for phpMyAdmin. Prefer 8.3 (PMA's reference version),
+# fall back to whatever is active.
+PMA_FPM_SOCK=""
+for VER in 8.3 8.2 8.4 8.5; do
+  if [[ -S "/run/php/php${VER}-fpm.sock" ]]; then
+    PMA_FPM_SOCK="/run/php/php${VER}-fpm.sock"
+    break
+  fi
+done
+if [[ -z "$PMA_FPM_SOCK" ]]; then
+  warn "No active PHP-FPM socket found for phpMyAdmin; defaulting to php8.3-fpm.sock"
+  PMA_FPM_SOCK="/run/php/php8.3-fpm.sock"
+fi
+
+# Nginx snippet sites can include from their server block (writeNginxSite does
+# this automatically for hostQ-managed vhosts).
+mkdir -p /etc/nginx/snippets
+cat > /etc/nginx/snippets/hostq-pma.conf <<NGINX
+# hostQ phpMyAdmin alias. Sites include this from their server block so
+# https://<domain>/phpmyadmin works without a separate vhost.
+location ^~ /phpmyadmin/ {
+    alias /usr/share/phpmyadmin/;
+    index index.php;
+    try_files \$uri \$uri/ /phpmyadmin/index.php?\$args;
+    location ~ ^/phpmyadmin/(.+\.php)\$ {
+        alias /usr/share/phpmyadmin/\$1;
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:${PMA_FPM_SOCK};
+        fastcgi_param SCRIPT_FILENAME \$request_filename;
+        include fastcgi_params;
+    }
+    location ~* ^/phpmyadmin/(.+\.(jpg|jpeg|gif|css|png|js|ico|html|xml|txt|woff|woff2|svg|map))\$ {
+        alias /usr/share/phpmyadmin/\$1;
+        access_log off;
+        expires 1d;
+    }
+}
+location = /phpmyadmin { return 301 /phpmyadmin/; }
+NGINX
+log "phpMyAdmin Nginx snippet ready (FPM via ${PMA_FPM_SOCK})"
+
 log "Certbot, WP-CLI, Pure-FTPd, and phpMyAdmin installed"
 
 header "Setting up hostQ panel"

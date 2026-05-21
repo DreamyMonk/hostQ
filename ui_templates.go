@@ -764,7 +764,7 @@ document.addEventListener('keydown',function(e){
     <div class="db-head">
       <div class="db-title">{{icon "database"}} <span class="mono">{{.Name}}</span></div>
       <div class="actions">
-        <a class="btn mini" href="/phpmyadmin/?db={{.Name}}" target="_blank">{{icon "terminal"}} phpMyAdmin</a>
+        <a class="btn mini" href="/pma-login?domain={{$.Site.Domain}}&db={{.Name}}&user={{.Name}}" target="_blank">{{icon "terminal"}} Open in phpMyAdmin</a>
         <button class="btn mini" onclick="openAddUser('{{.Name}}')">{{icon "plus"}} Add user</button>
         <form method="post" action="/databases" data-confirm="Drop database {{.Name}}? This deletes all tables and the matching user.">
           <input type="hidden" name="site" value="{{$.Site.Domain}}">
@@ -780,6 +780,7 @@ document.addEventListener('keydown',function(e){
           <td class="mono"><strong>{{.Login}}</strong></td>
           <td class="muted mono">{{.Host}}</td>
           <td class="right-col"><div class="actions" style="justify-content:flex-end">
+            <a class="btn mini" href="/pma-login?domain={{$.Site.Domain}}&user={{.Login}}" target="_blank" title="Sign in to phpMyAdmin as this user">{{icon "terminal"}}</a>
             <button class="btn mini" onclick="openResetUser('{{.Login}}')">{{icon "key"}} Reset password</button>
             <form method="post" action="/databases" data-confirm="Drop user {{.Login}} and revoke access?" style="display:inline">
               <input type="hidden" name="site" value="{{$.Site.Domain}}">

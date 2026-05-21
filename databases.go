@@ -140,6 +140,7 @@ func (a *App) databaseAction(w http.ResponseWriter, r *http.Request) {
 			sql := fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; CREATE USER IF NOT EXISTS %s@'localhost' IDENTIFIED BY %s; ALTER USER %s@'localhost' IDENTIFIED BY %s; GRANT ALL PRIVILEGES ON %s.* TO %s@'localhost'; FLUSH PRIVILEGES;",
 				sqlIdent(name), sqlString(user), sqlString(password), sqlString(user), sqlString(password), sqlIdent(name), sqlString(user))
 			if err := exec.Command("mysql", "-e", sql).Run(); err == nil {
+				a.rememberCred(user, password, site)
 				a.audit("database.create", "success", name)
 				http.Redirect(w, r, redirectURL+"&created="+name+"&user="+user+"&password="+password, http.StatusSeeOther)
 				return
@@ -157,6 +158,7 @@ func (a *App) databaseAction(w http.ResponseWriter, r *http.Request) {
 			status := "failure"
 			if err := exec.Command("mysql", "-e", sql).Run(); err == nil {
 				status = "success"
+				a.forgetCred(user)
 			}
 			a.audit("database.delete", status, target)
 		}
@@ -173,6 +175,7 @@ func (a *App) databaseAction(w http.ResponseWriter, r *http.Request) {
 			status := "failure"
 			if err := exec.Command("mysql", "-e", sql).Run(); err == nil {
 				status = "success"
+				a.rememberCred(user, pass, site)
 			}
 			a.audit("database.user-create", status, db+"/"+user)
 			http.Redirect(w, r, redirectURL+"&dbuser="+user+"&dbpass="+pass+"&db="+db, http.StatusSeeOther)
@@ -186,6 +189,7 @@ func (a *App) databaseAction(w http.ResponseWriter, r *http.Request) {
 			status := "failure"
 			if err := exec.Command("mysql", "-e", sql).Run(); err == nil {
 				status = "success"
+				a.rememberCred(user, pass, site)
 			}
 			a.audit("database.user-password", status, user)
 			http.Redirect(w, r, redirectURL+"&dbuser="+user+"&dbpass="+pass, http.StatusSeeOther)
@@ -203,6 +207,7 @@ func (a *App) databaseAction(w http.ResponseWriter, r *http.Request) {
 			status := "failure"
 			if err := exec.Command("mysql", "-e", sql).Run(); err == nil {
 				status = "success"
+				a.forgetCred(user)
 			}
 			a.audit("database.user-delete", status, user)
 		}
