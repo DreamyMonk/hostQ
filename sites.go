@@ -217,6 +217,10 @@ func (a *App) writeNginxSite(domain, root string, cache bool, phpVersion string)
         fastcgi_cache_valid 200 301 302 10m;
         add_header X-hostQ-Cache $upstream_cache_status always;`
 	}
+	pmaInclude := ""
+	if _, err := os.Stat("/etc/nginx/snippets/hostq-pma.conf"); err == nil {
+		pmaInclude = "    include snippets/hostq-pma.conf;\n"
+	}
 	siteBody := fmt.Sprintf(`    root %s;
     index index.php index.html;
     location / { try_files $uri $uri/ /index.php?$query_string; }
@@ -226,7 +230,7 @@ func (a *App) writeNginxSite(domain, root string, cache bool, phpVersion string)
         fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
         include fastcgi_params;%s
     }
-`, root, phpVersion, cacheBlock)
+%s`, root, phpVersion, cacheBlock, pmaInclude)
 
 	cacheLabel := "off"
 	if cache {

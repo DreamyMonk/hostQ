@@ -24,6 +24,7 @@ func (a *App) render(w http.ResponseWriter, view string, data map[string]any) {
 	if _, ok := data["PaletteSites"]; !ok && view != "login" {
 		data["PaletteSites"] = a.listSites()
 	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := a.tpl.ExecuteTemplate(w, "layout", data); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
