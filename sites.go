@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 )
 
 func (a *App) dashboard(w http.ResponseWriter, _ *http.Request) {
@@ -83,6 +84,9 @@ func (a *App) siteManager(w http.ResponseWriter, r *http.Request) {
 		if len(filtered) > 0 {
 			data["WPManage"] = &filtered[0]
 			data["WPUsers"] = a.listWPUsers(filtered[0].Path)
+			if report, err := a.loadMalfixReport(site.Domain); err == nil {
+				data["Malfix"] = report
+			}
 		}
 	case "ssl":
 		data["Certificates"] = a.listCertificates()
@@ -91,6 +95,10 @@ func (a *App) siteManager(w http.ResponseWriter, r *http.Request) {
 		data["Policy"] = a.backupPolicy(site.Domain)
 	case "php":
 		data["PHP"] = a.listPHP()
+	case "security":
+		if report, err := a.loadScanReport(site.Domain); err == nil {
+			data["Scan"] = report
+		}
 	}
 	a.render(w, "site", data)
 }
@@ -134,6 +142,7 @@ func (a *App) siteAction(w http.ResponseWriter, r *http.Request) {
 		}
 		_ = exec.Command("systemctl", "reload", "nginx").Run()
 	}
+	a.cache.invalidate("sites")
 	a.audit("site."+action, "success", domain)
 	http.Redirect(w, r, "/sites", http.StatusSeeOther)
 }
@@ -148,6 +157,9 @@ func (a *App) findSite(domain string) (Site, bool) {
 }
 
 func (a *App) listSites() []Site {
+	if v, ok := a.cache.get("sites"); ok {
+		return v.([]Site)
+	}
 	sites := []Site{}
 	entries, err := os.ReadDir(a.cfg.NginxSitesDir)
 	if err != nil {
@@ -182,6 +194,7 @@ func (a *App) listSites() []Site {
 		})
 	}
 	sort.Slice(sites, func(i, j int) bool { return sites[i].Domain < sites[j].Domain })
+	a.cache.set("sites", sites, 3*time.Second)
 	return sites
 }
 
@@ -264,4 +277,5 @@ func (a *App) writeNginxSite(domain, root string, cache bool, phpVersion string)
 	_ = os.Symlink(filepath.Join(a.cfg.NginxSitesDir, domain), filepath.Join("/etc/nginx/sites-enabled", domain))
 	_ = exec.Command("nginx", "-t").Run()
 	_ = exec.Command("systemctl", "reload", "nginx").Run()
+	a.cache.invalidate("sites")
 }

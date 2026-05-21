@@ -68,13 +68,20 @@ const layoutTemplate = `
 :root{
   --bg:#0a0f1c;--panel:#0d1424;--panel-2:#172033;--text:#e6eaf2;--muted:#7d8aa3;--line:#172033;
   --card:#ffffff;--card-line:#eef1f6;--card-line-2:#e6eaf0;--ink:#0b1220;--ink-muted:#5b6b85;
+  --page:#f6f8fb;--surface:#fff;--surface-2:#fbfcfe;--surface-hover:#f4f6fb;
   --brand:#3b82f6;--brand-2:#2563eb;--accent:#06b6d4;
   --ok:#16a34a;--bad:#dc2626;--warn:#d97706;
   --radius:10px;--shadow:0 1px 1px rgba(15,23,42,.03),0 1px 3px rgba(15,23,42,.04);
   --shadow-lg:0 10px 30px rgba(15,23,42,.08);
 }
+[data-theme="dark"]{
+  --card:#0f1729;--card-line:#1c2640;--card-line-2:#243153;--ink:#e6eaf2;--ink-muted:#8e9bb5;
+  --page:#070b15;--surface:#0f1729;--surface-2:#121b31;--surface-hover:#172033;
+  --shadow:0 1px 2px rgba(0,0,0,.35),0 0 0 1px rgba(255,255,255,.02);
+  --shadow-lg:0 12px 40px rgba(0,0,0,.45);
+}
 *{box-sizing:border-box}
-html,body{margin:0;padding:0;background:#f6f8fb;color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,sans-serif;font-size:13.5px;line-height:1.55;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+html,body{margin:0;padding:0;background:var(--page);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,sans-serif;font-size:13.5px;line-height:1.55;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
 a{color:inherit;text-decoration:none}
 button{font-family:inherit;font-size:inherit}
 svg{flex:none;vertical-align:middle}
@@ -99,34 +106,41 @@ aside.side{background:var(--bg);color:var(--text);padding:16px 10px;position:sti
 
 /* topbar */
 main.main{min-width:0}
-.topbar{position:sticky;top:0;z-index:10;background:#ffffff;border-bottom:1px solid var(--card-line);height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 22px}
-.topbar h1{margin:0;font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px;letter-spacing:-.01em}
+.topbar{position:sticky;top:0;z-index:10;background:var(--surface);border-bottom:1px solid var(--card-line);height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 22px}
+.topbar h1{margin:0;font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px;letter-spacing:-.01em;color:var(--ink)}
 .topbar h1 svg{opacity:.5;width:14px;height:14px}
-.topbar .right{display:flex;align-items:center;gap:10px;color:var(--ink-muted);font-size:12.5px}
-.topbar .right .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:#f4f6fb;color:#475569;font-weight:600;font-size:12px}
+.topbar .right{display:flex;align-items:center;gap:8px;color:var(--ink-muted);font-size:12.5px}
+.topbar .right .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:var(--surface-hover);color:var(--ink-muted);font-weight:600;font-size:12px}
 .topbar .right .chip svg{width:12px;height:12px}
+.iconbtn{width:32px;height:32px;border-radius:8px;border:1px solid var(--card-line);background:var(--surface);color:var(--ink-muted);display:grid;place-items:center;cursor:pointer;transition:background .12s,color .12s,border-color .12s}
+.iconbtn:hover{background:var(--surface-hover);color:var(--ink);border-color:var(--card-line-2)}
+.iconbtn svg{width:14px;height:14px}
+.kbd{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:10.5px;padding:1px 5px;border-radius:4px;border:1px solid var(--card-line);background:var(--surface-2);color:var(--ink-muted)}
+.searchbtn{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;border:1px solid var(--card-line);background:var(--surface);color:var(--ink-muted);font-size:12.5px;cursor:pointer;transition:background .12s,border-color .12s}
+.searchbtn:hover{background:var(--surface-hover);border-color:var(--card-line-2)}
+.searchbtn .kbd{margin-left:4px}
 .content{padding:22px}
 
 /* cards */
-.card{background:var(--card);border:1px solid var(--card-line);border-radius:12px;padding:18px;margin-bottom:12px;box-shadow:var(--shadow)}
-.card h2{margin:0 0 4px;font-size:15px;font-weight:700;letter-spacing:-.01em}
-.card h3{margin:0 0 10px;font-size:12px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.08em}
+.card{background:var(--card);border:1px solid var(--card-line);border-radius:12px;padding:18px;margin-bottom:12px;box-shadow:var(--shadow);color:var(--ink)}
+.card h2{margin:0 0 4px;font-size:15px;font-weight:700;letter-spacing:-.01em;color:var(--ink)}
+.card h3{margin:0 0 10px;font-size:12px;font-weight:700;color:var(--ink-muted);text-transform:uppercase;letter-spacing:.08em}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
 .grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:12px}
 
 /* stat cards */
-.stat{display:flex;flex-direction:column;gap:6px;background:#fff;border:1px solid var(--card-line);border-radius:12px;padding:16px 18px;box-shadow:var(--shadow);transition:transform .12s,box-shadow .12s}
+.stat{display:flex;flex-direction:column;gap:6px;background:var(--card);border:1px solid var(--card-line);border-radius:12px;padding:16px 18px;box-shadow:var(--shadow);transition:transform .12s,box-shadow .12s;color:var(--ink)}
 .stat:hover{transform:translateY(-1px);box-shadow:var(--shadow-lg)}
 .stat .label{display:flex;align-items:center;gap:8px;color:var(--ink-muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em}
 .stat .label svg{opacity:.7;width:14px;height:14px}
-.stat .val{font-size:24px;font-weight:800;color:#0b1220;letter-spacing:-.02em;line-height:1.1}
+.stat .val{font-size:24px;font-weight:800;color:var(--ink);letter-spacing:-.02em;line-height:1.1}
 .stat .sub{font-size:12px;color:var(--ink-muted)}
 .bar{height:5px;border-radius:99px;background:#eef2f7;overflow:hidden;margin-top:4px}
 .bar > div{height:100%;background:linear-gradient(90deg,#3b82f6,#06b6d4);transition:width .5s ease}
 
 /* buttons */
-.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--card-line);background:#fff;color:#0b1220;border-radius:8px;padding:7px 12px;font-weight:600;font-size:13px;cursor:pointer;transition:background .12s,border-color .12s,transform .05s,box-shadow .12s}
-.btn:hover{background:#f7f9fc;border-color:#dde3ee}
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--card-line);background:var(--surface);color:var(--ink);border-radius:8px;padding:7px 12px;font-weight:600;font-size:13px;cursor:pointer;transition:background .12s,border-color .12s,transform .05s,box-shadow .12s}
+.btn:hover{background:var(--surface-hover);border-color:var(--card-line-2)}
 .btn:active{transform:translateY(1px)}
 .btn svg{width:14px;height:14px}
 .btn.primary{background:var(--brand-2);border-color:var(--brand-2);color:#fff;box-shadow:0 1px 2px rgba(37,99,235,.25)}
@@ -140,23 +154,24 @@ main.main{min-width:0}
 .actions{display:flex;gap:6px;flex-wrap:wrap}
 
 /* inputs */
-.input,select.input,textarea.input{width:100%;border:1px solid var(--card-line);background:#fff;border-radius:8px;padding:8px 11px;font-size:13.5px;color:#0b1220;outline:none;transition:border-color .12s,box-shadow .12s}
-.input:hover{border-color:#dde3ee}
+.input,select.input,textarea.input{width:100%;border:1px solid var(--card-line);background:var(--surface);border-radius:8px;padding:8px 11px;font-size:13.5px;color:var(--ink);outline:none;transition:border-color .12s,box-shadow .12s}
+.input:hover{border-color:var(--card-line-2)}
 .input:focus{border-color:#93c5fd;box-shadow:0 0 0 3px rgba(59,130,246,.12)}
+.input::placeholder{color:var(--ink-muted);opacity:.7}
 .field{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
-.field label{font-size:11.5px;font-weight:700;color:#475569;letter-spacing:.01em}
+.field label{font-size:11.5px;font-weight:700;color:var(--ink-muted);letter-spacing:.01em}
 .row{display:flex;gap:10px;flex-wrap:wrap}
 .row > *{flex:1;min-width:160px}
 
 /* table */
-table{width:100%;border-collapse:separate;border-spacing:0;background:#fff;border:1px solid var(--card-line);border-radius:12px;overflow:hidden}
+table{width:100%;border-collapse:separate;border-spacing:0;background:var(--card);border:1px solid var(--card-line);border-radius:12px;overflow:hidden;color:var(--ink)}
 th,td{padding:11px 14px;text-align:left;font-size:13px;border-bottom:1px solid var(--card-line);vertical-align:middle}
-th{font-size:11px;font-weight:700;color:#5b6b85;text-transform:uppercase;letter-spacing:.08em;background:#fbfcfe}
+th{font-size:11px;font-weight:700;color:var(--ink-muted);text-transform:uppercase;letter-spacing:.08em;background:var(--surface-2)}
 tbody tr:last-child td{border-bottom:none}
-tbody tr:hover{background:#fbfcfe}
+tbody tr:hover{background:var(--surface-2)}
 
 /* badges */
-.badge{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--card-line);border-radius:999px;padding:2px 9px;font-size:11px;font-weight:700;background:#fff;color:#475569;letter-spacing:.01em}
+.badge{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--card-line);border-radius:999px;padding:2px 9px;font-size:11px;font-weight:700;background:var(--surface);color:var(--ink-muted);letter-spacing:.01em}
 .badge svg{width:11px;height:11px}
 .badge.ok{color:#166534;border-color:#bbf7d0;background:#f0fdf4}
 .badge.bad{color:#991b1b;border-color:#fde2e2;background:#fef2f2}
@@ -183,20 +198,34 @@ tbody tr:hover{background:#fbfcfe}
 .fm-table .right-col{text-align:right;white-space:nowrap}
 
 /* context menu */
-.ctxmenu{position:fixed;z-index:1000;min-width:200px;background:#fff;border:1px solid var(--card-line);border-radius:8px;box-shadow:0 10px 30px rgba(15,23,42,.18);padding:6px;display:none}
+.ctxmenu{position:fixed;z-index:1000;min-width:210px;background:var(--card);color:var(--ink);border:1px solid var(--card-line);border-radius:10px;box-shadow:var(--shadow-lg);padding:6px;display:none}
 .ctxmenu.show{display:block}
-.ctxmenu button{width:100%;border:none;background:none;text-align:left;padding:8px 10px;border-radius:6px;display:flex;align-items:center;gap:10px;cursor:pointer;color:#0f172a;font-weight:600}
-.ctxmenu button:hover{background:#f1f5f9}
+.ctxmenu button{width:100%;border:none;background:none;text-align:left;padding:8px 10px;border-radius:6px;display:flex;align-items:center;gap:10px;cursor:pointer;color:var(--ink);font-weight:600;font-size:13px}
+.ctxmenu button:hover{background:var(--surface-hover)}
 .ctxmenu .sep{height:1px;background:var(--card-line);margin:4px 2px}
 .ctxmenu .danger{color:#b91c1c}
 
 /* modal */
-.modal-bg{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:900;display:none;align-items:center;justify-content:center;padding:20px}
+.modal-bg{position:fixed;inset:0;background:rgba(7,11,21,.55);backdrop-filter:blur(4px);z-index:900;display:none;align-items:center;justify-content:center;padding:20px}
 .modal-bg.show{display:flex}
-.modal{background:#fff;border-radius:12px;padding:20px;width:100%;max-width:480px;box-shadow:0 20px 60px rgba(15,23,42,.25)}
-.modal h3{margin:0 0 4px;font-size:16px;font-weight:800}
+.modal{background:var(--card);color:var(--ink);border:1px solid var(--card-line);border-radius:12px;padding:20px;width:100%;max-width:480px;box-shadow:var(--shadow-lg)}
+.modal h3{margin:0 0 4px;font-size:16px;font-weight:800;color:var(--ink)}
 .modal p.muted{margin:0 0 14px}
 .modal .modal-foot{display:flex;gap:8px;justify-content:flex-end;margin-top:6px}
+
+/* command palette */
+.modal.palette{max-width:560px;padding:0;overflow:hidden}
+.palette-input{border:none;border-radius:0;border-bottom:1px solid var(--card-line);padding:14px 18px;font-size:15px;background:transparent}
+.palette-input:focus{box-shadow:none;border-color:var(--card-line-2)}
+.palette-list{max-height:50vh;overflow-y:auto;padding:6px}
+.palette-cat{padding:8px 10px 4px;font-size:10.5px;font-weight:700;color:var(--ink-muted);text-transform:uppercase;letter-spacing:.10em}
+.palette-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 12px;border-radius:7px;color:var(--ink);font-weight:600;font-size:13.5px;cursor:pointer;text-decoration:none}
+.palette-row:hover,.palette-row.on{background:var(--surface-hover)}
+.palette-row.on{outline:1px solid var(--brand);outline-offset:-1px}
+.palette-label{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.palette-hint{font-size:11px;color:var(--ink-muted);font-weight:600}
+.palette-empty{padding:18px;text-align:center;color:var(--ink-muted);font-size:13px}
+.palette-foot{display:flex;gap:14px;justify-content:flex-end;padding:8px 14px;border-top:1px solid var(--card-line);background:var(--surface-2);font-size:11px;color:var(--ink-muted)}
 
 /* login */
 .login-wrap{min-height:100vh;display:grid;place-items:center;padding:24px;background:radial-gradient(1200px 600px at 20% 0%,#dbeafe,transparent),radial-gradient(900px 500px at 100% 100%,#cffafe,transparent),#f1f5f9}
@@ -295,6 +324,7 @@ table.flat tbody tr:hover{background:transparent}
       <a href="/services" class="{{if eq .View "services"}}active{{end}}">{{icon "server"}}<span>Services</span></a>
       <a href="/cron" class="{{if eq .View "cron"}}active{{end}}">{{icon "clock"}}<span>Cron</span></a>
       <a href="/php" class="{{if eq .View "php"}}active{{end}}">{{icon "cpu"}}<span>PHP Versions</span></a>
+      <a href="/redis" class="{{if eq .View "redis"}}active{{end}}">{{icon "activity"}}<span>Redis Cache</span></a>
     </nav>
     <div class="navgroup">Advanced</div>
     <nav class="nav">
@@ -316,7 +346,8 @@ table.flat tbody tr:hover{background:transparent}
     <header class="topbar">
       <h1>{{.Title}}</h1>
       <div class="right">
-        <span class="chip">{{icon "clock"}} {{now.Format "15:04"}}</span>
+        <button type="button" class="searchbtn" onclick="openPalette()" title="Search (Ctrl/Cmd+K)">{{icon "circle"}} <span>Search…</span> <span class="kbd">⌘K</span></button>
+        <button type="button" class="iconbtn" id="themeBtn" onclick="toggleTheme()" title="Toggle theme">{{icon "circle"}}</button>
       </div>
     </header>
     <div class="content">
@@ -333,11 +364,115 @@ table.flat tbody tr:hover{background:transparent}
       {{else if eq .View "cron"}}{{template "cron" .}}
       {{else if eq .View "account"}}{{template "account" .}}
       {{else if eq .View "audit"}}{{template "audit" .}}
+      {{else if eq .View "redis"}}{{template "redis" .}}
       {{end}}
     </div>
   </main>
 </div>
 <div id="toasts" class="toasts" aria-live="polite"></div>
+
+<!-- Cmd+K command palette -->
+<div class="modal-bg" id="palette" style="align-items:flex-start;padding-top:12vh">
+  <div class="modal palette" role="dialog" aria-label="Quick search">
+    <input class="input palette-input" id="paletteInput" placeholder="Search sites, pages, actions…" autocomplete="off">
+    <div class="palette-list" id="paletteList"></div>
+    <div class="palette-foot"><span><span class="kbd">↑↓</span> navigate</span><span><span class="kbd">↵</span> open</span><span><span class="kbd">esc</span> close</span></div>
+  </div>
+</div>
+<div id="palette-data" hidden>
+  <a data-cat="Pages" data-icon="layout" href="/">Dashboard</a>
+  <a data-cat="Pages" data-icon="globe" href="/sites">All sites</a>
+  <a data-cat="Pages" data-icon="folder" href="/files?path=/">File manager</a>
+  <a data-cat="Pages" data-icon="server" href="/services">Services</a>
+  <a data-cat="Pages" data-icon="clock" href="/cron">Cron jobs</a>
+  <a data-cat="Pages" data-icon="cpu" href="/php">PHP versions</a>
+  <a data-cat="Pages" data-icon="activity" href="/redis">Redis cache</a>
+  <a data-cat="Pages" data-icon="database" href="/databases">All databases</a>
+  <a data-cat="Pages" data-icon="wordpress" href="/wordpress">All WordPress</a>
+  <a data-cat="Pages" data-icon="shield" href="/ssl">All certificates</a>
+  <a data-cat="Admin" data-icon="users" href="/account">Account</a>
+  <a data-cat="Admin" data-icon="activity" href="/audit">Audit log</a>
+  <a data-cat="Admin" data-icon="logout" href="/logout">Sign out</a>
+  {{range .PaletteSites}}<a data-cat="Sites" data-icon="globe" href="/site?domain={{.Domain}}">{{.Domain}}</a>{{end}}
+</div>
+
+<script>
+// Theme: dark/light toggle saved per-browser, picks up prefers-color-scheme.
+(function(){
+  var saved = localStorage.getItem('hostq-theme');
+  var sys = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  document.documentElement.dataset.theme = saved || sys;
+})();
+function toggleTheme(){
+  var cur = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = cur;
+  localStorage.setItem('hostq-theme', cur);
+}
+
+// Cmd+K palette
+var paletteItems=[], paletteIndex=0;
+function buildPalette(){
+  var data=document.getElementById('palette-data');
+  if(!data) return;
+  paletteItems = Array.prototype.slice.call(data.querySelectorAll('a')).map(function(a){
+    return {label:a.textContent.trim(), cat:a.dataset.cat||'', href:a.getAttribute('href'), icon:a.dataset.icon||''};
+  });
+}
+function renderPalette(q){
+  q = (q||'').trim().toLowerCase();
+  var list = document.getElementById('paletteList');
+  list.innerHTML = '';
+  var filtered = paletteItems;
+  if(q){
+    filtered = paletteItems.filter(function(it){ return it.label.toLowerCase().indexOf(q)>=0 || it.cat.toLowerCase().indexOf(q)>=0; });
+  }
+  if(filtered.length===0){
+    list.innerHTML = '<div class="palette-empty">No matches</div>';
+    paletteIndex = -1; return;
+  }
+  paletteIndex = 0;
+  var byCat = {};
+  filtered.forEach(function(it,i){ (byCat[it.cat] = byCat[it.cat]||[]).push({it:it,i:i}); });
+  Object.keys(byCat).forEach(function(cat){
+    var h=document.createElement('div'); h.className='palette-cat'; h.textContent=cat; list.appendChild(h);
+    byCat[cat].forEach(function(entry){
+      var row=document.createElement('a'); row.className='palette-row'; row.href=entry.it.href;
+      row.innerHTML='<span class="palette-label">'+escapeHtml(entry.it.label)+'</span><span class="palette-hint">'+escapeHtml(entry.it.cat)+'</span>';
+      row.dataset.idx = entry.i;
+      list.appendChild(row);
+    });
+  });
+  highlightRow();
+}
+function escapeHtml(s){ return s.replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+function highlightRow(){
+  var rows = document.querySelectorAll('#paletteList .palette-row');
+  rows.forEach(function(r,i){ r.classList.toggle('on', i===paletteIndex); });
+  if(rows[paletteIndex]) rows[paletteIndex].scrollIntoView({block:'nearest'});
+}
+function openPalette(){
+  if(!paletteItems.length) buildPalette();
+  var bg=document.getElementById('palette'); bg.classList.add('show');
+  var inp=document.getElementById('paletteInput'); inp.value=''; renderPalette('');
+  setTimeout(function(){ inp.focus(); }, 30);
+}
+function closePalette(){ document.getElementById('palette').classList.remove('show'); }
+document.addEventListener('keydown',function(e){
+  var k=(e.key||'').toLowerCase();
+  if((e.ctrlKey||e.metaKey) && k==='k'){ e.preventDefault(); openPalette(); return; }
+  var open = document.getElementById('palette') && document.getElementById('palette').classList.contains('show');
+  if(!open) return;
+  if(k==='escape'){ closePalette(); return; }
+  var rows = document.querySelectorAll('#paletteList .palette-row');
+  if(k==='arrowdown'){ e.preventDefault(); paletteIndex=Math.min(rows.length-1,paletteIndex+1); highlightRow(); }
+  else if(k==='arrowup'){ e.preventDefault(); paletteIndex=Math.max(0,paletteIndex-1); highlightRow(); }
+  else if(k==='enter'){ e.preventDefault(); if(rows[paletteIndex]) window.location = rows[paletteIndex].getAttribute('href'); }
+});
+document.addEventListener('input',function(e){
+  if(e.target && e.target.id==='paletteInput') renderPalette(e.target.value);
+});
+</script>
+
 <script>
 // Toast system: also shown for ?output= flash redirects, then URL is cleaned.
 function toast(msg, kind){
@@ -506,38 +641,109 @@ document.addEventListener('keydown',function(e){
   <a href="/site?domain={{.Site.Domain}}&tab=ssl"       class="{{if eq .Tab "ssl"}}active{{end}}">{{icon "shield"}} SSL</a>
   <a href="/site?domain={{.Site.Domain}}&tab=php"       class="{{if eq .Tab "php"}}active{{end}}">{{icon "cpu"}} PHP</a>
   <a href="/files?path=/{{.Site.Domain}}/htdocs">{{icon "folderOpen"}} Files</a>
+  <a href="/site?domain={{.Site.Domain}}&tab=security"  class="{{if eq .Tab "security"}}active{{end}}">{{icon "shield"}} Security</a>
   <a href="/site?domain={{.Site.Domain}}&tab=backups"   class="{{if eq .Tab "backups"}}active{{end}}">{{icon "archive"}} Backups</a>
 </div>
 
 {{if eq .Tab "overview"}}
-  <div class="grid">
-    <div class="stat"><div class="label">{{icon "cpu"}} PHP version</div><div class="val">{{.Site.PHPVersion}}</div><div class="sub">FastCGI Process Manager</div></div>
-    <div class="stat"><div class="label">{{icon "shield"}} SSL</div><div class="val">{{if .Site.SSL}}<span class="ok">on</span>{{else}}<span class="bad">off</span>{{end}}</div><div class="sub">Let's Encrypt</div></div>
-    <div class="stat"><div class="label">{{icon "activity"}} Cache</div><div class="val">{{if .Site.Cache}}<span class="ok">on</span>{{else}}off{{end}}</div><div class="sub">Nginx fastcgi cache</div></div>
-    <div class="stat"><div class="label">{{icon "globe"}} Status</div><div class="val">{{if .Site.Enabled}}<span class="ok">live</span>{{else}}<span class="bad">disabled</span>{{end}}</div><div class="sub">{{.Site.Domain}}</div></div>
-  </div>
-  <div class="card">
-    <h3>Site controls</h3>
-    <div class="actions">
-      <form method="post" action="/site-action"><input type="hidden" name="domain" value="{{.Site.Domain}}">
-        {{if .Site.Enabled}}<button class="btn" name="action" value="disable">{{icon "power"}} Disable site</button>
-        {{else}}<button class="btn primary" name="action" value="enable">{{icon "power"}} Enable site</button>{{end}}
-      </form>
-      <form method="post" action="/site-action"><input type="hidden" name="domain" value="{{.Site.Domain}}">
-        {{if .Site.Cache}}<button class="btn" name="action" value="cache-off">Cache: off</button>
-        {{else}}<button class="btn" name="action" value="cache-on">Cache: on</button>{{end}}
-      </form>
-      <form method="post" action="/site-action"><input type="hidden" name="domain" value="{{.Site.Domain}}">
-        <button class="btn" name="action" value="permissions">{{icon "shield"}} Fix permissions</button>
-      </form>
-      <a class="btn" href="/files?path=/{{.Site.Domain}}/htdocs">{{icon "folderOpen"}} Open files</a>
-      <a class="btn" href="/phpmyadmin/" target="_blank">{{icon "database"}} phpMyAdmin</a>
-      <form method="post" action="/site-action" data-confirm="Permanently delete this site, its document root, and Nginx vhost?">
-        <input type="hidden" name="domain" value="{{.Site.Domain}}">
-        <button class="btn danger" name="action" value="delete">{{icon "trash"}} Delete site</button>
-      </form>
+  <div class="grid-2">
+    <div class="card">
+      <h3>Quick actions</h3>
+      <div class="actions">
+        <a class="btn" href="/files?path=/{{.Site.Domain}}/htdocs">{{icon "folderOpen"}} Files</a>
+        <a class="btn" href="/site?domain={{.Site.Domain}}&tab=database">{{icon "database"}} Database</a>
+        <a class="btn" href="/site?domain={{.Site.Domain}}&tab=wordpress">{{icon "wordpress"}} WordPress</a>
+        <a class="btn" href="/site?domain={{.Site.Domain}}&tab=ssl">{{icon "shield"}} SSL</a>
+        <a class="btn" href="/site?domain={{.Site.Domain}}&tab=security">{{icon "shield"}} Security scan</a>
+        <a class="btn" href="/site?domain={{.Site.Domain}}&tab=backups">{{icon "archive"}} Backups</a>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Site controls</h3>
+      <div class="actions">
+        <form method="post" action="/site-action"><input type="hidden" name="domain" value="{{.Site.Domain}}">
+          {{if .Site.Enabled}}<button class="btn" name="action" value="disable">{{icon "power"}} Disable</button>
+          {{else}}<button class="btn primary" name="action" value="enable">{{icon "power"}} Enable</button>{{end}}
+        </form>
+        <form method="post" action="/site-action"><input type="hidden" name="domain" value="{{.Site.Domain}}">
+          {{if .Site.Cache}}<button class="btn" name="action" value="cache-off">Cache: off</button>
+          {{else}}<button class="btn" name="action" value="cache-on">Cache: on</button>{{end}}
+        </form>
+        <form method="post" action="/site-action"><input type="hidden" name="domain" value="{{.Site.Domain}}">
+          <button class="btn" name="action" value="permissions">{{icon "shield"}} Fix permissions</button>
+        </form>
+        <form method="post" action="/site-action" data-confirm="Permanently delete this site, its document root, and Nginx vhost?">
+          <input type="hidden" name="domain" value="{{.Site.Domain}}">
+          <button class="btn danger" name="action" value="delete">{{icon "trash"}} Delete site</button>
+        </form>
+      </div>
     </div>
   </div>
+{{end}}
+
+{{if eq .Tab "security"}}
+  <div class="toolbar">
+    <div class="muted">{{if .Scan}}Last scan {{.Scan.When}} · {{.Scan.Scanned}} files · {{.Scan.Took}}{{else}}No scans yet. Run one to inspect this site for malware patterns.{{end}}</div>
+    <form method="post" action="/security" style="display:inline">
+      <input type="hidden" name="domain" value="{{.Site.Domain}}">
+      <button class="btn primary" name="action" value="scan">{{icon "shield"}} Run security scan</button>
+    </form>
+  </div>
+  {{if .Scan}}
+    <div class="grid">
+      <div class="stat"><div class="label">{{icon "alert"}} Critical</div><div class="val"><span class="bad">{{.Scan.Critical}}</span></div><div class="sub">RCE / known webshell</div></div>
+      <div class="stat"><div class="label">{{icon "alert"}} High</div><div class="val">{{.Scan.High}}</div><div class="sub">very suspicious patterns</div></div>
+      <div class="stat"><div class="label">{{icon "info"}} Medium</div><div class="val">{{.Scan.Medium}}</div><div class="sub">worth a look</div></div>
+      <div class="stat"><div class="label">{{icon "check"}} Scanned</div><div class="val">{{.Scan.Scanned}}</div><div class="sub">files in {{.Scan.Took}}</div></div>
+    </div>
+    {{if .Scan.Findings}}
+    <div class="card" style="padding:0">
+      <table>
+        <thead><tr><th>Severity</th><th>File</th><th>Rule</th><th>Match</th><th>Modified</th><th class="right-col">Actions</th></tr></thead>
+        <tbody>
+          {{range .Scan.Findings}}<tr>
+            <td>
+              {{if eq .Severity "critical"}}<span class="badge bad">{{icon "alert"}} critical</span>
+              {{else if eq .Severity "high"}}<span class="badge bad">{{icon "alert"}} high</span>
+              {{else if eq .Severity "medium"}}<span class="badge warn">{{icon "info"}} medium</span>
+              {{else}}<span class="badge">{{.Severity}}</span>{{end}}
+            </td>
+            <td class="mono" style="max-width:280px;overflow:hidden;text-overflow:ellipsis">{{.Path}}</td>
+            <td><span class="badge">{{.Rule}}</span><div class="muted" style="margin-top:3px;font-size:11.5px">{{.Detail}}</div></td>
+            <td class="mono muted" style="font-size:11.5px;max-width:340px;word-break:break-all">{{if .Match}}{{.Match}}{{else}}—{{end}}</td>
+            <td class="muted">{{.Modified}}</td>
+            <td class="right-col"><div class="actions" style="justify-content:flex-end">
+              <form method="post" action="/security" style="display:inline" data-confirm="Quarantine this file? It will be moved to /var/backups/hostq/quarantine/{{$.Site.Domain}}/...">
+                <input type="hidden" name="domain" value="{{$.Site.Domain}}">
+                <input type="hidden" name="abs" value="{{.AbsPath}}">
+                <button class="btn mini" name="action" value="quarantine">{{icon "archive"}} Quarantine</button>
+              </form>
+              <form method="post" action="/security" style="display:inline" data-confirm="Permanently delete this file?">
+                <input type="hidden" name="domain" value="{{$.Site.Domain}}">
+                <input type="hidden" name="abs" value="{{.AbsPath}}">
+                <button class="btn mini danger" name="action" value="delete">{{icon "trash"}}</button>
+              </form>
+            </div></td>
+          </tr>{{end}}
+        </tbody>
+      </table>
+    </div>
+    {{else}}
+      <div class="card empty">
+        <div class="empty-ic">{{icon "check"}}</div>
+        <div><h3 style="margin:0 0 4px;color:var(--ink)">Clean</h3><p class="muted" style="margin:0">No suspicious patterns found in {{.Scan.Scanned}} scanned files. Run again any time after a deploy or plugin install.</p></div>
+      </div>
+    {{end}}
+  {{else}}
+    <div class="card empty">
+      <div class="empty-ic">{{icon "shield"}}</div>
+      <div>
+        <h3 style="margin:0 0 4px;color:var(--ink)">No scans yet</h3>
+        <p class="muted" style="margin:0">The scanner walks every PHP / HTML / JS / .htaccess file under <span class="mono">{{.Site.Root}}</span> and checks them against a curated set of malware patterns (known webshells, eval-decode, RCE callbacks, hidden iframes, PHP in uploads, etc.).</p>
+        <p class="muted" style="margin:6px 0 0">Findings can be <strong>quarantined</strong> (moved to <span class="mono">/var/backups/hostq/quarantine/{{.Site.Domain}}/&lt;timestamp&gt;/</span>) or deleted from this page.</p>
+      </div>
+    </div>
+  {{end}}
 {{end}}
 
 {{if eq .Tab "database"}}
@@ -663,6 +869,75 @@ document.addEventListener('keydown',function(e){
         {{else}}<tr><td colspan="4" class="muted">No users returned.</td></tr>{{end}}
       </tbody></table>
       <p class="muted" style="margin-top:10px">For per-user password resets, URL changes, and delete — open the <a href="/wordpress?manage={{.Site.Domain}}" style="color:#2563eb;font-weight:700">full manager</a>.</p>
+    </div>
+
+    <div class="card">
+      <div class="toolbar" style="margin:0">
+        <div>
+          <h3 style="margin:0">{{icon "shield"}} Malfix — file integrity & repair</h3>
+          <p class="muted" style="margin:4px 0 0">Verifies WordPress core, plugins, and themes against the official WordPress.org checksums. Reinstall any altered files in place.</p>
+        </div>
+        <form method="post" action="/malfix" style="display:inline"><input type="hidden" name="domain" value="{{.Site.Domain}}">
+          <button class="btn primary" name="action" value="scan">{{icon "refresh"}} Run integrity scan</button>
+        </form>
+      </div>
+      {{if .Malfix}}
+        <hr class="sep">
+        <div class="muted" style="margin-bottom:10px">Last scan {{.Malfix.When}} · {{.Malfix.Took}} · <strong>{{.Malfix.Summary}}</strong></div>
+        {{if and .Malfix.CoreOK (eq (len .Malfix.PluginsFailed) 0) (eq (len .Malfix.ThemesFailed) 0)}}
+          <div class="card empty" style="margin:0">
+            <div class="empty-ic">{{icon "check"}}</div>
+            <div><h3 style="margin:0 0 4px;color:var(--ink)">Clean install</h3><p class="muted" style="margin:0">Every core, plugin and theme file matches its WordPress.org checksum.</p></div>
+          </div>
+        {{else}}
+          {{if or (not .Malfix.CoreOK) (gt (len .Malfix.CoreFailed) 0)}}
+          <div class="db-card" style="border:1px solid var(--card-line);border-radius:10px;padding:14px 16px;margin-bottom:10px">
+            <div class="db-head" style="margin-bottom:8px">
+              <div class="db-title"><span class="badge bad">{{icon "alert"}} core altered</span> <span class="mono" style="font-weight:700">{{len .Malfix.CoreFailed}} file(s)</span></div>
+              <form method="post" action="/malfix" data-confirm="Re-download WordPress core and overwrite altered files? wp-content (themes/plugins/uploads) and wp-config.php are kept."><input type="hidden" name="domain" value="{{.Site.Domain}}">
+                <button class="btn mini primary" name="action" value="repair-core">{{icon "refresh"}} Repair core</button>
+              </form>
+            </div>
+            {{if .Malfix.CoreFailed}}<ul class="mono" style="margin:0;padding-left:18px;font-size:12px;color:var(--ink-muted)">
+              {{range .Malfix.CoreFailed}}<li>{{.}}</li>{{end}}
+            </ul>{{end}}
+          </div>
+          {{end}}
+          {{range $slug, $files := .Malfix.PluginsFailed}}
+          <div class="db-card" style="border:1px solid var(--card-line);border-radius:10px;padding:14px 16px;margin-bottom:10px">
+            <div class="db-head" style="margin-bottom:8px">
+              <div class="db-title"><span class="badge bad">{{icon "alert"}} plugin altered</span> <span class="mono" style="font-weight:700">{{$slug}}</span> <span class="muted">— {{len $files}} file(s)</span></div>
+              <form method="post" action="/malfix" data-confirm="Re-download plugin {{$slug}} from WordPress.org and overwrite altered files?"><input type="hidden" name="domain" value="{{$.Site.Domain}}"><input type="hidden" name="slug" value="{{$slug}}">
+                <button class="btn mini primary" name="action" value="repair-plugin">{{icon "refresh"}} Repair plugin</button>
+              </form>
+            </div>
+            <ul class="mono" style="margin:0;padding-left:18px;font-size:12px;color:var(--ink-muted)">
+              {{range $files}}<li>{{.}}</li>{{end}}
+            </ul>
+          </div>
+          {{end}}
+          {{range $slug, $files := .Malfix.ThemesFailed}}
+          <div class="db-card" style="border:1px solid var(--card-line);border-radius:10px;padding:14px 16px;margin-bottom:10px">
+            <div class="db-head" style="margin-bottom:8px">
+              <div class="db-title"><span class="badge bad">{{icon "alert"}} theme altered</span> <span class="mono" style="font-weight:700">{{$slug}}</span> <span class="muted">— {{len $files}} file(s)</span></div>
+              <form method="post" action="/malfix" data-confirm="Re-download theme {{$slug}} from WordPress.org and overwrite altered files?"><input type="hidden" name="domain" value="{{$.Site.Domain}}"><input type="hidden" name="slug" value="{{$slug}}">
+                <button class="btn mini primary" name="action" value="repair-theme">{{icon "refresh"}} Repair theme</button>
+              </form>
+            </div>
+            <ul class="mono" style="margin:0;padding-left:18px;font-size:12px;color:var(--ink-muted)">
+              {{range $files}}<li>{{.}}</li>{{end}}
+            </ul>
+          </div>
+          {{end}}
+          <form method="post" action="/malfix" data-confirm="Repair core + every altered plugin + every altered theme? Custom (non-WP.org) plugins and themes will be skipped silently — only those known to the WordPress.org repository can be re-downloaded."><input type="hidden" name="domain" value="{{.Site.Domain}}">
+            <button class="btn primary" name="action" value="repair-all">{{icon "shield"}} Repair everything</button>
+          </form>
+        {{end}}
+      {{else}}
+        <hr class="sep">
+        <p class="muted" style="margin:0">No integrity scan yet. The scan runs <span class="mono">wp core verify-checksums</span>, <span class="mono">wp plugin verify-checksums --all</span>, and <span class="mono">wp theme verify-checksums --all</span> and lists every file that no longer matches its published hash.</p>
+        <p class="muted" style="margin:6px 0 0">Repair re-downloads the affected component from WordPress.org with <span class="mono">--force</span>. Your <span class="mono">wp-config.php</span>, <span class="mono">wp-content/uploads/</span>, and any non-WP.org code is kept untouched.</p>
+      {{end}}
     </div>
   {{else}}
     <div class="card">
@@ -1315,5 +1590,46 @@ document.addEventListener('keydown',function(e){
     </tbody>
   </table>
 </div>
+{{end}}
+
+{{define "redis"}}
+<div class="page-head">
+  <div><h1>{{icon "activity"}} Redis</h1><p>Optional in-memory cache. Used by WordPress object-cache plugins when installed.</p></div>
+  {{if .Stats.Active}}<span class="badge ok">{{icon "check"}} active</span>{{else}}<span class="badge bad">{{icon "x"}} stopped</span>{{end}}
+</div>
+{{if .Stats.Active}}
+  <div class="grid">
+    <div class="stat"><div class="label">{{icon "cpu"}} Used memory</div><div class="val">{{.Stats.UsedMemory}}</div><div class="sub">Peak {{.Stats.PeakMemory}}</div></div>
+    <div class="stat"><div class="label">{{icon "box"}} Keys</div><div class="val">{{.Stats.TotalKeys}}</div><div class="sub">db0</div></div>
+    <div class="stat"><div class="label">{{icon "users"}} Clients</div><div class="val">{{.Stats.Clients}}</div><div class="sub">connected</div></div>
+    <div class="stat"><div class="label">{{icon "activity"}} Ops / sec</div><div class="val">{{.Stats.OpsPerSec}}</div><div class="sub">instantaneous</div></div>
+    <div class="stat"><div class="label">{{icon "check"}} Hit rate</div><div class="val">{{.Stats.HitRate}}</div><div class="sub">since boot</div></div>
+    <div class="stat"><div class="label">{{icon "clock"}} Uptime</div><div class="val">{{.Stats.UptimeDays}}d</div><div class="sub">v{{.Stats.Version}}</div></div>
+  </div>
+  <div class="card">
+    <h3>Actions</h3>
+    <div class="actions">
+      <form method="post" action="/redis" data-confirm="Flush ALL Redis keys? This empties every cached object.">
+        <button class="btn danger" name="action" value="flush">{{icon "trash"}} Flush all keys</button>
+      </form>
+      <form method="post" action="/redis">
+        <button class="btn" name="action" value="restart">{{icon "refresh"}} Restart Redis</button>
+      </form>
+      <form method="post" action="/redis">
+        <button class="btn" name="action" value="stop">{{icon "stop"}} Stop</button>
+      </form>
+    </div>
+    <p class="muted" style="margin-top:10px">To plug Redis into a WordPress site, install the <span class="mono">redis-cache</span> plugin (or <span class="mono">wp-redis</span>) and enable object cache from its settings. The Redis socket is at <span class="mono">127.0.0.1:6379</span>.</p>
+  </div>
+{{else}}
+  <div class="card empty">
+    <div class="empty-ic">{{icon "activity"}}</div>
+    <div>
+      <h3 style="margin:0 0 4px;color:var(--ink)">Redis is not running</h3>
+      <p class="muted" style="margin:0 0 10px">The package is installed but the service is stopped. Start it whenever you need a fast in-memory cache.</p>
+      <form method="post" action="/redis"><button class="btn primary" name="action" value="start">{{icon "play"}} Start Redis</button></form>
+    </div>
+  </div>
+{{end}}
 {{end}}
 `

@@ -21,6 +21,9 @@ func (a *App) audit(action, status, target string) {
 
 func (a *App) render(w http.ResponseWriter, view string, data map[string]any) {
 	data["View"] = view
+	if _, ok := data["PaletteSites"]; !ok && view != "login" {
+		data["PaletteSites"] = a.listSites()
+	}
 	if err := a.tpl.ExecuteTemplate(w, "layout", data); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
