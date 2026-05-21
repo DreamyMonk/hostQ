@@ -84,6 +84,9 @@ func (a *App) siteManager(w http.ResponseWriter, r *http.Request) {
 		if len(filtered) > 0 {
 			data["WPManage"] = &filtered[0]
 			data["WPUsers"] = a.listWPUsers(filtered[0].Path)
+			if report, err := a.loadMalfixReport(site.Domain); err == nil {
+				data["Malfix"] = report
+			}
 		}
 	case "ssl":
 		data["Certificates"] = a.listCertificates()

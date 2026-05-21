@@ -59,6 +59,7 @@ func main() {
 	mux.HandleFunc("/audit", app.requireAuth(app.auditLog))
 	mux.HandleFunc("/redis", app.requireAuth(app.redis))
 	mux.HandleFunc("/security", app.requireAuth(app.security))
+	mux.HandleFunc("/malfix", app.requireAuth(app.malfix))
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("ok")) })
 
 	log.Printf("hostQ panel listening on http://%s", app.cfg.Addr)

@@ -870,6 +870,75 @@ document.addEventListener('keydown',function(e){
       </tbody></table>
       <p class="muted" style="margin-top:10px">For per-user password resets, URL changes, and delete — open the <a href="/wordpress?manage={{.Site.Domain}}" style="color:#2563eb;font-weight:700">full manager</a>.</p>
     </div>
+
+    <div class="card">
+      <div class="toolbar" style="margin:0">
+        <div>
+          <h3 style="margin:0">{{icon "shield"}} Malfix — file integrity & repair</h3>
+          <p class="muted" style="margin:4px 0 0">Verifies WordPress core, plugins, and themes against the official WordPress.org checksums. Reinstall any altered files in place.</p>
+        </div>
+        <form method="post" action="/malfix" style="display:inline"><input type="hidden" name="domain" value="{{.Site.Domain}}">
+          <button class="btn primary" name="action" value="scan">{{icon "refresh"}} Run integrity scan</button>
+        </form>
+      </div>
+      {{if .Malfix}}
+        <hr class="sep">
+        <div class="muted" style="margin-bottom:10px">Last scan {{.Malfix.When}} · {{.Malfix.Took}} · <strong>{{.Malfix.Summary}}</strong></div>
+        {{if and .Malfix.CoreOK (eq (len .Malfix.PluginsFailed) 0) (eq (len .Malfix.ThemesFailed) 0)}}
+          <div class="card empty" style="margin:0">
+            <div class="empty-ic">{{icon "check"}}</div>
+            <div><h3 style="margin:0 0 4px;color:var(--ink)">Clean install</h3><p class="muted" style="margin:0">Every core, plugin and theme file matches its WordPress.org checksum.</p></div>
+          </div>
+        {{else}}
+          {{if or (not .Malfix.CoreOK) (gt (len .Malfix.CoreFailed) 0)}}
+          <div class="db-card" style="border:1px solid var(--card-line);border-radius:10px;padding:14px 16px;margin-bottom:10px">
+            <div class="db-head" style="margin-bottom:8px">
+              <div class="db-title"><span class="badge bad">{{icon "alert"}} core altered</span> <span class="mono" style="font-weight:700">{{len .Malfix.CoreFailed}} file(s)</span></div>
+              <form method="post" action="/malfix" data-confirm="Re-download WordPress core and overwrite altered files? wp-content (themes/plugins/uploads) and wp-config.php are kept."><input type="hidden" name="domain" value="{{.Site.Domain}}">
+                <button class="btn mini primary" name="action" value="repair-core">{{icon "refresh"}} Repair core</button>
+              </form>
+            </div>
+            {{if .Malfix.CoreFailed}}<ul class="mono" style="margin:0;padding-left:18px;font-size:12px;color:var(--ink-muted)">
+              {{range .Malfix.CoreFailed}}<li>{{.}}</li>{{end}}
+            </ul>{{end}}
+          </div>
+          {{end}}
+          {{range $slug, $files := .Malfix.PluginsFailed}}
+          <div class="db-card" style="border:1px solid var(--card-line);border-radius:10px;padding:14px 16px;margin-bottom:10px">
+            <div class="db-head" style="margin-bottom:8px">
+              <div class="db-title"><span class="badge bad">{{icon "alert"}} plugin altered</span> <span class="mono" style="font-weight:700">{{$slug}}</span> <span class="muted">— {{len $files}} file(s)</span></div>
+              <form method="post" action="/malfix" data-confirm="Re-download plugin {{$slug}} from WordPress.org and overwrite altered files?"><input type="hidden" name="domain" value="{{$.Site.Domain}}"><input type="hidden" name="slug" value="{{$slug}}">
+                <button class="btn mini primary" name="action" value="repair-plugin">{{icon "refresh"}} Repair plugin</button>
+              </form>
+            </div>
+            <ul class="mono" style="margin:0;padding-left:18px;font-size:12px;color:var(--ink-muted)">
+              {{range $files}}<li>{{.}}</li>{{end}}
+            </ul>
+          </div>
+          {{end}}
+          {{range $slug, $files := .Malfix.ThemesFailed}}
+          <div class="db-card" style="border:1px solid var(--card-line);border-radius:10px;padding:14px 16px;margin-bottom:10px">
+            <div class="db-head" style="margin-bottom:8px">
+              <div class="db-title"><span class="badge bad">{{icon "alert"}} theme altered</span> <span class="mono" style="font-weight:700">{{$slug}}</span> <span class="muted">— {{len $files}} file(s)</span></div>
+              <form method="post" action="/malfix" data-confirm="Re-download theme {{$slug}} from WordPress.org and overwrite altered files?"><input type="hidden" name="domain" value="{{$.Site.Domain}}"><input type="hidden" name="slug" value="{{$slug}}">
+                <button class="btn mini primary" name="action" value="repair-theme">{{icon "refresh"}} Repair theme</button>
+              </form>
+            </div>
+            <ul class="mono" style="margin:0;padding-left:18px;font-size:12px;color:var(--ink-muted)">
+              {{range $files}}<li>{{.}}</li>{{end}}
+            </ul>
+          </div>
+          {{end}}
+          <form method="post" action="/malfix" data-confirm="Repair core + every altered plugin + every altered theme? Custom (non-WP.org) plugins and themes will be skipped silently — only those known to the WordPress.org repository can be re-downloaded."><input type="hidden" name="domain" value="{{.Site.Domain}}">
+            <button class="btn primary" name="action" value="repair-all">{{icon "shield"}} Repair everything</button>
+          </form>
+        {{end}}
+      {{else}}
+        <hr class="sep">
+        <p class="muted" style="margin:0">No integrity scan yet. The scan runs <span class="mono">wp core verify-checksums</span>, <span class="mono">wp plugin verify-checksums --all</span>, and <span class="mono">wp theme verify-checksums --all</span> and lists every file that no longer matches its published hash.</p>
+        <p class="muted" style="margin:6px 0 0">Repair re-downloads the affected component from WordPress.org with <span class="mono">--force</span>. Your <span class="mono">wp-config.php</span>, <span class="mono">wp-content/uploads/</span>, and any non-WP.org code is kept untouched.</p>
+      {{end}}
+    </div>
   {{else}}
     <div class="card">
       <h3>Install WordPress on {{.Site.Domain}}</h3>
