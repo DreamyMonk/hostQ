@@ -18,6 +18,7 @@ func main() {
 			NginxSitesDir: env("HOSTQ_NGINX_AVAILABLE", "/etc/nginx/sites-available"),
 			JWTSecret:     env("JWT_SECRET", "change_this_hostq_secret"),
 		},
+		cache: newMemCache(),
 	}
 	if len(os.Args) > 1 && os.Args[1] == "init-admin" {
 		if err := app.initAdmin(); err != nil {
@@ -56,10 +57,11 @@ func main() {
 	mux.HandleFunc("/cron", app.requireAuth(app.cron))
 	mux.HandleFunc("/account", app.requireAuth(app.account))
 	mux.HandleFunc("/audit", app.requireAuth(app.auditLog))
+	mux.HandleFunc("/redis", app.requireAuth(app.redis))
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("ok")) })
 
 	log.Printf("hostQ panel listening on http://%s", app.cfg.Addr)
-	log.Fatal(http.ListenAndServe(app.cfg.Addr, securityHeaders(mux)))
+	log.Fatal(http.ListenAndServe(app.cfg.Addr, gzipMiddleware(securityHeaders(mux))))
 }
 
 func env(key, fallback string) string {

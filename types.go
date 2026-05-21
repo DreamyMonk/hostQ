@@ -135,8 +135,23 @@ type CronJob struct {
 }
 
 type App struct {
-	cfg Config
-	tpl *template.Template
+	cfg   Config
+	tpl   *template.Template
+	cache *memCache
+}
+
+type RedisStats struct {
+	Active        bool
+	Version       string
+	UptimeDays    string
+	UsedMemory    string
+	PeakMemory    string
+	Clients       string
+	OpsPerSec     string
+	TotalKeys     int
+	HitRate       string
+	EvictedKeys   string
+	Service       string
 }
 
 var domainRe = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)

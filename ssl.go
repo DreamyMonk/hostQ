@@ -106,6 +106,9 @@ func (a *App) removeBrokenNginxSSL(domain string) string {
 }
 
 func (a *App) listCertificates() []CertInfo {
+	if v, ok := a.cache.get("certs"); ok {
+		return v.([]CertInfo)
+	}
 	out, _ := exec.Command("certbot", "certificates").CombinedOutput()
 	certs := []CertInfo{}
 	for _, block := range strings.Split(string(out), "Certificate Name:") {
@@ -123,6 +126,7 @@ func (a *App) listCertificates() []CertInfo {
 		certs = append(certs, CertInfo{Domain: name[0], Expiry: expiry, Days: days, Status: status})
 	}
 	sort.Slice(certs, func(i, j int) bool { return certs[i].Domain < certs[j].Domain })
+	a.cache.set("certs", certs, 15*time.Second)
 	return certs
 }
 

@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"os/exec"
 	"strings"
+	"time"
 )
 
 func (a *App) php(w http.ResponseWriter, r *http.Request) {
@@ -19,6 +20,9 @@ func (a *App) php(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) listPHP() []PHPInfo {
+	if v, ok := a.cache.get("php"); ok {
+		return v.([]PHPInfo)
+	}
 	versions := []string{"8.2", "8.3", "8.4", "8.5"}
 	out := []PHPInfo{}
 	for _, version := range versions {
@@ -29,6 +33,7 @@ func (a *App) listPHP() []PHPInfo {
 		}
 		out = append(out, PHPInfo{Version: version, Service: service, Status: status})
 	}
+	a.cache.set("php", out, 10*time.Second)
 	return out
 }
 

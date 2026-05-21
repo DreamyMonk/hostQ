@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 )
 
 func (a *App) dashboard(w http.ResponseWriter, _ *http.Request) {
@@ -134,6 +135,7 @@ func (a *App) siteAction(w http.ResponseWriter, r *http.Request) {
 		}
 		_ = exec.Command("systemctl", "reload", "nginx").Run()
 	}
+	a.cache.invalidate("sites")
 	a.audit("site."+action, "success", domain)
 	http.Redirect(w, r, "/sites", http.StatusSeeOther)
 }
@@ -148,6 +150,9 @@ func (a *App) findSite(domain string) (Site, bool) {
 }
 
 func (a *App) listSites() []Site {
+	if v, ok := a.cache.get("sites"); ok {
+		return v.([]Site)
+	}
 	sites := []Site{}
 	entries, err := os.ReadDir(a.cfg.NginxSitesDir)
 	if err != nil {
@@ -182,6 +187,7 @@ func (a *App) listSites() []Site {
 		})
 	}
 	sort.Slice(sites, func(i, j int) bool { return sites[i].Domain < sites[j].Domain })
+	a.cache.set("sites", sites, 3*time.Second)
 	return sites
 }
 
@@ -264,4 +270,5 @@ func (a *App) writeNginxSite(domain, root string, cache bool, phpVersion string)
 	_ = os.Symlink(filepath.Join(a.cfg.NginxSitesDir, domain), filepath.Join("/etc/nginx/sites-enabled", domain))
 	_ = exec.Command("nginx", "-t").Run()
 	_ = exec.Command("systemctl", "reload", "nginx").Run()
+	a.cache.invalidate("sites")
 }
