@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -99,7 +100,14 @@ func safeName(name string) string {
 	name = strings.ReplaceAll(name, "/", "-")
 	name = strings.ReplaceAll(name, "\\", "-")
 	name = regexp.MustCompile(`[^a-zA-Z0-9._ -]+`).ReplaceAllString(name, "-")
-	return strings.Trim(name, ". ")
+	// Trim trailing dots/spaces only — leading dots are valid for hidden
+	// files (.htaccess, .gitignore, .user.ini). Reject the bare path
+	// indicators "." and ".." explicitly.
+	name = strings.TrimRight(name, ". ")
+	if name == "." || name == ".." {
+		return ""
+	}
+	return name
 }
 
 func blockedFileName(name string) bool {
@@ -355,6 +363,39 @@ func (a *App) fileAction(w http.ResponseWriter, r *http.Request) {
 		}
 		output = "Permissions updated to " + mode
 		a.audit("file.chmod", "success", chmodPath)
+	case "writable":
+		targetPath := a.safeWebPath(r.FormValue("target"))
+		if !a.canMutateWebPath(targetPath) {
+			output = "Cannot make that path writable"
+			break
+		}
+		if err := makePathWritable(targetPath); err != nil {
+			output = "make writable failed: " + err.Error()
+			a.audit("file.writable", "failure", targetPath)
+			break
+		}
+		output = "Made writable for www-data: " + filepath.Base(targetPath)
+		a.audit("file.writable", "success", targetPath)
+	case "bulk-writable":
+		_ = r.ParseForm()
+		count, failed := 0, 0
+		for _, t := range r.PostForm["target"] {
+			p := a.safeWebPath(t)
+			if !a.canMutateWebPath(p) {
+				failed++
+				continue
+			}
+			if err := makePathWritable(p); err != nil {
+				failed++
+				continue
+			}
+			count++
+			a.audit("file.writable", "success", p)
+		}
+		output = fmt.Sprintf("Made %d item(s) writable for www-data", count)
+		if failed > 0 {
+			output += fmt.Sprintf(" · %d failed", failed)
+		}
 	case "rename":
 		from := a.safeWebPath(r.FormValue("target"))
 		newName := safeName(r.FormValue("dest"))
@@ -648,6 +689,34 @@ func copyDir(src, dst string) error {
 		}
 	}
 	return nil
+}
+
+// makePathWritable hands ownership of a file or directory tree to www-data and
+// sets a g+w-friendly mode so PHP-FPM (which runs as www-data) can write into
+// it. This is the standard "config/, assets/, uploads/, storage/" treatment
+// most PHP apps need before their installer wizard will let you continue.
+//
+// Files end up at 664 (owner+group rw, world r). Directories at 775 (owner+
+// group rwx, world rx) so PHP can create new files inside. The site's other
+// owner (likely the panel's root) still has full access.
+func makePathWritable(path string) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	if out, err := exec.Command("chown", "-R", "www-data:www-data", path).CombinedOutput(); err != nil {
+		return fmt.Errorf("chown: %s", strings.TrimSpace(string(out)))
+	}
+	if info.IsDir() {
+		if out, err := exec.Command("find", path, "-type", "d", "-exec", "chmod", "775", "{}", "+").CombinedOutput(); err != nil {
+			return fmt.Errorf("chmod dirs: %s", strings.TrimSpace(string(out)))
+		}
+		if out, err := exec.Command("find", path, "-type", "f", "-exec", "chmod", "664", "{}", "+").CombinedOutput(); err != nil {
+			return fmt.Errorf("chmod files: %s", strings.TrimSpace(string(out)))
+		}
+		return nil
+	}
+	return os.Chmod(path, 0664)
 }
 
 func copyFile(src, dst string) error {

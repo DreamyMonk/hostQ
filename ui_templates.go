@@ -1299,6 +1299,7 @@ document.addEventListener('keydown',function(e){
   <button type="button" class="btn mini" onclick="fmBulkClear()">Clear</button>
   <div class="grow"></div>
   <button type="button" class="btn mini" onclick="fmBulkOpen('chmod')">{{icon "shield"}} Chmod</button>
+  <button type="button" class="btn mini" onclick="fmBulkWritable()">{{icon "check"}} Writable</button>
   <button type="button" class="btn mini" onclick="fmBulkOpen('copy')">{{icon "copy"}} Copy</button>
   <button type="button" class="btn mini" onclick="fmBulkOpen('move')">{{icon "move"}} Move</button>
   <button type="button" class="btn mini danger" onclick="fmBulkDelete()">{{icon "trash"}} Delete</button>
@@ -1382,6 +1383,7 @@ document.addEventListener('keydown',function(e){
   <div class="sep"></div>
   <button onclick="fmAction('rename')">{{icon "edit"}} Rename</button>
   <button onclick="fmAction('chmod')">{{icon "shield"}} Permissions (chmod)</button>
+  <button onclick="fmAction('writable')">{{icon "check"}} Make writable (www-data)</button>
   <button onclick="fmAction('copy')">{{icon "copy"}} Copy to…</button>
   <button onclick="fmAction('move')">{{icon "move"}} Move to…</button>
   <div class="sep"></div>
@@ -1520,6 +1522,14 @@ document.addEventListener('keydown',function(e){
       document.getElementById('del-target').value=path;
       document.getElementById('fm-delete-form').submit(); return;
     }
+    if(action==='writable'){
+      if(!confirm('Make '+name+' writable by www-data (chown + chmod 775/664 recursively)?')) return;
+      var f = document.createElement('form');
+      f.method='post'; f.style.display='none';
+      function h(n,v){ var i=document.createElement('input'); i.type='hidden'; i.name=n; i.value=v; f.appendChild(i); }
+      h('path', base); h('action','writable'); h('target', path);
+      document.body.appendChild(f); f.submit(); return;
+    }
     if(action==='rename'){
       document.getElementById('rn-from').textContent=name;
       document.getElementById('rn-target').value=path;
@@ -1581,6 +1591,13 @@ document.addEventListener('keydown',function(e){
     if(!confirm('Permanently delete '+n+' selected item(s)?')) return;
     fillTargets();
     document.getElementById('fmBulkAction').value='bulk-delete';
+    document.getElementById('fmBulkForm').submit();
+  };
+  window.fmBulkWritable = function(){
+    var n = selectedRows().length; if(!n) return;
+    if(!confirm('Make '+n+' selected item(s) writable by www-data (chown + chmod 775/664 recursively)?')) return;
+    fillTargets();
+    document.getElementById('fmBulkAction').value='bulk-writable';
     document.getElementById('fmBulkForm').submit();
   };
   window.fmBulkOpen = function(kind){
