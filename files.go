@@ -230,6 +230,71 @@ func (a *App) fileAction(w http.ResponseWriter, r *http.Request) {
 		}
 		output = "Renamed to " + newName
 		a.audit("file.rename", "success", from+" -> "+to)
+	case "bulk-delete":
+		_ = r.ParseForm()
+		count, failed := 0, 0
+		for _, t := range r.PostForm["target"] {
+			p := a.safeWebPath(t)
+			if !a.canMutateWebPath(p) {
+				failed++
+				continue
+			}
+			if err := os.RemoveAll(p); err == nil {
+				count++
+				a.audit("file.delete", "success", p)
+			} else {
+				failed++
+			}
+		}
+		output = fmt.Sprintf("Deleted %d item(s)", count)
+		if failed > 0 {
+			output += fmt.Sprintf(" · %d blocked or failed", failed)
+		}
+	case "bulk-chmod":
+		_ = r.ParseForm()
+		mode := r.FormValue("mode")
+		if !regexp.MustCompile(`^[0-7]{3,4}$`).MatchString(mode) {
+			output = "Invalid mode: use octal like 755 or 644"
+			break
+		}
+		parsed, _ := strconv.ParseUint(mode, 8, 32)
+		count := 0
+		for _, t := range r.PostForm["target"] {
+			p := a.safeWebPath(t)
+			if !a.canMutateWebPath(p) {
+				continue
+			}
+			if err := os.Chmod(p, os.FileMode(parsed)); err == nil {
+				count++
+				a.audit("file.chmod", "success", p)
+			}
+		}
+		output = fmt.Sprintf("Set mode %s on %d item(s)", mode, count)
+	case "bulk-move":
+		_ = r.ParseForm()
+		dest := strings.TrimSpace(r.FormValue("dest"))
+		if dest == "" {
+			output = "Destination required"
+			break
+		}
+		dp := a.safeWebPath(dest)
+		if info, err := os.Stat(dp); err != nil || !info.IsDir() {
+			output = "Destination must be an existing directory under /var/www"
+			break
+		}
+		count := 0
+		for _, t := range r.PostForm["target"] {
+			from := a.safeWebPath(t)
+			if !a.canMutateWebPath(from) {
+				continue
+			}
+			to := filepath.Join(dp, filepath.Base(from))
+			if err := os.Rename(from, to); err == nil {
+				count++
+				a.audit("file.move", "success", from+" -> "+to)
+			}
+		}
+		output = fmt.Sprintf("Moved %d item(s) into %s", count, dest)
 	case "move", "copy":
 		from := a.safeWebPath(r.FormValue("target"))
 		to := a.safeWebPath(r.FormValue("dest"))

@@ -191,6 +191,14 @@ tbody tr:hover{background:var(--surface-2)}
 .fm-toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
 .fm-toolbar form{display:inline-flex}
 .fm-toolbar .grow{flex:1}
+.fm-bulkbar{display:none;align-items:center;gap:10px;padding:9px 12px;margin-bottom:10px;border-radius:10px;background:linear-gradient(180deg,#0b1220,#172033);color:#e6eaf2;font-size:13px;font-weight:600;box-shadow:var(--shadow-lg)}
+.fm-bulkbar.show{display:flex}
+.fm-bulkbar .grow{flex:1}
+.fm-bulkbar .btn{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.10);color:#e6eaf2}
+.fm-bulkbar .btn:hover{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.18)}
+.fm-bulkbar .btn.danger{background:#7f1d1d;border-color:#991b1b;color:#fff}
+.fm-bulkbar .btn.danger:hover{background:#991b1b}
+.fm-check,.fm-checkall{width:16px;height:16px;cursor:pointer;accent-color:var(--brand-2)}
 .file-name{display:flex;align-items:center;gap:8px;font-weight:600}
 .file-name .ic{width:28px;height:28px;border-radius:6px;background:#eff6ff;color:#2563eb;display:grid;place-items:center}
 .file-name.dir .ic{background:#fef3c7;color:#b45309}
@@ -331,6 +339,7 @@ table.flat tbody tr:hover{background:transparent}
       <a href="/databases" class="{{if eq .View "databases"}}active{{end}}">{{icon "database"}}<span>All Databases</span></a>
       <a href="/wordpress" class="{{if eq .View "wordpress"}}active{{end}}">{{icon "wordpress"}}<span>All WordPress</span></a>
       <a href="/ssl" class="{{if eq .View "ssl"}}active{{end}}">{{icon "shield"}}<span>All Certificates</span></a>
+      <a href="/packages" class="{{if eq .View "packages"}}active{{end}}">{{icon "box"}}<span>Packages</span></a>
     </nav>
     <div class="navgroup">Admin</div>
     <nav class="nav">
@@ -365,6 +374,7 @@ table.flat tbody tr:hover{background:transparent}
       {{else if eq .View "account"}}{{template "account" .}}
       {{else if eq .View "audit"}}{{template "audit" .}}
       {{else if eq .View "redis"}}{{template "redis" .}}
+      {{else if eq .View "packages"}}{{template "packages" .}}
       {{end}}
     </div>
   </main>
@@ -1231,11 +1241,24 @@ document.addEventListener('keydown',function(e){
   <span class="badge">{{len .Items}} item(s)</span>
 </div>
 
+<div class="fm-bulkbar" id="fmBulkBar">
+  <span><strong id="fmSelCount">0</strong> selected</span>
+  <button type="button" class="btn mini" onclick="fmBulkClear()">Clear</button>
+  <div class="grow"></div>
+  <button type="button" class="btn mini" onclick="fmBulkOpen('chmod')">{{icon "shield"}} Chmod</button>
+  <button type="button" class="btn mini" onclick="fmBulkOpen('move')">{{icon "move"}} Move</button>
+  <button type="button" class="btn mini danger" onclick="fmBulkDelete()">{{icon "trash"}} Delete</button>
+</div>
+
 <div class="card" style="padding:0">
   <table class="fm-table">
-    <thead><tr><th>Name</th><th>Size</th><th>Mode</th><th>Modified</th><th class="right-col">Quick actions</th></tr></thead>
+    <thead><tr>
+      <th style="width:34px"><input type="checkbox" class="fm-checkall" onchange="fmCheckAll(this)"></th>
+      <th>Name</th><th>Size</th><th>Mode</th><th>Modified</th><th class="right-col">Quick actions</th>
+    </tr></thead>
     <tbody id="fm-rows">
       {{range .Items}}<tr data-name="{{.Name}}" data-path="{{.Path}}" data-kind="{{.Kind}}" data-mode="{{.Mode}}">
+        <td><input type="checkbox" class="fm-check" value="{{.Path}}" onchange="fmUpdateBulk()"></td>
         <td>
           {{if eq .Kind "dir"}}<a href="/files?path={{.Path}}" class="file-name dir"><span class="ic">{{icon "folder"}}</span>{{.Name}}</a>
           {{else}}<span class="file-name"><span class="ic">{{icon "file"}}</span>{{.Name}}</span>{{end}}
@@ -1249,10 +1272,34 @@ document.addEventListener('keydown',function(e){
           <button class="btn mini" onclick="fmAction('chmod', this)">{{icon "shield"}}</button>
           <button class="btn mini danger" onclick="fmAction('delete', this)">{{icon "trash"}}</button>
         </td>
-      </tr>{{else}}<tr><td colspan="5" class="muted">Folder is empty.</td></tr>{{end}}
+      </tr>{{else}}<tr><td colspan="6" class="muted">Folder is empty.</td></tr>{{end}}
     </tbody>
   </table>
 </div>
+
+<!-- Hidden bulk-action form: JS appends one <input name="target"> per selected row before submit. -->
+<form id="fmBulkForm" method="post" style="display:none">
+  <input type="hidden" name="path" value="{{.Path}}">
+  <input type="hidden" name="action" id="fmBulkAction">
+  <input type="hidden" name="mode" id="fmBulkMode">
+  <input type="hidden" name="dest" id="fmBulkDest">
+  <div id="fmBulkTargets"></div>
+</form>
+
+<!-- Bulk modals -->
+<div class="modal-bg" id="m-bulkchmod"><div class="modal">
+  <h3>{{icon "shield"}} Bulk chmod</h3>
+  <p class="muted">Apply an octal mode to <strong id="bcCount">0</strong> selected item(s).</p>
+  <div class="field"><label>Octal mode</label><input class="input mono" id="bcMode" placeholder="755" pattern="[0-7]{3,4}" required autofocus></div>
+  <div class="modal-foot"><button type="button" class="btn" onclick="closeModal('m-bulkchmod')">Cancel</button><button type="button" class="btn primary" onclick="fmBulkSubmit('bulk-chmod')">{{icon "check"}} Apply</button></div>
+</div></div>
+
+<div class="modal-bg" id="m-bulkmove"><div class="modal">
+  <h3>{{icon "move"}} Bulk move</h3>
+  <p class="muted">Move <strong id="bmCount">0</strong> selected item(s) into a destination directory.</p>
+  <div class="field"><label>Destination directory (under /var/www)</label><input class="input mono" id="bmDest" placeholder="/site.com/htdocs/archive" required></div>
+  <div class="modal-foot"><button type="button" class="btn" onclick="closeModal('m-bulkmove')">Cancel</button><button type="button" class="btn primary" onclick="fmBulkSubmit('bulk-move')">{{icon "move"}} Move</button></div>
+</div></div>
 
 <!-- Context Menu -->
 <div class="ctxmenu" id="ctxmenu">
@@ -1388,6 +1435,68 @@ document.addEventListener('keydown',function(e){
       document.getElementById('mv-dest').value=path;
       openModal('m-move'); return;
     }
+  };
+
+  // Bulk selection
+  function selectedRows(){ return Array.prototype.slice.call(document.querySelectorAll('.fm-check:checked')); }
+  window.fmCheckAll = function(box){
+    document.querySelectorAll('.fm-check').forEach(function(c){ c.checked = box.checked; });
+    fmUpdateBulk();
+  };
+  window.fmUpdateBulk = function(){
+    var n = selectedRows().length;
+    var bar = document.getElementById('fmBulkBar');
+    document.getElementById('fmSelCount').textContent = n;
+    if(n>0){ bar.classList.add('show'); } else { bar.classList.remove('show'); }
+    var all = document.querySelectorAll('.fm-check');
+    var allChecked = all.length>0 && Array.prototype.every.call(all, function(c){ return c.checked; });
+    var head = document.querySelector('.fm-checkall');
+    if(head){ head.checked = allChecked; head.indeterminate = !allChecked && n>0; }
+  };
+  window.fmBulkClear = function(){
+    document.querySelectorAll('.fm-check').forEach(function(c){ c.checked=false; });
+    fmUpdateBulk();
+  };
+  function fillTargets(){
+    var t = document.getElementById('fmBulkTargets');
+    t.innerHTML='';
+    selectedRows().forEach(function(c){
+      var i = document.createElement('input');
+      i.type='hidden'; i.name='target'; i.value=c.value;
+      t.appendChild(i);
+    });
+  }
+  window.fmBulkDelete = function(){
+    var n = selectedRows().length; if(!n) return;
+    if(!confirm('Permanently delete '+n+' selected item(s)?')) return;
+    fillTargets();
+    document.getElementById('fmBulkAction').value='bulk-delete';
+    document.getElementById('fmBulkForm').submit();
+  };
+  window.fmBulkOpen = function(kind){
+    var n = selectedRows().length; if(!n) return;
+    if(kind==='chmod'){
+      document.getElementById('bcCount').textContent = n;
+      document.getElementById('bcMode').value = '755';
+      openModal('m-bulkchmod');
+    } else if(kind==='move'){
+      document.getElementById('bmCount').textContent = n;
+      openModal('m-bulkmove');
+    }
+  };
+  window.fmBulkSubmit = function(action){
+    fillTargets();
+    document.getElementById('fmBulkAction').value = action;
+    if(action==='bulk-chmod'){
+      var m = document.getElementById('bcMode').value.trim();
+      if(!/^[0-7]{3,4}$/.test(m)){ alert('Mode must be 3 or 4 octal digits, e.g. 755'); return; }
+      document.getElementById('fmBulkMode').value = m;
+    } else if(action==='bulk-move'){
+      var d = document.getElementById('bmDest').value.trim();
+      if(!d){ alert('Destination required'); return; }
+      document.getElementById('fmBulkDest').value = d;
+    }
+    document.getElementById('fmBulkForm').submit();
   };
 })();
 </script>
@@ -1588,6 +1697,45 @@ document.addEventListener('keydown',function(e){
         <td>{{if eq .Status "success"}}<span class="badge ok">{{icon "check"}} {{.Status}}</span>{{else}}<span class="badge bad">{{icon "alert"}} {{.Status}}</span>{{end}}</td>
         <td class="mono muted">{{.Target}}</td>
       </tr>{{else}}<tr><td colspan="4" class="muted">No audit entries yet.</td></tr>{{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
+
+{{define "packages"}}
+<div class="page-head">
+  <div><h1>{{icon "box"}} Packages</h1><p>Install or remove server-side components on demand.</p></div>
+</div>
+<div class="card">
+  <p class="muted" style="margin:0">hostQ knows how to install, enable, and remove a curated set of apt packages. Use this page to add a missing PHP version, install Redis or phpMyAdmin after the box is already running, or strip something you no longer need. The install runs <span class="mono">apt-get install -y -qq</span> non-interactively (with debconf preseed where required) and enables the systemd unit when applicable.</p>
+</div>
+<div class="card" style="padding:0">
+  <table>
+    <thead><tr><th>Package</th><th>Status</th><th>Version</th><th>Service</th><th class="right-col">Action</th></tr></thead>
+    <tbody>
+      {{range .Packages}}<tr>
+        <td>
+          <strong>{{.Name}}</strong>
+          <div class="muted" style="font-size:11.5px;margin-top:2px">{{.Description}}</div>
+          <div class="muted mono" style="font-size:11px;margin-top:2px">{{if .Apt}}{{.Apt}}{{else}}—{{end}}</div>
+        </td>
+        <td>{{if .Installed}}<span class="badge ok">{{icon "check"}} installed</span>{{else}}<span class="badge">{{icon "x"}} not installed</span>{{end}}</td>
+        <td class="mono muted">{{if .Version}}{{.Version}}{{else}}—{{end}}</td>
+        <td>{{if .Service}}{{if .Active}}<span class="badge ok">{{icon "check"}} active</span>{{else}}<span class="badge bad">{{.Service}} stopped</span>{{end}}{{else}}<span class="muted">—</span>{{end}}</td>
+        <td class="right-col">
+          {{if .Installed}}
+            {{if .Apt}}<form method="post" data-confirm="Uninstall {{.Name}}? Configuration files will be purged.">
+              <input type="hidden" name="id" value="{{.ID}}">
+              <button class="btn mini danger" name="action" value="uninstall">{{icon "trash"}} Uninstall</button>
+            </form>{{else}}<span class="muted">built-in</span>{{end}}
+          {{else}}
+            <form method="post">
+              <input type="hidden" name="id" value="{{.ID}}">
+              <button class="btn mini primary" name="action" value="install">{{icon "download"}} Install</button>
+            </form>
+          {{end}}
+        </td>
+      </tr>{{else}}<tr><td colspan="5" class="muted">No packages declared.</td></tr>{{end}}
     </tbody>
   </table>
 </div>
