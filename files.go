@@ -230,6 +230,71 @@ func (a *App) fileAction(w http.ResponseWriter, r *http.Request) {
 		}
 		output = "Renamed to " + newName
 		a.audit("file.rename", "success", from+" -> "+to)
+	case "bulk-delete":
+		_ = r.ParseForm()
+		count, failed := 0, 0
+		for _, t := range r.PostForm["target"] {
+			p := a.safeWebPath(t)
+			if !a.canMutateWebPath(p) {
+				failed++
+				continue
+			}
+			if err := os.RemoveAll(p); err == nil {
+				count++
+				a.audit("file.delete", "success", p)
+			} else {
+				failed++
+			}
+		}
+		output = fmt.Sprintf("Deleted %d item(s)", count)
+		if failed > 0 {
+			output += fmt.Sprintf(" · %d blocked or failed", failed)
+		}
+	case "bulk-chmod":
+		_ = r.ParseForm()
+		mode := r.FormValue("mode")
+		if !regexp.MustCompile(`^[0-7]{3,4}$`).MatchString(mode) {
+			output = "Invalid mode: use octal like 755 or 644"
+			break
+		}
+		parsed, _ := strconv.ParseUint(mode, 8, 32)
+		count := 0
+		for _, t := range r.PostForm["target"] {
+			p := a.safeWebPath(t)
+			if !a.canMutateWebPath(p) {
+				continue
+			}
+			if err := os.Chmod(p, os.FileMode(parsed)); err == nil {
+				count++
+				a.audit("file.chmod", "success", p)
+			}
+		}
+		output = fmt.Sprintf("Set mode %s on %d item(s)", mode, count)
+	case "bulk-move":
+		_ = r.ParseForm()
+		dest := strings.TrimSpace(r.FormValue("dest"))
+		if dest == "" {
+			output = "Destination required"
+			break
+		}
+		dp := a.safeWebPath(dest)
+		if info, err := os.Stat(dp); err != nil || !info.IsDir() {
+			output = "Destination must be an existing directory under /var/www"
+			break
+		}
+		count := 0
+		for _, t := range r.PostForm["target"] {
+			from := a.safeWebPath(t)
+			if !a.canMutateWebPath(from) {
+				continue
+			}
+			to := filepath.Join(dp, filepath.Base(from))
+			if err := os.Rename(from, to); err == nil {
+				count++
+				a.audit("file.move", "success", from+" -> "+to)
+			}
+		}
+		output = fmt.Sprintf("Moved %d item(s) into %s", count, dest)
 	case "move", "copy":
 		from := a.safeWebPath(r.FormValue("target"))
 		to := a.safeWebPath(r.FormValue("dest"))
@@ -263,29 +328,60 @@ func (a *App) fileAction(w http.ResponseWriter, r *http.Request) {
 func (a *App) fileUpload(w http.ResponseWriter, r *http.Request) {
 	basePath := r.FormValue("path")
 	full := a.safeWebPath(basePath)
-	if err := r.ParseMultipartForm(64 << 20); err != nil {
+	if err := r.ParseMultipartForm(512 << 20); err != nil {
 		http.Redirect(w, r, "/files?path="+basePath+"&output="+queryEscape("upload parse failed: "+err.Error()), http.StatusSeeOther)
 		return
 	}
 	files := r.MultipartForm.File["upload"]
-	saved := 0
+	saved, dirs := 0, 0
+	skipped := 0
 	output := ""
 	for _, fh := range files {
-		name := safeName(fh.Filename)
-		if name == "" || blockedFileName(name) {
+		// With <input webkitdirectory>, browsers send fh.Filename including
+		// the file's path relative to the picked folder, e.g. "site/css/app.css".
+		raw := strings.ReplaceAll(strings.TrimSpace(fh.Filename), "\\", "/")
+		raw = strings.TrimPrefix(raw, "/")
+		if raw == "" {
+			skipped++
 			continue
 		}
-		target := filepath.Join(full, name)
-		if !a.canMutateWebPath(target) {
+		segments := strings.Split(raw, "/")
+		cleaned := make([]string, 0, len(segments))
+		blocked := false
+		for _, seg := range segments {
+			s := safeName(seg)
+			if s == "" || s == "." || s == ".." || blockedFileName(s) {
+				blocked = true
+				break
+			}
+			cleaned = append(cleaned, s)
+		}
+		if blocked || len(cleaned) == 0 {
+			skipped++
 			continue
+		}
+		rel := filepath.Join(cleaned...)
+		target := filepath.Join(full, rel)
+		if !a.canMutateWebPath(target) {
+			skipped++
+			continue
+		}
+		if len(cleaned) > 1 {
+			if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+				skipped++
+				continue
+			}
+			dirs++
 		}
 		src, err := fh.Open()
 		if err != nil {
+			skipped++
 			continue
 		}
 		dst, err := os.Create(target)
 		if err != nil {
 			_ = src.Close()
+			skipped++
 			continue
 		}
 		_, copyErr := io.Copy(dst, src)
@@ -294,12 +390,23 @@ func (a *App) fileUpload(w http.ResponseWriter, r *http.Request) {
 		if copyErr == nil {
 			saved++
 			a.audit("file.upload", "success", target)
+		} else {
+			skipped++
 		}
 	}
-	if saved == 0 {
-		output = "No files uploaded (blocked or empty)"
-	} else {
+	switch {
+	case saved == 0 && skipped == 0:
+		output = "No files in upload"
+	case saved == 0:
+		output = "No files uploaded (blocked, empty, or write failed)"
+	default:
 		output = fmt.Sprintf("Uploaded %d file(s)", saved)
+		if dirs > 0 {
+			output += " across nested folders"
+		}
+		if skipped > 0 {
+			output += fmt.Sprintf(" · %d skipped", skipped)
+		}
 	}
 	http.Redirect(w, r, "/files?path="+basePath+"&output="+queryEscape(output), http.StatusSeeOther)
 }

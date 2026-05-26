@@ -37,10 +37,21 @@ func (a *App) redisAction(w http.ResponseWriter, r *http.Request) {
 			a.audit("redis.restart", "success", "")
 		}
 	case "start":
-		if err := exec.Command("systemctl", "start", "redis-server").Run(); err != nil {
+		// Auto-install if the package isn't on the box yet, so the empty-state
+		// "Start Redis" button on the /redis page works on a stock install.
+		if !isAptInstalled("redis-server") {
+			out, err := aptInstall("redis-server")
+			if err != nil {
+				output = "auto-install failed: " + tail(string(out), 200)
+				a.audit("redis.install", "failure", "")
+				break
+			}
+			a.audit("redis.install", "success", "")
+		}
+		if err := exec.Command("systemctl", "enable", "--now", "redis-server").Run(); err != nil {
 			output = "start failed: " + err.Error()
 		} else {
-			output = "Redis started."
+			output = "Redis is installed and running."
 			a.audit("redis.start", "success", "")
 		}
 	case "stop":

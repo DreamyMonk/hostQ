@@ -61,6 +61,11 @@ func main() {
 	mux.HandleFunc("/security", app.requireAuth(app.security))
 	mux.HandleFunc("/malfix", app.requireAuth(app.malfix))
 	mux.HandleFunc("/pma-login", app.requireAuth(app.pmaLogin))
+	// /packages was merged into /services in v0.11. Keep a redirect for
+	// bookmarks and old release notes.
+	mux.HandleFunc("/packages", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/services", http.StatusMovedPermanently)
+	})
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("ok")) })
 
 	log.Printf("hostQ panel listening on http://%s", app.cfg.Addr)
