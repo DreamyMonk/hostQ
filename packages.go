@@ -28,13 +28,15 @@ type PackageInfo struct {
 
 func managedPackages() []PackageDef {
 	return []PackageDef{
-		{ID: "redis", Name: "Redis", Apt: "redis-server", Service: "redis-server", Description: "Optional in-memory cache for WordPress object cache plugins.", Group: "Cache"},
+		{ID: "nginx", Name: "Nginx", Apt: "nginx", Service: "nginx", Description: "Web server that fronts every hosted site and the panel itself.", Group: "Web"},
+		{ID: "mariadb", Name: "MariaDB", Apt: "mariadb-server", Service: "mariadb", Description: "MySQL-compatible database server. Backs every site's data store.", Group: "Database"},
+		{ID: "phpmyadmin", Name: "phpMyAdmin", Apt: "phpmyadmin", Description: "Web UI for MariaDB/MySQL. Panel single sign-on is wired through this.", Group: "Database"},
 		{ID: "php82", Name: "PHP 8.2 FPM", Apt: "php8.2-fpm php8.2-cli php8.2-mysql php8.2-xml php8.2-mbstring php8.2-curl php8.2-zip php8.2-gd php8.2-intl", Service: "php8.2-fpm", Description: "PHP 8.2 FastCGI Process Manager.", Group: "PHP"},
 		{ID: "php83", Name: "PHP 8.3 FPM", Apt: "php8.3-fpm php8.3-cli php8.3-mysql php8.3-xml php8.3-mbstring php8.3-curl php8.3-zip php8.3-gd php8.3-intl", Service: "php8.3-fpm", Description: "PHP 8.3 FastCGI Process Manager.", Group: "PHP"},
 		{ID: "php84", Name: "PHP 8.4 FPM", Apt: "php8.4-fpm php8.4-cli php8.4-mysql php8.4-xml php8.4-mbstring php8.4-curl php8.4-zip php8.4-gd php8.4-intl", Service: "php8.4-fpm", Description: "PHP 8.4 FastCGI Process Manager.", Group: "PHP"},
 		{ID: "php85", Name: "PHP 8.5 FPM", Apt: "php8.5-fpm php8.5-cli php8.5-mysql php8.5-xml php8.5-mbstring php8.5-curl php8.5-zip php8.5-gd php8.5-intl", Service: "php8.5-fpm", Description: "PHP 8.5 FastCGI Process Manager.", Group: "PHP"},
+		{ID: "redis", Name: "Redis", Apt: "redis-server", Service: "redis-server", Description: "Optional in-memory cache for WordPress object-cache plugins.", Group: "Cache"},
 		{ID: "certbot", Name: "Certbot (Let's Encrypt)", Apt: "certbot python3-certbot-nginx", Description: "Free TLS certificates via ACME.", Group: "TLS"},
-		{ID: "phpmyadmin", Name: "phpMyAdmin", Apt: "phpmyadmin", Description: "Web UI for MariaDB/MySQL. Auto-login from the panel is wired through this.", Group: "Database"},
 		{ID: "pureftpd", Name: "Pure-FTPd", Apt: "pure-ftpd pure-ftpd-common", Service: "pure-ftpd", Description: "Lightweight FTP server.", Group: "Transfer"},
 		{ID: "wpcli", Name: "WP-CLI", Apt: "", Description: "Already installed by install.sh from the official phar build.", Group: "Tooling"},
 	}

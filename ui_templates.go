@@ -339,7 +339,6 @@ table.flat tbody tr:hover{background:transparent}
       <a href="/databases" class="{{if eq .View "databases"}}active{{end}}">{{icon "database"}}<span>All Databases</span></a>
       <a href="/wordpress" class="{{if eq .View "wordpress"}}active{{end}}">{{icon "wordpress"}}<span>All WordPress</span></a>
       <a href="/ssl" class="{{if eq .View "ssl"}}active{{end}}">{{icon "shield"}}<span>All Certificates</span></a>
-      <a href="/packages" class="{{if eq .View "packages"}}active{{end}}">{{icon "box"}}<span>Packages</span></a>
     </nav>
     <div class="navgroup">Admin</div>
     <nav class="nav">
@@ -374,7 +373,6 @@ table.flat tbody tr:hover{background:transparent}
       {{else if eq .View "account"}}{{template "account" .}}
       {{else if eq .View "audit"}}{{template "audit" .}}
       {{else if eq .View "redis"}}{{template "redis" .}}
-      {{else if eq .View "packages"}}{{template "packages" .}}
       {{end}}
     </div>
   </main>
@@ -578,14 +576,18 @@ document.addEventListener('keydown',function(e){
     </table>
   </div>
   <div class="card">
-    <h2>Services</h2>
-    <p class="muted">Run/restart from <a href="/services" style="color:#2563eb;font-weight:700">Services →</a></p>
+    <h2>Services &amp; Packages</h2>
+    <p class="muted">Install / remove / control all components — <a href="/services" style="color:#2563eb;font-weight:700">open page →</a></p>
     <table style="margin-top:10px">
-      <thead><tr><th>Name</th><th>Status</th></tr></thead>
+      <thead><tr><th>Component</th><th>State</th></tr></thead>
       <tbody>
         {{range .Services}}<tr>
-          <td>{{.Name}} <span class="muted mono">({{.Systemd}})</span></td>
-          <td>{{if eq .Status "active"}}<span class="badge ok">{{icon "check"}} active</span>{{else}}<span class="badge bad">{{icon "alert"}} {{.Status}}</span>{{end}}</td>
+          <td>{{.Name}} {{if .Service}}<span class="muted mono">({{.Service}})</span>{{end}}</td>
+          <td>
+            {{if not .Installed}}<span class="badge">not installed</span>
+            {{else if .Service}}{{if .Active}}<span class="badge ok">{{icon "check"}} active</span>{{else}}<span class="badge bad">stopped</span>{{end}}
+            {{else}}<span class="badge ok">{{icon "check"}} installed</span>{{end}}
+          </td>
         </tr>{{end}}
       </tbody>
     </table>
@@ -1235,7 +1237,8 @@ document.addEventListener('keydown',function(e){
 <div class="fm-toolbar">
   <button class="btn" onclick="openModal('m-mkdir')">{{icon "folder"}} New folder</button>
   <button class="btn" onclick="openModal('m-touch')">{{icon "file"}} New file</button>
-  <button class="btn" onclick="openModal('m-upload')">{{icon "upload"}} Upload</button>
+  <button class="btn" onclick="openModal('m-upload')">{{icon "upload"}} Upload files</button>
+  <button class="btn" onclick="openModal('m-upload-dir')">{{icon "folderOpen"}} Upload folder</button>
   <a class="btn" href="/files?path={{.Path}}">{{icon "refresh"}} Refresh</a>
   <div class="grow"></div>
   <span class="badge">{{len .Items}} item(s)</span>
@@ -1332,10 +1335,19 @@ document.addEventListener('keydown',function(e){
 </div></div>
 
 <div class="modal-bg" id="m-upload"><div class="modal">
-  <h3>Upload files</h3><p class="muted">Upload one or more files to <span class="mono">{{.Path}}</span> (max 64 MB).</p>
+  <h3>Upload files</h3><p class="muted">Upload one or more files to <span class="mono">{{.Path}}</span> (max 512 MB per request).</p>
   <form method="post" enctype="multipart/form-data"><input type="hidden" name="path" value="{{.Path}}"><input type="hidden" name="action" value="upload">
     <div class="field"><label>Choose files</label><input class="input" type="file" name="upload" multiple required></div>
     <div class="modal-foot"><button type="button" class="btn" onclick="closeModal('m-upload')">Cancel</button><button class="btn primary">{{icon "upload"}} Upload</button></div>
+  </form>
+</div></div>
+
+<div class="modal-bg" id="m-upload-dir"><div class="modal">
+  <h3>Upload folder</h3><p class="muted">Pick a folder — every file inside it is uploaded into <span class="mono">{{.Path}}</span>, preserving the directory tree.</p>
+  <form method="post" enctype="multipart/form-data"><input type="hidden" name="path" value="{{.Path}}"><input type="hidden" name="action" value="upload">
+    <div class="field"><label>Choose folder</label><input class="input" type="file" name="upload" webkitdirectory directory multiple required></div>
+    <p class="muted" style="font-size:12px;margin:0 0 6px">Hidden files and known secrets (.env, .key, .pem) are silently skipped. Max 512 MB per request.</p>
+    <div class="modal-foot"><button type="button" class="btn" onclick="closeModal('m-upload-dir')">Cancel</button><button class="btn primary">{{icon "upload"}} Upload folder</button></div>
   </form>
 </div></div>
 
@@ -1600,23 +1612,42 @@ document.addEventListener('keydown',function(e){
 
 {{define "services"}}
 <div class="page-head">
-  <div><h1>{{icon "server"}} Services</h1><p>Start, stop and restart server daemons.</p></div>
+  <div><h1>{{icon "server"}} Services &amp; Packages</h1><p>Install, remove, and control every managed component from one place.</p></div>
+</div>
+<div class="card">
+  <p class="muted" style="margin:0">Each row is a server component hostQ knows how to manage end-to-end. <strong>Install</strong> runs <span class="mono">apt-get install -y -qq</span> non-interactively (with debconf preseed where required) and enables the systemd unit. <strong>Start / Restart / Stop</strong> control the unit. <strong>Start</strong> on a missing package auto-installs it first so the empty-state buttons just work.</p>
 </div>
 <div class="card" style="padding:0">
   <table>
-    <thead><tr><th>Service</th><th>Systemd unit</th><th>Status</th><th class="right-col">Actions</th></tr></thead>
+    <thead><tr><th>Component</th><th>Status</th><th>Version</th><th class="right-col">Actions</th></tr></thead>
     <tbody>
       {{range .Services}}<tr>
-        <td><strong>{{.Name}}</strong></td>
-        <td class="mono muted">{{.Systemd}}</td>
-        <td>{{if eq .Status "active"}}<span class="badge ok">{{icon "check"}} active</span>{{else}}<span class="badge bad">{{icon "alert"}} {{.Status}}</span>{{end}}</td>
-        <td class="right-col"><form method="post" style="display:inline-flex;gap:6px">
-          <input type="hidden" name="id" value="{{.ID}}">
-          <button class="btn mini" name="action" value="restart">{{icon "refresh"}} Restart</button>
-          <button class="btn mini primary" name="action" value="start">{{icon "play"}} Start</button>
-          <button class="btn mini danger" name="action" value="stop">{{icon "stop"}} Stop</button>
-        </form></td>
-      </tr>{{end}}
+        <td>
+          <strong>{{.Name}}</strong>
+          <div class="muted" style="font-size:11.5px;margin-top:2px">{{.Description}}</div>
+          <div class="muted mono" style="font-size:11px;margin-top:2px">{{if .Apt}}apt: {{.Apt}}{{else}}built-in{{end}}{{if .Service}} · unit: {{.Service}}{{end}}</div>
+        </td>
+        <td>
+          {{if .Installed}}<span class="badge ok">{{icon "check"}} installed</span>{{else}}<span class="badge">{{icon "x"}} not installed</span>{{end}}
+          {{if .Service}}{{if .Active}}<br><span class="badge ok" style="margin-top:4px">{{icon "check"}} active</span>{{else if .Installed}}<br><span class="badge bad" style="margin-top:4px">stopped</span>{{end}}{{end}}
+        </td>
+        <td class="mono muted">{{if .Version}}{{.Version}}{{else}}—{{end}}</td>
+        <td class="right-col"><div class="actions" style="justify-content:flex-end">
+          {{if .Installed}}
+            {{if .Service}}
+              {{if .Active}}
+                <form method="post" style="display:inline"><input type="hidden" name="id" value="{{.ID}}"><button class="btn mini" name="action" value="restart">{{icon "refresh"}} Restart</button></form>
+                <form method="post" style="display:inline"><input type="hidden" name="id" value="{{.ID}}"><button class="btn mini" name="action" value="stop">{{icon "stop"}} Stop</button></form>
+              {{else}}
+                <form method="post" style="display:inline"><input type="hidden" name="id" value="{{.ID}}"><button class="btn mini primary" name="action" value="start">{{icon "play"}} Start</button></form>
+              {{end}}
+            {{end}}
+            {{if .Apt}}<form method="post" style="display:inline" data-confirm="Uninstall {{.Name}}? Configuration files will be purged."><input type="hidden" name="id" value="{{.ID}}"><button class="btn mini danger" name="action" value="uninstall">{{icon "trash"}} Uninstall</button></form>{{end}}
+          {{else}}
+            {{if .Apt}}<form method="post" style="display:inline"><input type="hidden" name="id" value="{{.ID}}"><button class="btn mini primary" name="action" value="install">{{icon "download"}} Install</button></form>{{else}}<span class="muted">built-in</span>{{end}}
+          {{end}}
+        </div></td>
+      </tr>{{else}}<tr><td colspan="4" class="muted">No managed components declared.</td></tr>{{end}}
     </tbody>
   </table>
 </div>
@@ -1697,45 +1728,6 @@ document.addEventListener('keydown',function(e){
         <td>{{if eq .Status "success"}}<span class="badge ok">{{icon "check"}} {{.Status}}</span>{{else}}<span class="badge bad">{{icon "alert"}} {{.Status}}</span>{{end}}</td>
         <td class="mono muted">{{.Target}}</td>
       </tr>{{else}}<tr><td colspan="4" class="muted">No audit entries yet.</td></tr>{{end}}
-    </tbody>
-  </table>
-</div>
-{{end}}
-
-{{define "packages"}}
-<div class="page-head">
-  <div><h1>{{icon "box"}} Packages</h1><p>Install or remove server-side components on demand.</p></div>
-</div>
-<div class="card">
-  <p class="muted" style="margin:0">hostQ knows how to install, enable, and remove a curated set of apt packages. Use this page to add a missing PHP version, install Redis or phpMyAdmin after the box is already running, or strip something you no longer need. The install runs <span class="mono">apt-get install -y -qq</span> non-interactively (with debconf preseed where required) and enables the systemd unit when applicable.</p>
-</div>
-<div class="card" style="padding:0">
-  <table>
-    <thead><tr><th>Package</th><th>Status</th><th>Version</th><th>Service</th><th class="right-col">Action</th></tr></thead>
-    <tbody>
-      {{range .Packages}}<tr>
-        <td>
-          <strong>{{.Name}}</strong>
-          <div class="muted" style="font-size:11.5px;margin-top:2px">{{.Description}}</div>
-          <div class="muted mono" style="font-size:11px;margin-top:2px">{{if .Apt}}{{.Apt}}{{else}}—{{end}}</div>
-        </td>
-        <td>{{if .Installed}}<span class="badge ok">{{icon "check"}} installed</span>{{else}}<span class="badge">{{icon "x"}} not installed</span>{{end}}</td>
-        <td class="mono muted">{{if .Version}}{{.Version}}{{else}}—{{end}}</td>
-        <td>{{if .Service}}{{if .Active}}<span class="badge ok">{{icon "check"}} active</span>{{else}}<span class="badge bad">{{.Service}} stopped</span>{{end}}{{else}}<span class="muted">—</span>{{end}}</td>
-        <td class="right-col">
-          {{if .Installed}}
-            {{if .Apt}}<form method="post" data-confirm="Uninstall {{.Name}}? Configuration files will be purged.">
-              <input type="hidden" name="id" value="{{.ID}}">
-              <button class="btn mini danger" name="action" value="uninstall">{{icon "trash"}} Uninstall</button>
-            </form>{{else}}<span class="muted">built-in</span>{{end}}
-          {{else}}
-            <form method="post">
-              <input type="hidden" name="id" value="{{.ID}}">
-              <button class="btn mini primary" name="action" value="install">{{icon "download"}} Install</button>
-            </form>
-          {{end}}
-        </td>
-      </tr>{{else}}<tr><td colspan="5" class="muted">No packages declared.</td></tr>{{end}}
     </tbody>
   </table>
 </div>

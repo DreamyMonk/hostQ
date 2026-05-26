@@ -328,29 +328,60 @@ func (a *App) fileAction(w http.ResponseWriter, r *http.Request) {
 func (a *App) fileUpload(w http.ResponseWriter, r *http.Request) {
 	basePath := r.FormValue("path")
 	full := a.safeWebPath(basePath)
-	if err := r.ParseMultipartForm(64 << 20); err != nil {
+	if err := r.ParseMultipartForm(512 << 20); err != nil {
 		http.Redirect(w, r, "/files?path="+basePath+"&output="+queryEscape("upload parse failed: "+err.Error()), http.StatusSeeOther)
 		return
 	}
 	files := r.MultipartForm.File["upload"]
-	saved := 0
+	saved, dirs := 0, 0
+	skipped := 0
 	output := ""
 	for _, fh := range files {
-		name := safeName(fh.Filename)
-		if name == "" || blockedFileName(name) {
+		// With <input webkitdirectory>, browsers send fh.Filename including
+		// the file's path relative to the picked folder, e.g. "site/css/app.css".
+		raw := strings.ReplaceAll(strings.TrimSpace(fh.Filename), "\\", "/")
+		raw = strings.TrimPrefix(raw, "/")
+		if raw == "" {
+			skipped++
 			continue
 		}
-		target := filepath.Join(full, name)
-		if !a.canMutateWebPath(target) {
+		segments := strings.Split(raw, "/")
+		cleaned := make([]string, 0, len(segments))
+		blocked := false
+		for _, seg := range segments {
+			s := safeName(seg)
+			if s == "" || s == "." || s == ".." || blockedFileName(s) {
+				blocked = true
+				break
+			}
+			cleaned = append(cleaned, s)
+		}
+		if blocked || len(cleaned) == 0 {
+			skipped++
 			continue
+		}
+		rel := filepath.Join(cleaned...)
+		target := filepath.Join(full, rel)
+		if !a.canMutateWebPath(target) {
+			skipped++
+			continue
+		}
+		if len(cleaned) > 1 {
+			if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+				skipped++
+				continue
+			}
+			dirs++
 		}
 		src, err := fh.Open()
 		if err != nil {
+			skipped++
 			continue
 		}
 		dst, err := os.Create(target)
 		if err != nil {
 			_ = src.Close()
+			skipped++
 			continue
 		}
 		_, copyErr := io.Copy(dst, src)
@@ -359,12 +390,23 @@ func (a *App) fileUpload(w http.ResponseWriter, r *http.Request) {
 		if copyErr == nil {
 			saved++
 			a.audit("file.upload", "success", target)
+		} else {
+			skipped++
 		}
 	}
-	if saved == 0 {
-		output = "No files uploaded (blocked or empty)"
-	} else {
+	switch {
+	case saved == 0 && skipped == 0:
+		output = "No files in upload"
+	case saved == 0:
+		output = "No files uploaded (blocked, empty, or write failed)"
+	default:
 		output = fmt.Sprintf("Uploaded %d file(s)", saved)
+		if dirs > 0 {
+			output += " across nested folders"
+		}
+		if skipped > 0 {
+			output += fmt.Sprintf(" · %d skipped", skipped)
+		}
 	}
 	http.Redirect(w, r, "/files?path="+basePath+"&output="+queryEscape(output), http.StatusSeeOther)
 }
