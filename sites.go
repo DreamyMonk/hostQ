@@ -176,14 +176,115 @@ func (a *App) saveExtraNginx(domain, content string) error {
 	if p == "" {
 		return fmt.Errorf("invalid domain")
 	}
-	if strings.TrimSpace(content) == "" {
+	cleaned := sanitizeExtraNginx(content)
+	if cleaned == "" {
 		_ = os.Remove(p)
 		return nil
 	}
 	if err := os.MkdirAll(filepath.Dir(p), 0700); err != nil {
 		return err
 	}
-	return os.WriteFile(p, []byte(content), 0644)
+	return os.WriteFile(p, []byte(cleaned), 0644)
+}
+
+// sanitizeExtraNginx makes a user-pasted snippet safe to include inside a
+// hostQ-managed server block. It (1) peels off an outer `server { ... }`
+// wrapper if the user pasted a full vhost, and (2) drops top-level
+// directives that would duplicate what writeNginxSite already emits
+// (listen, server_name, root, index, ssl_*).
+func sanitizeExtraNginx(content string) string {
+	s := strings.TrimSpace(content)
+	if s == "" {
+		return ""
+	}
+	s = unwrapOuterServer(s)
+	s = stripTopLevelDirectives(s, map[string]bool{
+		"listen":              true,
+		"server_name":         true,
+		"root":                true,
+		"index":               true,
+		"ssl_certificate":     true,
+		"ssl_certificate_key": true,
+		"ssl_dhparam":         true,
+		"ssl_protocols":       true,
+		"ssl_ciphers":         true,
+		"ssl_session_cache":   true,
+		"ssl_session_timeout": true,
+	})
+	return strings.TrimSpace(s)
+}
+
+// unwrapOuterServer returns the body of a single top-level `server { ... }`
+// block when the input starts with one; otherwise returns the input as-is.
+func unwrapOuterServer(s string) string {
+	trim := strings.TrimSpace(s)
+	if !strings.HasPrefix(trim, "server") {
+		return s
+	}
+	// find the opening brace
+	rest := strings.TrimSpace(strings.TrimPrefix(trim, "server"))
+	if !strings.HasPrefix(rest, "{") {
+		return s
+	}
+	open := strings.Index(s, "{")
+	if open < 0 {
+		return s
+	}
+	depth, end := 0, -1
+	for i := open; i < len(s); i++ {
+		switch s[i] {
+		case '{':
+			depth++
+		case '}':
+			depth--
+			if depth == 0 {
+				end = i
+			}
+		}
+		if end >= 0 {
+			break
+		}
+	}
+	if end < 0 || end <= open+1 {
+		return s
+	}
+	return strings.TrimSpace(s[open+1 : end])
+}
+
+// stripTopLevelDirectives removes lines that start (at brace depth 0) with one
+// of the named directives. Lines inside nested blocks (location { ... }, if {},
+// etc.) are kept untouched so user rewrite logic survives.
+func stripTopLevelDirectives(s string, names map[string]bool) string {
+	var b strings.Builder
+	depthBefore := 0
+	for _, line := range strings.Split(s, "\n") {
+		drop := false
+		trimmed := strings.TrimSpace(line)
+		if depthBefore == 0 && trimmed != "" && !strings.HasPrefix(trimmed, "#") {
+			// Extract the directive name (first token, may include trailing ; or {).
+			tok := trimmed
+			for _, sep := range []string{" ", "\t", ";", "{"} {
+				if i := strings.Index(tok, sep); i >= 0 {
+					tok = tok[:i]
+				}
+			}
+			if names[tok] {
+				drop = true
+			}
+		}
+		if !drop {
+			b.WriteString(line)
+			b.WriteByte('\n')
+		}
+		for _, c := range line {
+			if c == '{' {
+				depthBefore++
+			} else if c == '}' {
+				depthBefore--
+			}
+		}
+	}
+	return strings.TrimRight(b.String(), "\n")
 }
 
 // siteNginx renders the per-site custom Nginx editor and handles its actions.
