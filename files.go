@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -303,6 +304,37 @@ func (a *App) fileAction(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		output = fmt.Sprintf("Moved %d item(s) into %s", count, dest)
+	case "bulk-copy":
+		_ = r.ParseForm()
+		dest := strings.TrimSpace(r.FormValue("dest"))
+		if dest == "" {
+			output = "Destination required"
+			break
+		}
+		dp := a.safeWebPath(dest)
+		if info, err := os.Stat(dp); err != nil || !info.IsDir() {
+			output = "Destination must be an existing directory under /var/www"
+			break
+		}
+		count, failed := 0, 0
+		for _, t := range r.PostForm["target"] {
+			from := a.safeWebPath(t)
+			if !a.canMutateWebPath(from) {
+				failed++
+				continue
+			}
+			to := filepath.Join(dp, filepath.Base(from))
+			if err := copyAny(from, to); err == nil {
+				count++
+				a.audit("file.copy", "success", from+" -> "+to)
+			} else {
+				failed++
+			}
+		}
+		output = fmt.Sprintf("Copied %d item(s) into %s", count, dest)
+		if failed > 0 {
+			output += fmt.Sprintf(" · %d failed", failed)
+		}
 	case "move", "copy":
 		from := a.safeWebPath(r.FormValue("target"))
 		to := a.safeWebPath(r.FormValue("dest"))
@@ -336,11 +368,19 @@ func (a *App) fileAction(w http.ResponseWriter, r *http.Request) {
 func (a *App) fileUpload(w http.ResponseWriter, r *http.Request) {
 	basePath := r.FormValue("path")
 	full := a.safeWebPath(basePath)
+	log.Printf("upload: start path=%q content-length=%d ua=%q", basePath, r.ContentLength, r.Header.Get("User-Agent"))
 	if err := r.ParseMultipartForm(512 << 20); err != nil {
-		http.Redirect(w, r, "/files?path="+basePath+"&output="+queryEscape("upload parse failed: "+err.Error()), http.StatusSeeOther)
+		log.Printf("upload: parse failed path=%q err=%v", basePath, err)
+		http.Redirect(w, r, "/files?path="+url.QueryEscape(basePath)+"&output="+queryEscape("upload parse failed: "+err.Error()), http.StatusSeeOther)
+		return
+	}
+	if r.MultipartForm == nil {
+		log.Printf("upload: no multipart form path=%q", basePath)
+		http.Redirect(w, r, "/files?path="+url.QueryEscape(basePath)+"&output="+queryEscape("upload received no form data"), http.StatusSeeOther)
 		return
 	}
 	files := r.MultipartForm.File["upload"]
+	log.Printf("upload: received %d file part(s) for %q", len(files), basePath)
 	saved, dirs := 0, 0
 	skipped := 0
 	output := ""

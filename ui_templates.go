@@ -1255,6 +1255,7 @@ document.addEventListener('keydown',function(e){
   <button type="button" class="btn mini" onclick="fmBulkClear()">Clear</button>
   <div class="grow"></div>
   <button type="button" class="btn mini" onclick="fmBulkOpen('chmod')">{{icon "shield"}} Chmod</button>
+  <button type="button" class="btn mini" onclick="fmBulkOpen('copy')">{{icon "copy"}} Copy</button>
   <button type="button" class="btn mini" onclick="fmBulkOpen('move')">{{icon "move"}} Move</button>
   <button type="button" class="btn mini danger" onclick="fmBulkDelete()">{{icon "trash"}} Delete</button>
 </div>
@@ -1308,6 +1309,13 @@ document.addEventListener('keydown',function(e){
   <p class="muted">Move <strong id="bmCount">0</strong> selected item(s) into a destination directory.</p>
   <div class="field"><label>Destination directory (under /var/www)</label><input class="input mono" id="bmDest" placeholder="/site.com/htdocs/archive" required></div>
   <div class="modal-foot"><button type="button" class="btn" onclick="closeModal('m-bulkmove')">Cancel</button><button type="button" class="btn primary" onclick="fmBulkSubmit('bulk-move')">{{icon "move"}} Move</button></div>
+</div></div>
+
+<div class="modal-bg" id="m-bulkcopy"><div class="modal">
+  <h3>{{icon "copy"}} Bulk copy</h3>
+  <p class="muted">Copy <strong id="bcpCount">0</strong> selected item(s) into a destination directory. Directories copy recursively; existing files in the destination are overwritten.</p>
+  <div class="field"><label>Destination directory (under /var/www)</label><input class="input mono" id="bcpDest" placeholder="/site.com/htdocs/backup" required></div>
+  <div class="modal-foot"><button type="button" class="btn" onclick="closeModal('m-bulkcopy')">Cancel</button><button type="button" class="btn primary" onclick="fmBulkSubmit('bulk-copy')">{{icon "copy"}} Copy</button></div>
 </div></div>
 
 <!-- Context Menu -->
@@ -1514,6 +1522,9 @@ document.addEventListener('keydown',function(e){
     } else if(kind==='move'){
       document.getElementById('bmCount').textContent = n;
       openModal('m-bulkmove');
+    } else if(kind==='copy'){
+      document.getElementById('bcpCount').textContent = n;
+      openModal('m-bulkcopy');
     }
   };
   window.fmBulkSubmit = function(action){
@@ -1527,6 +1538,10 @@ document.addEventListener('keydown',function(e){
       var d = document.getElementById('bmDest').value.trim();
       if(!d){ alert('Destination required'); return; }
       document.getElementById('fmBulkDest').value = d;
+    } else if(action==='bulk-copy'){
+      var d2 = document.getElementById('bcpDest').value.trim();
+      if(!d2){ alert('Destination required'); return; }
+      document.getElementById('fmBulkDest').value = d2;
     }
     document.getElementById('fmBulkForm').submit();
   };
