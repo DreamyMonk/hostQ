@@ -200,6 +200,23 @@ tbody tr:hover{background:var(--surface-2)}
 .fm-bulkbar .btn.danger:hover{background:#991b1b}
 .fm-check,.fm-checkall{width:16px;height:16px;cursor:pointer;accent-color:var(--brand-2)}
 
+/* destination input + Browse button row */
+.pick-row{display:flex;gap:6px}
+.pick-row .input{flex:1;min-width:0}
+
+/* directory picker */
+.dp-crumbs{display:flex;flex-wrap:wrap;gap:2px;align-items:center;padding:6px 10px;background:var(--surface-2);border:1px solid var(--card-line);border-radius:8px;margin-bottom:8px;font-size:12.5px;min-height:32px}
+.dp-crumbs a{padding:2px 7px;border-radius:5px;color:var(--ink);font-weight:600;cursor:pointer}
+.dp-crumbs a:hover{background:var(--surface-hover);color:var(--brand-2)}
+.dp-crumbs .sep{color:var(--ink-muted);margin:0 1px}
+.dp-list{max-height:300px;overflow:auto;border:1px solid var(--card-line);border-radius:8px;background:var(--card)}
+.dp-row{display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--card-line);font-size:13px;color:var(--ink)}
+.dp-row:last-child{border-bottom:none}
+.dp-row:hover{background:var(--surface-hover)}
+.dp-row.up{font-weight:600;color:var(--ink-muted)}
+.dp-row .ic{width:24px;height:24px;border-radius:5px;background:#fef3c7;color:#b45309;display:grid;place-items:center;flex:none}
+[data-theme="dark"] .dp-row .ic{background:rgba(180,83,9,.22);color:#fbbf24}
+
 /* upload progress */
 .upbar{height:10px;border-radius:99px;background:var(--surface-2);overflow:hidden;border:1px solid var(--card-line)}
 .upbar-fill{height:100%;width:0%;background:linear-gradient(90deg,#3b82f6,#06b6d4);transition:width .15s ease}
@@ -1313,14 +1330,26 @@ document.addEventListener('keydown',function(e){
 <div class="modal-bg" id="m-bulkmove"><div class="modal">
   <h3>{{icon "move"}} Bulk move</h3>
   <p class="muted">Move <strong id="bmCount">0</strong> selected item(s) into a destination directory.</p>
-  <div class="field"><label>Destination directory (under /var/www)</label><input class="input mono" id="bmDest" placeholder="/site.com/htdocs/archive" required></div>
+  <div class="field">
+    <label>Destination directory (under /var/www)</label>
+    <div class="pick-row">
+      <input class="input mono" id="bmDest" placeholder="/site.com/htdocs/archive" required>
+      <button type="button" class="btn" onclick="openDirPicker('bmDest')">{{icon "folder"}} Browse</button>
+    </div>
+  </div>
   <div class="modal-foot"><button type="button" class="btn" onclick="closeModal('m-bulkmove')">Cancel</button><button type="button" class="btn primary" onclick="fmBulkSubmit('bulk-move')">{{icon "move"}} Move</button></div>
 </div></div>
 
 <div class="modal-bg" id="m-bulkcopy"><div class="modal">
   <h3>{{icon "copy"}} Bulk copy</h3>
   <p class="muted">Copy <strong id="bcpCount">0</strong> selected item(s) into a destination directory. Directories copy recursively; existing files in the destination are overwritten.</p>
-  <div class="field"><label>Destination directory (under /var/www)</label><input class="input mono" id="bcpDest" placeholder="/site.com/htdocs/backup" required></div>
+  <div class="field">
+    <label>Destination directory (under /var/www)</label>
+    <div class="pick-row">
+      <input class="input mono" id="bcpDest" placeholder="/site.com/htdocs/backup" required>
+      <button type="button" class="btn" onclick="openDirPicker('bcpDest')">{{icon "folder"}} Browse</button>
+    </div>
+  </div>
   <div class="modal-foot"><button type="button" class="btn" onclick="closeModal('m-bulkcopy')">Cancel</button><button type="button" class="btn primary" onclick="fmBulkSubmit('bulk-copy')">{{icon "copy"}} Copy</button></div>
 </div></div>
 
@@ -1418,6 +1447,18 @@ document.addEventListener('keydown',function(e){
 </div></div>
 
 <form method="post" id="fm-delete-form" style="display:none"><input type="hidden" name="path" value="{{.Path}}"><input type="hidden" name="action" value="delete"><input type="hidden" name="target" id="del-target"></form>
+
+<!-- Folder picker modal -->
+<div class="modal-bg" id="m-dirpicker"><div class="modal" style="max-width:560px">
+  <h3>{{icon "folderOpen"}} Pick destination folder</h3>
+  <div class="dp-crumbs" id="dpCrumbs"></div>
+  <div class="dp-list" id="dpList"><div class="muted" style="padding:14px;text-align:center">Loading…</div></div>
+  <div class="muted mono" id="dpCurrent" style="margin-top:8px;font-size:12px"></div>
+  <div class="modal-foot">
+    <button type="button" class="btn" onclick="closeModal('m-dirpicker')">Cancel</button>
+    <button type="button" class="btn primary" id="dpUseBtn">{{icon "check"}} Use this folder</button>
+  </div>
+</div></div>
 
 <script>
 (function(){
@@ -1551,6 +1592,89 @@ document.addEventListener('keydown',function(e){
     }
     document.getElementById('fmBulkForm').submit();
   };
+
+  // ---- Directory picker ------------------------------------------------
+  var dpTargetInput = null;
+  var dpCurrentPath = '/';
+  function escHtml(s){ return s.replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  window.openDirPicker = function(targetInputId){
+    dpTargetInput = targetInputId;
+    var startInput = document.getElementById(targetInputId);
+    var start = (startInput && startInput.value.trim()) || '/';
+    // If user typed a path that includes a filename, strip the trailing
+    // segment so we open the parent directory.
+    if(start !== '/' && !/\/$/.test(start)){
+      // Treat as directory if it looks like one; otherwise use parent.
+      // We don't know — try the literal path first, server falls back to /.
+    }
+    loadDp(start);
+    openModal('m-dirpicker');
+  };
+  function loadDp(path){
+    var list = document.getElementById('dpList');
+    list.innerHTML = '<div class="muted" style="padding:14px;text-align:center">Loading…</div>';
+    fetch('/api/dirs?path=' + encodeURIComponent(path), {credentials:'same-origin'})
+      .then(function(r){ if(!r.ok){ throw new Error('HTTP '+r.status); } return r.json(); })
+      .then(renderDp)
+      .catch(function(err){
+        list.innerHTML = '<div class="muted" style="padding:14px;text-align:center">Failed to list folder: '+escHtml(String(err.message||err))+'</div>';
+      });
+  }
+  function renderDp(data){
+    dpCurrentPath = data.path || '/';
+    document.getElementById('dpCurrent').textContent = 'Selected: ' + dpCurrentPath;
+
+    var crumbs = document.getElementById('dpCrumbs');
+    crumbs.innerHTML = '';
+    function addCrumb(label, path){
+      var a = document.createElement('a');
+      a.textContent = label;
+      a.addEventListener('click', function(){ loadDp(path); });
+      crumbs.appendChild(a);
+    }
+    addCrumb('/var/www', '/');
+    var parts = dpCurrentPath.split('/').filter(Boolean);
+    var acc = '';
+    parts.forEach(function(p){
+      acc += '/' + p;
+      var sep = document.createElement('span'); sep.className='sep'; sep.textContent='/';
+      crumbs.appendChild(sep);
+      addCrumb(p, acc);
+    });
+
+    var list = document.getElementById('dpList');
+    list.innerHTML = '';
+    if(data.up !== undefined){
+      var up = document.createElement('div');
+      up.className = 'dp-row up';
+      up.innerHTML = '<span class="ic">↑</span><span>.. (up one level)</span>';
+      up.addEventListener('click', function(){ loadDp(data.up || '/'); });
+      list.appendChild(up);
+    }
+    (data.items || []).forEach(function(it){
+      var row = document.createElement('div');
+      row.className = 'dp-row';
+      row.innerHTML = '<span class="ic">📁</span><span>'+escHtml(it.name)+'</span>';
+      row.addEventListener('click', function(){ loadDp(it.path); });
+      list.appendChild(row);
+    });
+    if((!data.items || !data.items.length) && data.up === undefined){
+      list.innerHTML = '<div class="muted" style="padding:14px;text-align:center">No sub-folders here. Use this folder or go up.</div>';
+    } else if(!data.items || !data.items.length){
+      var none = document.createElement('div');
+      none.className = 'muted';
+      none.style.cssText = 'padding:10px 12px;text-align:center;font-size:12px';
+      none.textContent = 'No sub-folders inside this folder.';
+      list.appendChild(none);
+    }
+    document.getElementById('dpUseBtn').onclick = function(){
+      if(dpTargetInput){
+        var inp = document.getElementById(dpTargetInput);
+        if(inp){ inp.value = dpCurrentPath; inp.focus(); }
+      }
+      closeModal('m-dirpicker');
+    };
+  }
 
   // ---- XHR upload with live progress -----------------------------------
   var currentXHR = null;

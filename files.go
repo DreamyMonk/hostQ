@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -119,6 +120,47 @@ func (a *App) canMutateWebPath(path string) bool {
 		return false
 	}
 	return !blockedFileName(filepath.Base(clean))
+}
+
+// apiDirs lists subdirectories under the requested path so the browser-side
+// folder picker can navigate the tree without needing a separate /files
+// render. JSON shape: {path, up?, items:[{name, path}]}.
+func (a *App) apiDirs(w http.ResponseWriter, r *http.Request) {
+	reqPath := strings.TrimSpace(r.URL.Query().Get("path"))
+	if reqPath == "" {
+		reqPath = "/"
+	}
+	reqPath = filepath.ToSlash(filepath.Clean("/" + strings.TrimPrefix(reqPath, "/")))
+	full := a.safeWebPath(reqPath)
+	type item struct {
+		Name string `json:"name"`
+		Path string `json:"path"`
+	}
+	resp := struct {
+		Path  string `json:"path"`
+		Up    string `json:"up,omitempty"`
+		Items []item `json:"items"`
+	}{Path: reqPath, Items: []item{}}
+	if reqPath != "/" {
+		resp.Up = filepath.ToSlash(filepath.Dir(reqPath))
+	}
+	if entries, err := os.ReadDir(full); err == nil {
+		for _, e := range entries {
+			if !e.IsDir() || blockedFileName(e.Name()) {
+				continue
+			}
+			resp.Items = append(resp.Items, item{
+				Name: e.Name(),
+				Path: filepath.ToSlash(filepath.Join(reqPath, e.Name())),
+			})
+		}
+	}
+	sort.Slice(resp.Items, func(i, j int) bool {
+		return strings.ToLower(resp.Items[i].Name) < strings.ToLower(resp.Items[j].Name)
+	})
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	_ = json.NewEncoder(w).Encode(resp)
 }
 
 func (a *App) fileDownload(w http.ResponseWriter, r *http.Request, reqPath string) {
