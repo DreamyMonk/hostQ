@@ -199,6 +199,12 @@ tbody tr:hover{background:var(--surface-2)}
 .fm-bulkbar .btn.danger{background:#7f1d1d;border-color:#991b1b;color:#fff}
 .fm-bulkbar .btn.danger:hover{background:#991b1b}
 .fm-check,.fm-checkall{width:16px;height:16px;cursor:pointer;accent-color:var(--brand-2)}
+
+/* upload progress */
+.upbar{height:10px;border-radius:99px;background:var(--surface-2);overflow:hidden;border:1px solid var(--card-line)}
+.upbar-fill{height:100%;width:0%;background:linear-gradient(90deg,#3b82f6,#06b6d4);transition:width .15s ease}
+.up-stats{display:flex;justify-content:space-between;font-size:12px;color:var(--ink-muted);margin-top:8px;font-variant-numeric:tabular-nums}
+.up-stats strong{color:var(--ink);font-weight:700}
 .file-name{display:flex;align-items:center;gap:8px;font-weight:600}
 .file-name .ic{width:28px;height:28px;border-radius:6px;background:#eff6ff;color:#2563eb;display:grid;place-items:center}
 .file-name.dir .ic{background:#fef3c7;color:#b45309}
@@ -1336,7 +1342,7 @@ document.addEventListener('keydown',function(e){
 
 <div class="modal-bg" id="m-upload"><div class="modal">
   <h3>Upload files</h3><p class="muted">Upload one or more files to <span class="mono">{{.Path}}</span> (max 512 MB per request).</p>
-  <form method="post" enctype="multipart/form-data"><input type="hidden" name="path" value="{{.Path}}"><input type="hidden" name="action" value="upload">
+  <form method="post" enctype="multipart/form-data" class="js-upload" data-modal="m-upload"><input type="hidden" name="path" value="{{.Path}}"><input type="hidden" name="action" value="upload">
     <div class="field"><label>Choose files</label><input class="input" type="file" name="upload" multiple required></div>
     <div class="modal-foot"><button type="button" class="btn" onclick="closeModal('m-upload')">Cancel</button><button class="btn primary">{{icon "upload"}} Upload</button></div>
   </form>
@@ -1344,11 +1350,25 @@ document.addEventListener('keydown',function(e){
 
 <div class="modal-bg" id="m-upload-dir"><div class="modal">
   <h3>Upload folder</h3><p class="muted">Pick a folder — every file inside it is uploaded into <span class="mono">{{.Path}}</span>, preserving the directory tree.</p>
-  <form method="post" enctype="multipart/form-data"><input type="hidden" name="path" value="{{.Path}}"><input type="hidden" name="action" value="upload">
+  <form method="post" enctype="multipart/form-data" class="js-upload" data-modal="m-upload-dir"><input type="hidden" name="path" value="{{.Path}}"><input type="hidden" name="action" value="upload">
     <div class="field"><label>Choose folder</label><input class="input" type="file" name="upload" webkitdirectory directory multiple required></div>
     <p class="muted" style="font-size:12px;margin:0 0 6px">Hidden files and known secrets (.env, .key, .pem) are silently skipped. Max 512 MB per request.</p>
     <div class="modal-foot"><button type="button" class="btn" onclick="closeModal('m-upload-dir')">Cancel</button><button class="btn primary">{{icon "upload"}} Upload folder</button></div>
   </form>
+</div></div>
+
+<!-- Upload progress modal (driven by XHR upload event listeners) -->
+<div class="modal-bg" id="m-upload-progress"><div class="modal">
+  <h3 id="upTitle">Uploading…</h3>
+  <p class="muted" id="upSubtitle" style="margin:4px 0 12px">Preparing files…</p>
+  <div class="upbar"><div class="upbar-fill" id="upBar"></div></div>
+  <div class="up-stats">
+    <span id="upStats">0 B / 0 B</span>
+    <span><strong id="upPct">0%</strong> · <span id="upSpeed">0 B/s</span> · ETA <span id="upEta">—</span></span>
+  </div>
+  <div class="modal-foot">
+    <button type="button" class="btn danger" id="upCancelBtn" onclick="cancelUpload()">{{icon "x"}} Cancel</button>
+  </div>
 </div></div>
 
 <div class="modal-bg" id="m-rename"><div class="modal">
@@ -1510,6 +1530,85 @@ document.addEventListener('keydown',function(e){
     }
     document.getElementById('fmBulkForm').submit();
   };
+
+  // ---- XHR upload with live progress -----------------------------------
+  var currentXHR = null;
+  var uploadStart = 0;
+  function humanBytes(n){
+    if(!isFinite(n) || n<0) return '0 B';
+    var u=['B','KB','MB','GB','TB']; var i=0;
+    while(n>=1024 && i<u.length-1){ n/=1024; i++; }
+    return (i===0?n.toFixed(0):n.toFixed(1)) + ' ' + u[i];
+  }
+  function humanSeconds(s){
+    if(!isFinite(s) || s<0) return '—';
+    if(s<60) return Math.ceil(s)+'s';
+    if(s<3600){ var m=Math.floor(s/60); return m+'m '+Math.ceil(s-m*60)+'s'; }
+    var h=Math.floor(s/3600); return h+'h '+Math.floor((s-h*3600)/60)+'m';
+  }
+  function setUpProgress(loaded, total){
+    var pct = total>0 ? Math.min(100, Math.round(loaded/total*100)) : 0;
+    document.getElementById('upBar').style.width = pct+'%';
+    document.getElementById('upPct').textContent = pct+'%';
+    document.getElementById('upStats').textContent = humanBytes(loaded)+' / '+humanBytes(total);
+    var elapsed = (Date.now()-uploadStart)/1000;
+    var rate = elapsed>0 ? loaded/elapsed : 0;
+    var eta = rate>0 ? (total-loaded)/rate : 0;
+    document.getElementById('upSpeed').textContent = humanBytes(rate)+'/s';
+    document.getElementById('upEta').textContent = (loaded>=total && total>0) ? 'done' : humanSeconds(eta);
+  }
+  window.cancelUpload = function(){
+    if(currentXHR){ try{ currentXHR.abort(); }catch(_e){} }
+    currentXHR = null;
+    closeModal('m-upload-progress');
+    toast('Upload cancelled','bad');
+  };
+  function startXHRUpload(form){
+    var files = form.querySelector('input[type=file]');
+    if(!files || !files.files || !files.files.length){ return false; }
+    var fd = new FormData(form);
+    var nFiles = files.files.length;
+    document.getElementById('upTitle').textContent = nFiles>1 ? 'Uploading '+nFiles+' files…' : 'Uploading file…';
+    document.getElementById('upSubtitle').textContent = nFiles>1 ? files.files[0].webkitRelativePath || files.files[0].name : files.files[0].name;
+    document.getElementById('upBar').style.width = '0%';
+    document.getElementById('upPct').textContent = '0%';
+    document.getElementById('upStats').textContent = '0 B / 0 B';
+    document.getElementById('upSpeed').textContent = '0 B/s';
+    document.getElementById('upEta').textContent = '—';
+    closeModal(form.dataset.modal||'m-upload');
+    openModal('m-upload-progress');
+
+    var xhr = new XMLHttpRequest();
+    currentXHR = xhr;
+    uploadStart = Date.now();
+    xhr.upload.addEventListener('progress', function(e){
+      if(e.lengthComputable){ setUpProgress(e.loaded, e.total); }
+    });
+    xhr.upload.addEventListener('load', function(){
+      setUpProgress(1,1);
+      document.getElementById('upSubtitle').textContent = 'Server is finalising the upload…';
+    });
+    xhr.addEventListener('load', function(){
+      currentXHR = null;
+      closeModal('m-upload-progress');
+      if(xhr.responseURL){ window.location = xhr.responseURL; }
+      else { window.location.reload(); }
+    });
+    xhr.addEventListener('error', function(){
+      currentXHR = null;
+      closeModal('m-upload-progress');
+      toast('Upload failed (network error)','bad');
+    });
+    xhr.addEventListener('abort', function(){ currentXHR = null; });
+    xhr.open('POST', form.action || window.location.pathname + window.location.search);
+    xhr.send(fd);
+    return true;
+  }
+  document.addEventListener('submit', function(e){
+    var f = e.target;
+    if(!f || !f.classList || !f.classList.contains('js-upload')) return;
+    if(startXHRUpload(f)){ e.preventDefault(); }
+  }, true);
 })();
 </script>
 {{end}}
