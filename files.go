@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -137,7 +138,14 @@ func (a *App) fileDownload(w http.ResponseWriter, r *http.Request, reqPath strin
 }
 
 func (a *App) fileAction(w http.ResponseWriter, r *http.Request) {
-	// Multipart upload has its own size limit + parsing
+	// Multipart uploads need a much larger parse budget than the rest of
+	// the actions. Dispatch *before* FormValue triggers the default 32 MB
+	// ParseMultipartForm — once the body is parsed at that limit, calling
+	// ParseMultipartForm again with a larger budget is a no-op.
+	if strings.HasPrefix(strings.ToLower(r.Header.Get("Content-Type")), "multipart/form-data") {
+		a.fileUpload(w, r)
+		return
+	}
 	action := r.FormValue("action")
 	if action == "upload" {
 		a.fileUpload(w, r)
@@ -468,7 +476,11 @@ func copyFile(src, dst string) error {
 	return err
 }
 
+// queryEscape escapes an arbitrary string so it is safe to drop into a
+// "?output=" query parameter. The previous homebrew Replacer left "%" and
+// other special characters un-escaped, which broke browser-side URL parsing
+// (and made some XHR redirects look like "network error"). net/url does the
+// right thing for every byte.
 func queryEscape(s string) string {
-	r := strings.NewReplacer(" ", "+", "&", "%26", "?", "%3F", "#", "%23", "=", "%3D", "/", "%2F")
-	return r.Replace(s)
+	return url.QueryEscape(s)
 }

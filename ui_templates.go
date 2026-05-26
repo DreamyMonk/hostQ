@@ -1581,6 +1581,11 @@ document.addEventListener('keydown',function(e){
     var xhr = new XMLHttpRequest();
     currentXHR = xhr;
     uploadStart = Date.now();
+    function fail(reason){
+      currentXHR = null;
+      closeModal('m-upload-progress');
+      toast(reason, 'bad');
+    }
     xhr.upload.addEventListener('progress', function(e){
       if(e.lengthComputable){ setUpProgress(e.loaded, e.total); }
     });
@@ -1588,19 +1593,30 @@ document.addEventListener('keydown',function(e){
       setUpProgress(1,1);
       document.getElementById('upSubtitle').textContent = 'Server is finalising the upload…';
     });
+    xhr.upload.addEventListener('error', function(){ fail('Upload failed (connection dropped mid-transfer)'); });
     xhr.addEventListener('load', function(){
+      if(xhr.status >= 400){
+        fail('Upload rejected by server (HTTP ' + xhr.status + ')');
+        return;
+      }
       currentXHR = null;
       closeModal('m-upload-progress');
       if(xhr.responseURL){ window.location = xhr.responseURL; }
       else { window.location.reload(); }
     });
     xhr.addEventListener('error', function(){
-      currentXHR = null;
-      closeModal('m-upload-progress');
-      toast('Upload failed (network error)','bad');
+      var msg = 'Upload failed';
+      if(xhr.status){ msg += ' (HTTP ' + xhr.status + ')'; }
+      else { msg += ' — server unreachable or connection blocked. If a reverse proxy sits in front, check client_max_body_size + proxy_request_buffering.'; }
+      fail(msg);
     });
+    xhr.addEventListener('timeout', function(){ fail('Upload timed out'); });
     xhr.addEventListener('abort', function(){ currentXHR = null; });
-    xhr.open('POST', form.action || window.location.pathname + window.location.search);
+    // Same-origin relative URL — avoids accidental scheme/origin drift if the
+    // form's resolved action picks up a different host.
+    var url = window.location.pathname + (window.location.search || '');
+    xhr.timeout = 0;
+    xhr.open('POST', url);
     xhr.send(fd);
     return true;
   }
