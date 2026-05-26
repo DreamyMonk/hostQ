@@ -214,6 +214,18 @@ func sanitizeExtraNginx(content string) string {
 	return strings.TrimSpace(s)
 }
 
+// hasUserLocationSlash returns true if the (already-sanitised) extra config
+// declares its own `location / { ... }` so writeNginxSite can skip the
+// panel default.
+var locationSlashRe = regexp.MustCompile(`(?m)^\s*location\s+/\s*\{`)
+
+func hasUserLocationSlash(extra string) bool {
+	if strings.TrimSpace(extra) == "" {
+		return false
+	}
+	return locationSlashRe.MatchString(extra)
+}
+
 // unwrapOuterServer returns the body of a single top-level `server { ... }`
 // block when the input starts with one; otherwise returns the input as-is.
 func unwrapOuterServer(s string) string {
@@ -416,16 +428,24 @@ func (a *App) writeNginxSite(domain, root string, cache bool, phpVersion string)
 			extraInclude = fmt.Sprintf("    # hostQ custom rules for %s\n    include %s;\n", domain, extraPath)
 		}
 	}
+	// If the user supplies their own `location /` block in extra.conf, suppress
+	// the panel default so nginx doesn't reject "duplicate location" and so
+	// the user can choose, e.g., $uri.php fallback over /index.php front
+	// controller. Anything more nuanced (regex location overrides, etc.) the
+	// user can paste freely.
+	defaultLocationSlash := "    location / { try_files $uri $uri/ /index.php?$query_string; }\n"
+	if hasUserLocationSlash(a.loadExtraNginx(domain)) {
+		defaultLocationSlash = "    # location / is overridden by the site's custom Nginx config.\n"
+	}
 	siteBody := fmt.Sprintf(`    root %s;
     index index.php index.html;
-    location / { try_files $uri $uri/ /index.php?$query_string; }
-    location ~ \.php$ {
+%s    location ~ \.php$ {
         include snippets/fastcgi-php.conf;
         fastcgi_pass unix:/run/php/php%s-fpm.sock;
         fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
         include fastcgi_params;%s
     }
-%s%s`, root, phpVersion, cacheBlock, pmaInclude, extraInclude)
+%s%s`, root, defaultLocationSlash, phpVersion, cacheBlock, pmaInclude, extraInclude)
 
 	cacheLabel := "off"
 	if cache {
