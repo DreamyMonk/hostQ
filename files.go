@@ -163,6 +163,97 @@ func (a *App) apiDirs(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(resp)
 }
 
+// looksTextual is a cheap heuristic: a NUL byte in the first 8 KB means binary.
+// Good enough to keep the in-browser editor from being handed an image or zip.
+func looksTextual(data []byte) bool {
+	n := len(data)
+	if n > 8000 {
+		n = 8000
+	}
+	for i := 0; i < n; i++ {
+		if data[i] == 0 {
+			return false
+		}
+	}
+	return true
+}
+
+// fileEditMaxBytes caps in-browser editing. Bigger files should be downloaded
+// and edited locally. The cap also matches Go's default form-parse budget
+// (10 MB) with a comfortable margin.
+const fileEditMaxBytes = 2 * 1024 * 1024
+
+// fileEdit renders the in-browser text editor, or saves a POSTed edit.
+// Handles dot-files like .htaccess natively — the only files it refuses are
+// the secret patterns blockedFileName() already filters everywhere.
+func (a *App) fileEdit(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+		a.fileEditSave(w, r)
+		return
+	}
+	reqPath := strings.TrimSpace(r.URL.Query().Get("path"))
+	if reqPath == "" {
+		http.Redirect(w, r, "/files?path=/", http.StatusSeeOther)
+		return
+	}
+	full := a.safeWebPath(reqPath)
+	parent := filepath.ToSlash(filepath.Dir(reqPath))
+	if !a.canMutateWebPath(full) {
+		http.Redirect(w, r, "/files?path="+url.QueryEscape(parent)+"&output="+queryEscape("Cannot edit that path"), http.StatusSeeOther)
+		return
+	}
+	info, err := os.Stat(full)
+	if err != nil || info.IsDir() {
+		http.Redirect(w, r, "/files?path="+url.QueryEscape(parent)+"&output="+queryEscape("Not a file"), http.StatusSeeOther)
+		return
+	}
+	if info.Size() > fileEditMaxBytes {
+		http.Redirect(w, r, "/files?path="+url.QueryEscape(parent)+"&output="+queryEscape("File too large to edit in browser (>2 MB) — download instead"), http.StatusSeeOther)
+		return
+	}
+	data, err := os.ReadFile(full)
+	if err != nil {
+		http.Redirect(w, r, "/files?path="+url.QueryEscape(parent)+"&output="+queryEscape("read failed: "+err.Error()), http.StatusSeeOther)
+		return
+	}
+	if !looksTextual(data) {
+		http.Redirect(w, r, "/files?path="+url.QueryEscape(parent)+"&output="+queryEscape("Looks like a binary file — download and edit locally"), http.StatusSeeOther)
+		return
+	}
+	a.render(w, "fileedit", map[string]any{
+		"Title":   "Edit " + info.Name(),
+		"Path":    reqPath,
+		"Parent":  parent,
+		"Name":    info.Name(),
+		"Content": string(data),
+		"Mode":    fmt.Sprintf("%o", info.Mode().Perm()),
+		"Size":    humanSize(info.Size()),
+		"ModTime": info.ModTime().Format("2006-01-02 15:04"),
+		"Output":  r.URL.Query().Get("output"),
+	})
+}
+
+func (a *App) fileEditSave(w http.ResponseWriter, r *http.Request) {
+	reqPath := strings.TrimSpace(r.FormValue("path"))
+	content := r.FormValue("content")
+	full := a.safeWebPath(reqPath)
+	parent := filepath.ToSlash(filepath.Dir(reqPath))
+	if !a.canMutateWebPath(full) {
+		http.Redirect(w, r, "/files?path="+url.QueryEscape(parent)+"&output="+queryEscape("Cannot save to that path"), http.StatusSeeOther)
+		return
+	}
+	var mode os.FileMode = 0644
+	if info, err := os.Stat(full); err == nil && !info.IsDir() {
+		mode = info.Mode().Perm()
+	}
+	if err := os.WriteFile(full, []byte(content), mode); err != nil {
+		http.Redirect(w, r, "/file-edit?path="+url.QueryEscape(reqPath)+"&output="+queryEscape("save failed: "+err.Error()), http.StatusSeeOther)
+		return
+	}
+	a.audit("file.edit", "success", full)
+	http.Redirect(w, r, "/files?path="+url.QueryEscape(parent)+"&output="+queryEscape("Saved "+filepath.Base(full)), http.StatusSeeOther)
+}
+
 func (a *App) fileDownload(w http.ResponseWriter, r *http.Request, reqPath string) {
 	full := a.safeWebPath(reqPath)
 	root := filepath.Clean(a.cfg.WebRoot)

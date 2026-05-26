@@ -200,6 +200,26 @@ tbody tr:hover{background:var(--surface-2)}
 .fm-bulkbar .btn.danger:hover{background:#991b1b}
 .fm-check,.fm-checkall{width:16px;height:16px;cursor:pointer;accent-color:var(--brand-2)}
 
+/* in-browser code editor */
+.edit-toolbar{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--card);border:1px solid var(--card-line);border-radius:10px 10px 0 0;border-bottom:none}
+.edit-toolbar .grow{flex:1}
+.edit-toolbar .meta{color:var(--ink-muted);font-size:12px}
+.edit-toolbar .meta strong{color:var(--ink);font-weight:700}
+.edit-wrapper{display:flex}
+.edit-gutter{flex:none;width:54px;padding:14px 8px 14px 0;background:var(--surface-2);color:var(--ink-muted);border:1px solid var(--card-line);border-right:none;border-radius:0 0 0 10px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:13px;line-height:1.5;text-align:right;user-select:none;overflow:hidden;white-space:pre;font-variant-numeric:tabular-nums}
+.edit-area{
+  flex:1;min-width:0;min-height:65vh;resize:vertical;
+  border:1px solid var(--card-line);border-radius:0 0 10px 0;
+  padding:14px 16px;
+  font-family:ui-monospace,SFMono-Regular,Consolas,monospace;
+  font-size:13px;line-height:1.5;
+  background:var(--card);color:var(--ink);
+  outline:none;tab-size:2;
+  white-space:pre-wrap;
+}
+.edit-area:focus{border-color:#93c5fd;box-shadow:0 0 0 3px rgba(59,130,246,.12)}
+.edit-area.nowrap{white-space:pre}
+
 /* destination input + Browse button row */
 .pick-row{display:flex;gap:6px}
 .pick-row .input{flex:1;min-width:0}
@@ -396,6 +416,7 @@ table.flat tbody tr:hover{background:transparent}
       {{else if eq .View "account"}}{{template "account" .}}
       {{else if eq .View "audit"}}{{template "audit" .}}
       {{else if eq .View "redis"}}{{template "redis" .}}
+      {{else if eq .View "fileedit"}}{{template "fileedit" .}}
       {{end}}
     </div>
   </main>
@@ -1300,10 +1321,10 @@ document.addEventListener('keydown',function(e){
         <td class="muted mono">{{.Mode}}</td>
         <td class="muted">{{.ModTime}}</td>
         <td class="right-col">
-          {{if eq .Kind "file"}}<a class="btn mini" href="/files?path={{$.Path}}&download={{.Path}}">{{icon "download"}}</a>{{end}}
-          <button class="btn mini" onclick="fmAction('rename', this)">{{icon "edit"}}</button>
-          <button class="btn mini" onclick="fmAction('chmod', this)">{{icon "shield"}}</button>
-          <button class="btn mini danger" onclick="fmAction('delete', this)">{{icon "trash"}}</button>
+          {{if eq .Kind "file"}}<a class="btn mini" href="/file-edit?path={{.Path}}" title="Edit in browser">{{icon "terminal"}}</a><a class="btn mini" href="/files?path={{$.Path}}&download={{.Path}}" title="Download">{{icon "download"}}</a>{{end}}
+          <button class="btn mini" onclick="fmAction('rename', this)" title="Rename">{{icon "edit"}}</button>
+          <button class="btn mini" onclick="fmAction('chmod', this)" title="Permissions">{{icon "shield"}}</button>
+          <button class="btn mini danger" onclick="fmAction('delete', this)" title="Delete">{{icon "trash"}}</button>
         </td>
       </tr>{{else}}<tr><td colspan="6" class="muted">Folder is empty.</td></tr>{{end}}
     </tbody>
@@ -1356,6 +1377,7 @@ document.addEventListener('keydown',function(e){
 <!-- Context Menu -->
 <div class="ctxmenu" id="ctxmenu">
   <button onclick="fmAction('open')" data-files-hide>{{icon "folderOpen"}} Open</button>
+  <button onclick="fmAction('edit')" data-dirs-hide>{{icon "terminal"}} Edit in browser</button>
   <button onclick="fmAction('download')" data-dirs-hide>{{icon "download"}} Download</button>
   <div class="sep"></div>
   <button onclick="fmAction('rename')">{{icon "edit"}} Rename</button>
@@ -1490,7 +1512,8 @@ document.addEventListener('keydown',function(e){
     var name=tr.dataset.name, path=tr.dataset.path, kind=tr.dataset.kind, mode=tr.dataset.mode;
     var base="{{.Path}}";
     var parent=base.replace(/\/+$/,'');
-    if(action==='open'){ if(kind==='dir') window.location='/files?path='+encodeURIComponent(path); return; }
+    if(action==='open'){ if(kind==='dir') window.location='/files?path='+encodeURIComponent(path); else window.location='/file-edit?path='+encodeURIComponent(path); return; }
+    if(action==='edit'){ if(kind==='file') window.location='/file-edit?path='+encodeURIComponent(path); return; }
     if(action==='download'){ if(kind==='file') window.location='/files?path='+encodeURIComponent(base)+'&download='+encodeURIComponent(path); return; }
     if(action==='delete'){
       if(!confirm('Permanently delete '+name+'?')) return;
@@ -1991,6 +2014,99 @@ document.addEventListener('keydown',function(e){
     </tbody>
   </table>
 </div>
+{{end}}
+
+{{define "fileedit"}}
+<div class="page-head">
+  <div>
+    <h1>{{icon "terminal"}} {{.Name}}</h1>
+    <p class="muted mono">{{.Path}}</p>
+  </div>
+  <a class="btn" href="/files?path={{.Parent}}">{{icon "chevronUp"}} Back to files</a>
+</div>
+<form method="post" action="/file-edit" id="editForm">
+  <input type="hidden" name="path" value="{{.Path}}">
+  <div class="edit-toolbar">
+    <button class="btn primary" type="submit">{{icon "check"}} Save (Ctrl+S)</button>
+    <a class="btn" href="/files?path={{.Parent}}" id="editDiscardBtn">{{icon "x"}} Discard</a>
+    <span class="grow"></span>
+    <span class="meta">size <strong>{{.Size}}</strong> · mode <strong class="mono">{{.Mode}}</strong> · modified <strong>{{.ModTime}}</strong></span>
+    <label class="meta" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer">
+      <input type="checkbox" id="editWrap" checked> wrap
+    </label>
+  </div>
+  <div class="edit-wrapper">
+    <pre class="edit-gutter" id="editGutter">1</pre>
+    <textarea class="edit-area" name="content" id="editArea" spellcheck="false" autocomplete="off" autocapitalize="off">{{.Content}}</textarea>
+  </div>
+</form>
+<script>
+(function(){
+  var area = document.getElementById('editArea');
+  var gutter = document.getElementById('editGutter');
+  var wrap = document.getElementById('editWrap');
+  var form = document.getElementById('editForm');
+  var discard = document.getElementById('editDiscardBtn');
+  var orig = area.value;
+  var dirty = false;
+
+  function renderGutter(){
+    var lines = area.value.split('\n').length;
+    var out = '';
+    for(var i=1; i<=lines; i++){ out += i + '\n'; }
+    gutter.textContent = out;
+  }
+  function syncScroll(){ gutter.scrollTop = area.scrollTop; }
+  function applyWrap(){
+    if(wrap.checked){ area.classList.remove('nowrap'); area.setAttribute('wrap','soft'); }
+    else { area.classList.add('nowrap'); area.setAttribute('wrap','off'); }
+  }
+
+  area.addEventListener('input', function(){ dirty = (area.value !== orig); renderGutter(); });
+  area.addEventListener('scroll', syncScroll);
+  area.addEventListener('keydown', function(e){
+    if(e.key === 'Tab'){
+      e.preventDefault();
+      var s = area.selectionStart, en = area.selectionEnd;
+      var before = area.value.substring(0, s);
+      var after = area.value.substring(en);
+      if(e.shiftKey){
+        // Outdent: if the cursor's line starts with 2 spaces or a tab, remove them.
+        var lineStart = before.lastIndexOf('\n') + 1;
+        var head = area.value.substring(lineStart, lineStart+2);
+        if(head === '  '){
+          area.value = area.value.substring(0, lineStart) + area.value.substring(lineStart+2);
+          area.selectionStart = area.selectionEnd = Math.max(lineStart, s-2);
+        } else if(head.charAt(0) === '\t'){
+          area.value = area.value.substring(0, lineStart) + area.value.substring(lineStart+1);
+          area.selectionStart = area.selectionEnd = Math.max(lineStart, s-1);
+        }
+      } else {
+        area.value = before + '  ' + after;
+        area.selectionStart = area.selectionEnd = s + 2;
+      }
+      dirty = (area.value !== orig);
+      renderGutter();
+    } else if((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')){
+      e.preventDefault();
+      form.submit();
+    }
+  });
+
+  wrap.addEventListener('change', applyWrap);
+  form.addEventListener('submit', function(){ dirty = false; });
+  discard.addEventListener('click', function(e){
+    if(dirty && !confirm('Discard unsaved changes?')){ e.preventDefault(); }
+  });
+  window.addEventListener('beforeunload', function(e){
+    if(dirty){ e.preventDefault(); e.returnValue = ''; }
+  });
+
+  renderGutter();
+  applyWrap();
+  area.focus();
+})();
+</script>
 {{end}}
 
 {{define "redis"}}
