@@ -703,6 +703,7 @@ document.addEventListener('keydown',function(e){
   <a href="/site?domain={{.Site.Domain}}&tab=ssl"       class="{{if eq .Tab "ssl"}}active{{end}}">{{icon "shield"}} SSL</a>
   <a href="/site?domain={{.Site.Domain}}&tab=php"       class="{{if eq .Tab "php"}}active{{end}}">{{icon "cpu"}} PHP</a>
   <a href="/files?path=/{{.Site.Domain}}/htdocs">{{icon "folderOpen"}} Files</a>
+  <a href="/site?domain={{.Site.Domain}}&tab=nginx"     class="{{if eq .Tab "nginx"}}active{{end}}">{{icon "server"}} Nginx</a>
   <a href="/site?domain={{.Site.Domain}}&tab=security"  class="{{if eq .Tab "security"}}active{{end}}">{{icon "shield"}} Security</a>
   <a href="/site?domain={{.Site.Domain}}&tab=backups"   class="{{if eq .Tab "backups"}}active{{end}}">{{icon "archive"}} Backups</a>
 </div>
@@ -741,6 +742,49 @@ document.addEventListener('keydown',function(e){
       </div>
     </div>
   </div>
+{{end}}
+
+{{if eq .Tab "nginx"}}
+  <div class="toolbar">
+    <div class="muted">Drop in custom Nginx directives (rewrite rules, location blocks, headers) so they survive every panel-driven vhost rewrite.</div>
+    <form method="post" action="/site-nginx" style="display:inline">
+      <input type="hidden" name="domain" value="{{.Site.Domain}}">
+      <button class="btn" name="action" value="flush" data-confirm="Purge the shared FastCGI cache and reload Nginx?">{{icon "refresh"}} Flush cache</button>
+    </form>
+  </div>
+  <div class="card">
+    <h3>Custom Nginx config block</h3>
+    <p class="muted">These directives are included inside every <span class="mono">server { ... }</span> block hostQ writes for {{.Site.Domain}} (both port 80 and port 443 when SSL is on). Use this to add the rewrite rules your <span class="mono">.htaccess</span> used to handle on Apache — Nginx does not read <span class="mono">.htaccess</span>.</p>
+    <form method="post" action="/site-nginx">
+      <input type="hidden" name="domain" value="{{.Site.Domain}}">
+      <input type="hidden" name="action" value="save">
+      <textarea class="input mono" name="nginx" rows="14" spellcheck="false" placeholder="# Catch-all front controller (route everything missing through index.php)
+location / {
+    try_files $uri $uri/ /index.php?$args;
+}
+
+# Example: friendly URLs that pass the path to PHP via ?route=
+# rewrite ^/shop/?$               /index.php?route=shop          last;
+# rewrite ^/shop/([^/]+)/?$       /index.php?route=shop&cat=$1   last;
+# rewrite ^/product/([^/]+)/?$    /index.php?route=product&slug=$1 last;
+
+# Example: security headers
+# add_header X-Content-Type-Options nosniff always;
+# add_header Referrer-Policy strict-origin-when-cross-origin always;
+">{{.NginxExtra}}</textarea>
+      <div style="margin-top:10px;display:flex;gap:8px">
+        <button class="btn primary" type="submit">{{icon "check"}} Save &amp; reload</button>
+      </div>
+      <p class="muted" style="font-size:12px;margin-top:8px">If <span class="mono">nginx -t</span> rejects your edit hostQ rolls back automatically — the running config keeps working and the toast tells you what nginx complained about.</p>
+    </form>
+  </div>
+  {{if .NginxVhost}}
+  <div class="card">
+    <h3>Current rendered vhost (read-only)</h3>
+    <p class="muted" style="margin:0 0 10px">Shows the actual <span class="mono">/etc/nginx/sites-available/{{.Site.Domain}}</span> hostQ generated, including your custom config + the phpMyAdmin snippet + the SSL block.</p>
+    <pre class="mono" style="background:var(--surface-2);color:var(--ink);padding:14px;border-radius:8px;font-size:12px;line-height:1.55;overflow:auto;max-height:340px;border:1px solid var(--card-line);white-space:pre">{{.NginxVhost}}</pre>
+  </div>
+  {{end}}
 {{end}}
 
 {{if eq .Tab "security"}}

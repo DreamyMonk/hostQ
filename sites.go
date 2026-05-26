@@ -99,6 +99,11 @@ func (a *App) siteManager(w http.ResponseWriter, r *http.Request) {
 		if report, err := a.loadScanReport(site.Domain); err == nil {
 			data["Scan"] = report
 		}
+	case "nginx":
+		data["NginxExtra"] = a.loadExtraNginx(site.Domain)
+		if vhost, err := os.ReadFile(filepath.Join(a.cfg.NginxSitesDir, site.Domain)); err == nil {
+			data["NginxVhost"] = string(vhost)
+		}
 	}
 	a.render(w, "site", data)
 }
@@ -145,6 +150,89 @@ func (a *App) siteAction(w http.ResponseWriter, r *http.Request) {
 	a.cache.invalidate("sites")
 	a.audit("site."+action, "success", domain)
 	http.Redirect(w, r, "/sites", http.StatusSeeOther)
+}
+
+// extraNginxPath is where per-site custom Nginx directives are persisted.
+// The file is included from inside every hostQ-managed server block so
+// rewrite rules survive any panel action that re-renders the vhost (cache
+// toggle, PHP switch, SSL install, WordPress install).
+func (a *App) extraNginxPath(domain string) string {
+	if !domainRe.MatchString(domain) {
+		return ""
+	}
+	return filepath.Join(a.cfg.DataDir, "sites", domain+".extra.conf")
+}
+
+func (a *App) loadExtraNginx(domain string) string {
+	if p := a.extraNginxPath(domain); p != "" {
+		data, _ := os.ReadFile(p)
+		return string(data)
+	}
+	return ""
+}
+
+func (a *App) saveExtraNginx(domain, content string) error {
+	p := a.extraNginxPath(domain)
+	if p == "" {
+		return fmt.Errorf("invalid domain")
+	}
+	if strings.TrimSpace(content) == "" {
+		_ = os.Remove(p)
+		return nil
+	}
+	if err := os.MkdirAll(filepath.Dir(p), 0700); err != nil {
+		return err
+	}
+	return os.WriteFile(p, []byte(content), 0644)
+}
+
+// siteNginx renders the per-site custom Nginx editor and handles its actions.
+// "save" persists the custom block and re-renders the vhost; if nginx -t
+// refuses it, the file is rolled back so the running config keeps working.
+// "flush" purges the shared FastCGI cache directory and reloads Nginx.
+func (a *App) siteNginx(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/sites", http.StatusSeeOther)
+		return
+	}
+	domain := strings.ToLower(strings.TrimSpace(r.FormValue("domain")))
+	site, ok := a.findSite(domain)
+	if !ok {
+		http.Redirect(w, r, "/sites", http.StatusSeeOther)
+		return
+	}
+	action := r.FormValue("action")
+	output := ""
+	switch action {
+	case "save":
+		content := r.FormValue("nginx")
+		prev := a.loadExtraNginx(domain)
+		if err := a.saveExtraNginx(domain, content); err != nil {
+			output = "save failed: " + err.Error()
+			break
+		}
+		a.writeNginxSite(domain, site.Root, site.Cache, site.PHPVersion)
+		if out, err := exec.Command("nginx", "-t").CombinedOutput(); err != nil {
+			_ = a.saveExtraNginx(domain, prev)
+			a.writeNginxSite(domain, site.Root, site.Cache, site.PHPVersion)
+			output = "nginx -t failed; rolled back. " + strings.TrimSpace(string(out))
+			a.audit("nginx.save", "failure", domain)
+		} else {
+			_ = exec.Command("systemctl", "reload", "nginx").Run()
+			output = "Custom Nginx config saved and reloaded."
+			a.audit("nginx.save", "success", domain)
+		}
+	case "flush":
+		_ = os.RemoveAll("/var/cache/nginx/hostq-fastcgi")
+		_ = os.MkdirAll("/var/cache/nginx/hostq-fastcgi", 0755)
+		_ = exec.Command("chown", "-R", "www-data:www-data", "/var/cache/nginx/hostq-fastcgi").Run()
+		_ = exec.Command("systemctl", "reload", "nginx").Run()
+		output = "FastCGI cache flushed; Nginx reloaded."
+		a.audit("nginx.flush", "success", domain)
+	default:
+		output = "Unknown nginx action: " + action
+	}
+	http.Redirect(w, r, "/site?domain="+domain+"&tab=nginx&output="+queryEscape(output), http.StatusSeeOther)
 }
 
 func (a *App) findSite(domain string) (Site, bool) {
@@ -221,6 +309,12 @@ func (a *App) writeNginxSite(domain, root string, cache bool, phpVersion string)
 	if _, err := os.Stat("/etc/nginx/snippets/hostq-pma.conf"); err == nil {
 		pmaInclude = "    include snippets/hostq-pma.conf;\n"
 	}
+	extraInclude := ""
+	if extraPath := a.extraNginxPath(domain); extraPath != "" {
+		if data, err := os.ReadFile(extraPath); err == nil && len(strings.TrimSpace(string(data))) > 0 {
+			extraInclude = fmt.Sprintf("    # hostQ custom rules for %s\n    include %s;\n", domain, extraPath)
+		}
+	}
 	siteBody := fmt.Sprintf(`    root %s;
     index index.php index.html;
     location / { try_files $uri $uri/ /index.php?$query_string; }
@@ -230,7 +324,7 @@ func (a *App) writeNginxSite(domain, root string, cache bool, phpVersion string)
         fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
         include fastcgi_params;%s
     }
-%s`, root, phpVersion, cacheBlock, pmaInclude)
+%s%s`, root, phpVersion, cacheBlock, pmaInclude, extraInclude)
 
 	cacheLabel := "off"
 	if cache {
