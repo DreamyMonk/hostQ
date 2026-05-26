@@ -522,15 +522,21 @@ document.addEventListener('submit',function(e){
   var m=(e.submitter&&e.submitter.getAttribute('data-confirm'))||e.target.getAttribute('data-confirm');
   if(m && !confirm(m)){ e.preventDefault(); }
 });
-// Generic modal helpers
+// Generic modal helpers. Modals marked with the "persistent" class survive
+// backdrop clicks and Escape — used for the upload progress modal so an
+// accidental side-click doesn't hide an in-flight transfer.
 function openModal(id){ var el=document.getElementById(id); if(el){ el.classList.add('show'); } }
 function closeModal(id){ var el=document.getElementById(id); if(el){ el.classList.remove('show'); } }
 document.addEventListener('click',function(e){
-  if(e.target.classList && e.target.classList.contains('modal-bg')){ e.target.classList.remove('show'); }
+  if(e.target.classList && e.target.classList.contains('modal-bg') && !e.target.classList.contains('persistent')){
+    e.target.classList.remove('show');
+  }
 });
 document.addEventListener('keydown',function(e){
   if(e.key==='Escape'){
-    document.querySelectorAll('.modal-bg.show').forEach(function(m){ m.classList.remove('show'); });
+    document.querySelectorAll('.modal-bg.show').forEach(function(m){
+      if(!m.classList.contains('persistent')){ m.classList.remove('show'); }
+    });
   }
 });
 </script>
@@ -1366,7 +1372,7 @@ document.addEventListener('keydown',function(e){
 </div></div>
 
 <!-- Upload progress modal (driven by XHR upload event listeners) -->
-<div class="modal-bg" id="m-upload-progress"><div class="modal">
+<div class="modal-bg persistent" id="m-upload-progress"><div class="modal">
   <h3 id="upTitle">Uploading…</h3>
   <p class="muted" id="upSubtitle" style="margin:4px 0 12px">Preparing files…</p>
   <div class="upbar"><div class="upbar-fill" id="upBar"></div></div>
