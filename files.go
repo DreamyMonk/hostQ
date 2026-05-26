@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"mime"
 	"net/http"
 	"net/url"
 	"os"
@@ -385,9 +386,24 @@ func (a *App) fileUpload(w http.ResponseWriter, r *http.Request) {
 	skipped := 0
 	output := ""
 	for _, fh := range files {
-		// With <input webkitdirectory>, browsers send fh.Filename including
-		// the file's path relative to the picked folder, e.g. "site/css/app.css".
-		raw := strings.ReplaceAll(strings.TrimSpace(fh.Filename), "\\", "/")
+		// With <input webkitdirectory>, browsers send the file's full path
+		// relative to the picked folder, e.g. "site/css/app.css", in the
+		// multipart part's Content-Disposition filename parameter.
+		//
+		// Go's mime/multipart, however, runs filepath.Base() on the filename
+		// it exposes as fh.Filename, so any directory tree is stripped before
+		// our handler sees it. Parse the raw Content-Disposition header
+		// ourselves to recover the original path. Falls back to fh.Filename
+		// for clients that don't include a directory.
+		raw := fh.Filename
+		if cd := fh.Header.Get("Content-Disposition"); cd != "" {
+			if _, params, err := mime.ParseMediaType(cd); err == nil {
+				if name := params["filename"]; name != "" {
+					raw = name
+				}
+			}
+		}
+		raw = strings.ReplaceAll(strings.TrimSpace(raw), "\\", "/")
 		raw = strings.TrimPrefix(raw, "/")
 		if raw == "" {
 			skipped++
