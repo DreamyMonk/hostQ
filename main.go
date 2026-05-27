@@ -48,6 +48,7 @@ func main() {
 	mux.HandleFunc("/site", app.requireAuth(app.siteManager))
 	mux.HandleFunc("/site-action", app.requireAuth(app.siteAction))
 	mux.HandleFunc("/site-nginx", app.requireAuth(app.siteNginx))
+	mux.HandleFunc("/site-php-ext", app.requireAuth(app.sitePhpExt))
 	mux.HandleFunc("/backups", app.requireAuth(app.backups))
 	mux.HandleFunc("/files", app.requireAuth(app.files))
 	mux.HandleFunc("/file-edit", app.requireAuth(app.fileEdit))

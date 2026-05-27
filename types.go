@@ -101,6 +101,15 @@ type PHPInfo struct {
 	Status  string
 }
 
+type PHPExtension struct {
+	Name      string // module name as PHP sees it (e.g. "gd", "redis")
+	Apt       string // apt package providing it (e.g. "php8.4-gd")
+	Installed bool   // mods-available/<name>.ini present
+	Enabled   bool   // symlink in fpm/conf.d/
+	Loaded    bool   // actually reported by `php -m`
+	Common    bool   // surfaced as installable even when not yet on disk
+}
+
 type Service struct {
 	ID      string
 	Name    string

@@ -1122,6 +1122,47 @@ location / {
       <p class="muted" style="margin-top:8px">Currently using <strong>PHP {{.Site.PHPVersion}}</strong>. The vhost is rewritten and nginx reloaded.</p>
     </form>
   </div>
+
+  <div class="card">
+    <div class="toolbar" style="margin:0">
+      <div>
+        <h3 style="margin:0">PHP {{.Site.PHPVersion}} extensions</h3>
+        <p class="muted" style="margin:4px 0 0">Tick what you want enabled, untick what you don't, then click <strong>Apply changes</strong>. Missing packages are installed via apt and enabled in one step. PHP-FPM is reloaded at the end.</p>
+      </div>
+      <span class="badge warn" title="PHP modules live per PHP version, not per site">{{icon "alert"}} affects every site on PHP {{.Site.PHPVersion}}</span>
+    </div>
+    <hr class="sep">
+    <form method="post" action="/site-php-ext">
+      <input type="hidden" name="domain" value="{{.Site.Domain}}">
+      <table>
+        <thead><tr><th style="width:38px"><input type="checkbox" id="extAll" onchange="document.querySelectorAll('.extbox').forEach(function(c){c.checked=this.checked}.bind(this))"></th><th>Extension</th><th>Status</th><th>Apt package</th><th class="right-col"></th></tr></thead>
+        <tbody>
+          {{range .PHPExtensions}}<tr>
+            <td><input type="checkbox" class="extbox" name="ext_{{.Name}}" {{if .Enabled}}checked{{end}}></td>
+            <td><strong class="mono">{{.Name}}</strong>{{if .Common}} <span class="badge info" style="margin-left:6px">common</span>{{end}}</td>
+            <td>
+              {{if .Loaded}}<span class="badge ok">{{icon "check"}} loaded</span>
+              {{else if .Enabled}}<span class="badge ok">{{icon "check"}} enabled</span>
+              {{else if .Installed}}<span class="badge">installed · disabled</span>
+              {{else}}<span class="badge">not installed</span>{{end}}
+            </td>
+            <td class="mono muted" style="font-size:11.5px">{{.Apt}}</td>
+            <td class="right-col">
+              {{if .Installed}}<form method="post" action="/site-php-ext" data-confirm="Uninstall {{.Apt}}? Other sites on PHP {{$.Site.PHPVersion}} will lose this extension too." style="display:inline">
+                <input type="hidden" name="domain" value="{{$.Site.Domain}}">
+                <input type="hidden" name="ext" value="{{.Name}}">
+                <button class="btn mini danger" name="action" value="uninstall">{{icon "trash"}}</button>
+              </form>{{end}}
+            </td>
+          </tr>{{else}}<tr><td colspan="5" class="muted">No extensions reported for PHP {{$.Site.PHPVersion}}. Is the FPM package installed?</td></tr>{{end}}
+        </tbody>
+      </table>
+      <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+        <button class="btn primary" name="action" value="apply">{{icon "check"}} Apply changes</button>
+        <span class="muted" style="font-size:12px">Reloads php{{.Site.PHPVersion}}-fpm when done.</span>
+      </div>
+    </form>
+  </div>
 {{end}}
 
 {{if eq .Tab "backups"}}
