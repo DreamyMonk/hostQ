@@ -122,13 +122,19 @@ button.link{background:none;border:none;color:#60a5fa;text-decoration:underline;
 
 func renderPMAFallback(w http.ResponseWriter, user, db, domain string) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	backLabel := "Back to site"
+	backHref := "/site?domain=" + html.EscapeString(domain) + "&tab=database"
+	if strings.TrimSpace(domain) == "" {
+		backLabel = "Back to databases"
+		backHref = "/databases"
+	}
 	fmt.Fprintf(w, `<!doctype html><html><body style="font-family:sans-serif;padding:40px;max-width:520px;margin:auto;line-height:1.55">
 <h2>No saved password for <code>%s</code></h2>
 <p>This database user wasn't created or reset through hostQ, so no password is remembered for auto-login.</p>
-<p>Reset the user's password from <strong>Site → Database</strong> and then click phpMyAdmin again, or open phpMyAdmin manually below.</p>
-<p><a href="/phpmyadmin/?db=%s" style="display:inline-block;background:#2563eb;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none">Open phpMyAdmin</a> &nbsp; <a href="/site?domain=%s&tab=database">Back to site</a></p>
+<p>Reset the user's password from the Databases page and then click phpMyAdmin again, or open phpMyAdmin manually below.</p>
+<p><a href="/phpmyadmin/?db=%s" style="display:inline-block;background:#2563eb;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none">Open phpMyAdmin</a> &nbsp; <a href="%s">%s</a></p>
 </body></html>`,
-		html.EscapeString(user), html.EscapeString(db), html.EscapeString(domain))
+		html.EscapeString(user), html.EscapeString(db), backHref, html.EscapeString(backLabel))
 }
 
 var pmaTokenRe = regexp.MustCompile(`name=["']token["'][^>]*value=["']([^"']+)["']|value=["']([^"']+)["'][^>]*name=["']token["']`)

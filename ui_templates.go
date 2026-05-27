@@ -1901,40 +1901,98 @@ location / {
 
 {{define "databases"}}
 <div class="page-head">
-  <div><h1>{{icon "database"}} Databases</h1><p>MariaDB / MySQL databases managed by hostQ.</p></div>
+  <div><h1>{{icon "database"}} Databases</h1><p>Every MariaDB / MySQL database managed by hostQ.</p></div>
   <span class="badge info">MariaDB</span>
 </div>
-{{if .Created}}<div class="alert ok">
-  {{icon "check"}}
-  <div>
-    <strong>Database created:</strong> <span class="mono">{{.Created}}</span><br>
-    <strong>User:</strong> <span class="mono">{{.User}}</span> · <strong>Password:</strong> <span class="mono">{{.Password}}</span>
-    <div class="muted" style="font-weight:500">Save this password now — it is shown only once.</div>
-  </div>
+
+{{if .Created}}<div class="card credentials">{{icon "key"}}
+  <div><strong>Database ready</strong> <span class="mono pill">{{.Created}}</span> · user <span class="mono pill">{{.User}}</span> · password <span class="mono pill">{{.Password}}</span><div class="muted" style="font-weight:500;margin-top:4px">Save this password — it is shown only once.</div></div>
 </div>{{end}}
-<div class="card">
-  <h3>Create database</h3>
-  <form method="post"><div class="row">
-    <input class="input" name="name" placeholder="project_name" value="{{.Site}}" required>
-    <button class="btn primary" name="action" value="create">{{icon "plus"}} Create database</button>
-  </div>
-  <p class="muted" style="margin-top:8px">A database and matching user are created with a generated password. Database names are auto-prefixed with <span class="mono">hostq_</span>.</p>
-  </form>
+{{if .DBUser}}<div class="card credentials">{{icon "key"}}
+  <div><strong>User ready</strong> <span class="mono pill">{{.DBUser}}</span> · password <span class="mono pill">{{.DBPass}}</span>{{if .DBName}} · on <span class="mono pill">{{.DBName}}</span>{{end}}<div class="muted" style="font-weight:500;margin-top:4px">Shown only once.</div></div>
+</div>{{end}}
+
+<div class="toolbar">
+  <div class="muted">{{len .Databases}} database{{if ne (len .Databases) 1}}s{{end}} on this server</div>
+  <button class="btn primary" onclick="openModal('m-dbs-newdb')">{{icon "plus"}} New database</button>
 </div>
-<div class="card" style="padding:0">
-  <table>
-    <thead><tr><th>Database</th><th class="right-col">Actions</th></tr></thead>
+
+{{range .Databases}}
+<div class="card db-card">
+  <div class="db-head">
+    <div class="db-title">{{icon "database"}} <span class="mono">{{.Name}}</span></div>
+    <div class="actions">
+      <a class="btn mini" href="/pma-login?user={{.Name}}&db={{.Name}}" target="_blank">{{icon "terminal"}} Open in phpMyAdmin</a>
+      <button class="btn mini" onclick="dbsOpenAddUser('{{.Name}}')">{{icon "plus"}} Add user</button>
+      <form method="post" action="/databases" data-confirm="Drop database {{.Name}}? This deletes all tables and the matching user." style="display:inline">
+        <input type="hidden" name="target" value="{{.Name}}">
+        <button class="btn mini danger" name="action" value="delete">{{icon "trash"}} Drop</button>
+      </form>
+    </div>
+  </div>
+  {{if .Users}}<table class="flat">
+    <thead><tr><th>User</th><th>Host</th><th class="right-col">Actions</th></tr></thead>
     <tbody>
-      {{range .Databases}}<tr>
-        <td class="mono">{{.Name}}</td>
-        <td class="right-col"><form method="post" data-confirm="Permanently drop this database and its user?">
-          <input type="hidden" name="target" value="{{.Name}}">
-          <button class="btn mini danger" name="action" value="delete">{{icon "trash"}} Drop</button>
-        </form></td>
-      </tr>{{else}}<tr><td class="muted" colspan="2">No user databases found, or mysql CLI is not available.</td></tr>{{end}}
+      {{range .Users}}<tr>
+        <td class="mono"><strong>{{.Login}}</strong></td>
+        <td class="muted mono">{{.Host}}</td>
+        <td class="right-col"><div class="actions" style="justify-content:flex-end">
+          <a class="btn mini" href="/pma-login?user={{.Login}}" target="_blank" title="Sign in to phpMyAdmin as this user">{{icon "terminal"}}</a>
+          <button class="btn mini" onclick="dbsOpenResetUser('{{.Login}}')">{{icon "key"}} Reset password</button>
+          <form method="post" action="/databases" data-confirm="Drop user {{.Login}} and revoke access?" style="display:inline">
+            <input type="hidden" name="user" value="{{.Login}}">
+            <button class="btn mini danger" name="action" value="user-delete">{{icon "trash"}}</button>
+          </form>
+        </div></td>
+      </tr>{{end}}
     </tbody>
   </table>
+  {{else}}<p class="muted" style="margin:6px 0 0">No users yet — add one with the button above.</p>{{end}}
 </div>
+{{else}}
+  <div class="card empty">
+    <div class="empty-ic">{{icon "database"}}</div>
+    <div><h3 style="margin:0 0 4px;color:var(--ink)">No databases yet</h3><p class="muted" style="margin:0">Click <strong>New database</strong> above. Database names are auto-prefixed with <span class="mono">hostq_</span> so panel-managed ones stand out.</p></div>
+  </div>
+{{end}}
+
+<!-- New database modal -->
+<div class="modal-bg" id="m-dbs-newdb"><div class="modal">
+  <h3>{{icon "plus"}} New database</h3>
+  <p class="muted">Creates a database and a matching user with a 24-char password. Auto-prefixed with <span class="mono">hostq_</span>.</p>
+  <form method="post" action="/databases">
+    <div class="field"><label>Name</label><input class="input mono" name="name" placeholder="project_name" required autofocus></div>
+    <div class="modal-foot"><button type="button" class="btn" onclick="closeModal('m-dbs-newdb')">Cancel</button><button class="btn primary" name="action" value="create">{{icon "check"}} Create</button></div>
+  </form>
+</div></div>
+
+<!-- Add user modal (populated by JS) -->
+<div class="modal-bg" id="m-dbs-adduser"><div class="modal">
+  <h3>{{icon "plus"}} Add user</h3>
+  <p class="muted">User will receive full privileges on <span class="mono" id="dbs-mu-db"></span>.</p>
+  <form method="post" action="/databases">
+    <input type="hidden" name="target" id="dbs-mu-target">
+    <div class="field"><label>Username (letters, digits, _; max 32)</label><input class="input mono" name="user" placeholder="app_user" required></div>
+    <div class="field"><label>Password</label><input class="input mono" name="password" type="text" placeholder="leave empty to auto-generate"></div>
+    <div class="modal-foot"><button type="button" class="btn" onclick="closeModal('m-dbs-adduser')">Cancel</button><button class="btn primary" name="action" value="user-create">{{icon "check"}} Add user</button></div>
+  </form>
+</div></div>
+
+<!-- Reset password modal -->
+<div class="modal-bg" id="m-dbs-resetuser"><div class="modal">
+  <h3>{{icon "key"}} Reset password</h3>
+  <p class="muted">Sets a new password for user <span class="mono" id="dbs-ru-user-label"></span>.</p>
+  <form method="post" action="/databases">
+    <input type="hidden" name="user" id="dbs-ru-user">
+    <div class="field"><label>New password (8+ chars)</label><input class="input mono" name="password" type="text" minlength="8" required></div>
+    <div class="modal-foot"><button type="button" class="btn" onclick="closeModal('m-dbs-resetuser')">Cancel</button><button class="btn primary" name="action" value="user-password">{{icon "check"}} Reset</button></div>
+  </form>
+</div></div>
+
+<script>
+function dbsOpenAddUser(db){ document.getElementById('dbs-mu-db').textContent=db; document.getElementById('dbs-mu-target').value=db; openModal('m-dbs-adduser'); }
+function dbsOpenResetUser(u){ document.getElementById('dbs-ru-user-label').textContent=u; document.getElementById('dbs-ru-user').value=u; openModal('m-dbs-resetuser'); }
+</script>
 {{end}}
 
 {{define "php"}}

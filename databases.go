@@ -21,6 +21,9 @@ func (a *App) databases(w http.ResponseWriter, r *http.Request) {
 		"Created":   r.URL.Query().Get("created"),
 		"User":      r.URL.Query().Get("user"),
 		"Password":  r.URL.Query().Get("password"),
+		"DBUser":    r.URL.Query().Get("dbuser"),
+		"DBPass":    r.URL.Query().Get("dbpass"),
+		"DBName":    r.URL.Query().Get("db"),
 		"Site":      siteFilter,
 	})
 }
