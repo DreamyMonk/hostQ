@@ -447,15 +447,6 @@ table.flat tbody tr:hover{background:transparent}
       <a href="/sites" class="{{if or (eq .View "sites") (eq .View "site")}}active{{end}}">{{icon "globe"}}<span>Sites</span></a>
       <a href="/files?path=/" class="{{if eq .View "files"}}active{{end}}">{{icon "folder"}}<span>File Manager</span></a>
     </nav>
-    <div class="navgroup">Hosting</div>
-    <nav class="nav">
-      <a href="/databases" class="{{if eq .View "databases"}}active{{end}}">{{icon "database"}}<span>All Databases</span></a>
-      <a href="/wordpress" class="{{if eq .View "wordpress"}}active{{end}}">{{icon "wordpress"}}<span>All WordPress</span></a>
-      <a href="/ssl" class="{{if eq .View "ssl"}}active{{end}}">{{icon "shield"}}<span>All Certificates</span></a>
-      <a href="/backups" class="{{if eq .View "backups"}}active{{end}}">{{icon "database"}}<span>Backups</span></a>
-      <a href="/cron" class="{{if eq .View "cron"}}active{{end}}">{{icon "clock"}}<span>Cron</span></a>
-      <a href="/phpmyadmin/" target="_blank" rel="noopener">{{icon "database"}}<span>phpMyAdmin ↗</span></a>
-    </nav>
     <div class="navgroup">System</div>
     <nav class="nav">
       <a href="/services">{{icon "server"}}<span>Admin area →</span></a>
