@@ -2502,7 +2502,7 @@ function dbsOpenResetUser(u){ document.getElementById('dbs-ru-user-label').textC
 
 {{define "account"}}
 <div class="page-head">
-  <div><h1>{{icon "users"}} Account</h1><p>Manage your panel administrator credentials.</p></div>
+  <div><h1>{{icon "users"}} Account</h1><p>Manage your panel administrator credentials and panel access.</p></div>
 </div>
 <div class="grid-2">
   <div class="card">
@@ -2518,6 +2518,47 @@ function dbsOpenResetUser(u){ document.getElementById('dbs-ru-user-label').textC
       <button class="btn primary">{{icon "check"}} Update password</button>
     </form>
   </div>
+</div>
+
+<div class="card">
+  <h2>{{icon "globe"}} Panel access hostname</h2>
+  <p class="muted" style="margin-top:4px">Bind the panel to a real domain instead of using the bare-IP <span class="mono">:8090</span> setup port. The panel writes an nginx vhost that proxies the hostname to <span class="mono">127.0.0.1:8090</span> and exposes <span class="mono">/phpmyadmin/</span> on the same origin so phpMyAdmin SSO works.</p>
+
+  {{if .PanelHost.Hostname}}
+    <div class="card credentials" style="margin:12px 0 0">{{icon "check"}}
+      <div>
+        <strong>Current:</strong> <a class="mono pill" href="{{if .PanelHost.SSL}}https{{else}}http{{end}}://{{.PanelHost.Hostname}}/" target="_blank" style="color:#fff;text-decoration:none">{{if .PanelHost.SSL}}https://{{else}}http://{{end}}{{.PanelHost.Hostname}}/</a>
+        {{if .PanelHost.SSL}}<span class="badge ok" style="margin-left:6px">{{icon "shield"}} SSL on</span>{{else}}<span class="badge" style="margin-left:6px">HTTP only</span>{{end}}
+        <div class="muted" style="font-weight:500;margin-top:4px">Configured {{.PanelHost.Updated}}{{if .PanelHost.Email}} · cert email {{.PanelHost.Email}}{{end}}.</div>
+      </div>
+    </div>
+    <hr class="sep">
+    <div class="actions">
+      <form method="post" action="/account" style="display:inline">
+        <input type="hidden" name="hostname" value="{{.PanelHost.Hostname}}">
+        <input type="hidden" name="email" value="{{.PanelHost.Email}}">
+        <input type="hidden" name="ssl" value="1">
+        <button class="btn" name="action" value="panel-host-set">{{icon "refresh"}} Re-issue SSL</button>
+      </form>
+      <form method="post" action="/account" data-confirm="Remove the {{.PanelHost.Hostname}} proxy vhost? The panel keeps working on :8090 and your Let's Encrypt cert (if any) is kept on disk." style="display:inline">
+        <button class="btn danger" name="action" value="panel-host-remove">{{icon "trash"}} Remove panel hostname</button>
+      </form>
+    </div>
+  {{else}}
+    <form method="post" action="/account" style="margin-top:10px">
+      <div class="row">
+        <div class="field"><label>Hostname</label><input class="input mono" name="hostname" placeholder="panel.example.com" required pattern="^[a-zA-Z0-9][a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"></div>
+        <div class="field"><label>Admin email <span class="muted" style="font-weight:500">(required for SSL)</span></label><input class="input" name="email" type="email" placeholder="admin@example.com"></div>
+      </div>
+      <div class="field" style="margin-bottom:6px"><label style="display:inline-flex;align-items:center;gap:6px;font-weight:600"><input type="checkbox" name="ssl" value="1" checked> Enable HTTPS via Let's Encrypt</label></div>
+      <button class="btn primary" name="action" value="panel-host-set">{{icon "shield"}} Set up panel hostname</button>
+      <ul class="muted" style="font-size:12px;margin:10px 0 0;padding-left:18px;line-height:1.6">
+        <li>DNS A record for the hostname must already point at this server — certbot validates ownership over port 80.</li>
+        <li>If certbot fails (DNS not propagated, port 80 blocked, Cloudflare proxy on) the vhost is still set up on HTTP — re-issue once DNS is right.</li>
+        <li>If you're behind Cloudflare, set the DNS record to <strong>grey-cloud (DNS only)</strong> for the cert issue, then flip back to <strong>orange (proxied)</strong> with SSL/TLS mode set to <strong>Full (strict)</strong>.</li>
+      </ul>
+    </form>
+  {{end}}
 </div>
 {{end}}
 

@@ -2,14 +2,148 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
 )
+
+// panelHostState tracks what hostname the panel is currently bound to via the
+// auto-managed nginx proxy vhost. Persisted at /etc/hostq/panel-host.json so
+// the Account page can show the current setting and certbot status across
+// restarts.
+type PanelHostState struct {
+	Hostname string `json:"hostname"`
+	SSL      bool   `json:"ssl"`
+	Email    string `json:"email"`
+	Updated  string `json:"updated"`
+}
+
+const (
+	panelVhostPath     = "/etc/nginx/sites-available/hostq-panel"
+	panelVhostLink     = "/etc/nginx/sites-enabled/hostq-panel"
+	panelHostStateFile = "panel-host.json"
+)
+
+func (a *App) loadPanelHostState() PanelHostState {
+	var s PanelHostState
+	data, err := os.ReadFile(filepath.Join(a.cfg.DataDir, panelHostStateFile))
+	if err != nil {
+		return s
+	}
+	_ = json.Unmarshal(data, &s)
+	return s
+}
+
+func (a *App) savePanelHostState(s PanelHostState) error {
+	if err := os.MkdirAll(a.cfg.DataDir, 0700); err != nil {
+		return err
+	}
+	data, _ := json.MarshalIndent(s, "", "  ")
+	return os.WriteFile(filepath.Join(a.cfg.DataDir, panelHostStateFile), data, 0600)
+}
+
+// writePanelProxyVhost emits the nginx vhost that proxies <hostname> to the
+// panel on 127.0.0.1:8090 and exposes /phpmyadmin/ via the managed snippet.
+func (a *App) writePanelProxyVhost(hostname string) error {
+	if !domainRe.MatchString(hostname) {
+		return fmt.Errorf("invalid hostname")
+	}
+	pmaInclude := ""
+	if _, err := os.Stat("/etc/nginx/snippets/hostq-pma.conf"); err == nil {
+		pmaInclude = "    include snippets/hostq-pma.conf;\n"
+	}
+	content := fmt.Sprintf(`# hostQ panel proxy — auto-managed. Bind the panel UI to %s
+# and expose /phpmyadmin/ on the same origin so SSO works.
+server {
+    listen 80;
+    listen [::]:80;
+    server_name %s;
+    access_log /var/log/nginx/hostq-panel.access.log combined;
+
+    client_max_body_size 512m;
+%s
+    location / {
+        proxy_pass http://127.0.0.1:8090;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 600s;
+        proxy_send_timeout 600s;
+        proxy_buffering off;
+    }
+}
+`, hostname, hostname, pmaInclude)
+	if err := os.WriteFile(panelVhostPath, []byte(content), 0644); err != nil {
+		return err
+	}
+	if _, err := os.Lstat(panelVhostLink); err != nil {
+		if err := os.Symlink(panelVhostPath, panelVhostLink); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// setupPanelHostname writes the vhost, optionally runs certbot for SSL, and
+// persists the result. Errors are returned as the message so the caller can
+// surface them via the toast on /account.
+func (a *App) setupPanelHostname(hostname, email string, withSSL bool) (string, error) {
+	hostname = strings.ToLower(strings.TrimSpace(hostname))
+	hostname = strings.TrimPrefix(hostname, "www.")
+	if !domainRe.MatchString(hostname) {
+		return "Invalid hostname", fmt.Errorf("bad hostname")
+	}
+	if err := a.writePanelProxyVhost(hostname); err != nil {
+		return "write vhost failed: " + err.Error(), err
+	}
+	if out, err := exec.Command("nginx", "-t").CombinedOutput(); err != nil {
+		return "nginx -t failed: " + tail(string(out), 240), err
+	}
+	_ = exec.Command("systemctl", "reload", "nginx").Run()
+	state := PanelHostState{Hostname: hostname, SSL: false, Email: email, Updated: time.Now().Format(time.RFC3339)}
+	if withSSL {
+		if email == "" || !strings.Contains(email, "@") {
+			_ = a.savePanelHostState(state)
+			return "Panel hostname set, but SSL needs a valid admin email — re-run with one filled in. HTTP works at http://" + hostname + "/ now.", nil
+		}
+		out, err := exec.Command("certbot", "--nginx", "-d", hostname, "-m", email, "--agree-tos", "--non-interactive", "--redirect").CombinedOutput()
+		if err != nil {
+			_ = a.savePanelHostState(state)
+			a.audit("panel.host-ssl", "failure", hostname)
+			return "Vhost created (HTTP only). Certbot failed: " + tail(string(out), 240), err
+		}
+		state.SSL = true
+		_ = a.savePanelHostState(state)
+		a.audit("panel.host-ssl", "success", hostname)
+		return "Panel hostname ready at https://" + hostname + "/ — SSL installed.", nil
+	}
+	_ = a.savePanelHostState(state)
+	a.audit("panel.host-set", "success", hostname)
+	return "Panel hostname ready at http://" + hostname + "/", nil
+}
+
+// removePanelHostname undoes everything setupPanelHostname did. The Let's
+// Encrypt cert (if any) is kept on disk — operators can certbot delete it
+// manually if they really want it gone.
+func (a *App) removePanelHostname() (string, error) {
+	_ = os.Remove(panelVhostLink)
+	_ = os.Remove(panelVhostPath)
+	_ = os.Remove(filepath.Join(a.cfg.DataDir, panelHostStateFile))
+	if out, err := exec.Command("nginx", "-t").CombinedOutput(); err != nil {
+		return "nginx -t failed after removal: " + tail(string(out), 240), err
+	}
+	_ = exec.Command("systemctl", "reload", "nginx").Run()
+	a.audit("panel.host-remove", "success", "")
+	return "Panel hostname removed. Direct :8090 access still works.", nil
+}
 
 func (a *App) account(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodPost {
@@ -18,14 +152,29 @@ func (a *App) account(w http.ResponseWriter, r *http.Request) {
 	}
 	acc, _ := a.readAccount()
 	a.render(w, "account", map[string]any{
-		"Title":   "Account",
-		"Account": acc,
-		"Output":  r.URL.Query().Get("output"),
+		"Title":     "Account",
+		"Account":   acc,
+		"Output":    r.URL.Query().Get("output"),
+		"PanelHost": a.loadPanelHostState(),
 	})
 }
 
 func (a *App) accountAction(w http.ResponseWriter, r *http.Request) {
 	output := ""
+	switch r.FormValue("action") {
+	case "panel-host-set":
+		msg, _ := a.setupPanelHostname(
+			r.FormValue("hostname"),
+			strings.TrimSpace(r.FormValue("email")),
+			r.FormValue("ssl") == "1",
+		)
+		http.Redirect(w, r, "/account?output="+queryEscape(msg), http.StatusSeeOther)
+		return
+	case "panel-host-remove":
+		msg, _ := a.removePanelHostname()
+		http.Redirect(w, r, "/account?output="+queryEscape(msg), http.StatusSeeOther)
+		return
+	}
 	acc, err := a.readAccount()
 	if err != nil {
 		http.Redirect(w, r, "/account?output="+queryEscape("Cannot load account"), http.StatusSeeOther)
