@@ -99,6 +99,14 @@ func main() {
 	})
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("ok")) })
 
+	// Best-effort: write the pma snippet + default vhost if missing. If
+	// PHP-FPM or phpMyAdmin aren't on the box yet this no-ops with an err
+	// the operator can re-trigger from the panel later. We deliberately do
+	// not fail the panel boot on this.
+	if err := app.ensurePMADefaultVhost(); err != nil {
+		log.Printf("pma default vhost not set up yet: %v", err)
+	}
+
 	log.Printf("hostQ panel listening on http://%s", app.cfg.Addr)
 	log.Fatal(http.ListenAndServe(app.cfg.Addr, gzipMiddleware(securityHeaders(mux))))
 }

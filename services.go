@@ -63,7 +63,18 @@ func (a *App) servicesAction(w http.ResponseWriter, r *http.Request) {
 		if def.Service != "" {
 			_ = exec.Command("systemctl", "enable", "--now", def.Service).Run()
 		}
-		output = def.Name + " installed."
+		// phpMyAdmin needs the snippet + default vhost to be reachable on
+		// any host. install.sh writes those on first boot; do the same now
+		// when the operator installs phpMyAdmin from the panel later.
+		if def.ID == "phpmyadmin" {
+			if err := a.ensurePMADefaultVhost(); err != nil {
+				output = def.Name + " installed, but nginx setup is incomplete: " + err.Error()
+			} else {
+				output = def.Name + " installed and nginx /phpmyadmin/ wired up."
+			}
+		} else {
+			output = def.Name + " installed."
+		}
 		a.audit("packages.install", "success", id)
 		a.cache.invalidate("services", "php")
 	case "uninstall":

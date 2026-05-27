@@ -13,6 +13,64 @@ import (
 	"time"
 )
 
+// ensurePMASnippet writes /etc/nginx/snippets/hostq-pma.conf when missing.
+// install.sh wrote this on first boot, but operators who install phpMyAdmin
+// later (via the Services & Packages page or apt directly) won't get the
+// snippet automatically — and without the snippet every /phpmyadmin/ request
+// 404s.
+//
+// We pick the first available PHP-FPM socket (prefer 8.3 — phpMyAdmin's
+// upstream test target), falling back through 8.2/8.4/8.5. If no FPM is
+// installed yet, return an error so the caller can skip the rest of the
+// setup.
+func (a *App) ensurePMASnippet() error {
+	if _, err := os.Stat("/usr/share/phpmyadmin/index.php"); err != nil {
+		return fmt.Errorf("phpmyadmin package not installed")
+	}
+	const path = "/etc/nginx/snippets/hostq-pma.conf"
+	if _, err := os.Stat(path); err == nil {
+		return nil
+	}
+	sock := ""
+	for _, v := range []string{"8.3", "8.2", "8.4", "8.5"} {
+		s := "/run/php/php" + v + "-fpm.sock"
+		if _, err := os.Stat(s); err == nil {
+			sock = s
+			break
+		}
+	}
+	if sock == "" {
+		return fmt.Errorf("no PHP-FPM socket under /run/php — install PHP first")
+	}
+	content := `# hostQ phpMyAdmin alias. Sites include this from their server block
+# so https://<domain>/phpmyadmin works without a separate vhost.
+location ^~ /phpmyadmin/ {
+    alias /usr/share/phpmyadmin/;
+    index index.php;
+    try_files $uri $uri/ /phpmyadmin/index.php?$args;
+    location ~ ^/phpmyadmin/(.+\.php)$ {
+        alias /usr/share/phpmyadmin/$1;
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:` + sock + `;
+        fastcgi_param SCRIPT_FILENAME $request_filename;
+        include fastcgi_params;
+    }
+    location ~* ^/phpmyadmin/(.+\.(jpg|jpeg|gif|css|png|js|ico|html|xml|txt|woff|woff2|svg|map))$ {
+        alias /usr/share/phpmyadmin/$1;
+        access_log off;
+        expires 1d;
+    }
+}
+location = /phpmyadmin { return 301 /phpmyadmin/; }
+`
+	_ = os.MkdirAll("/etc/nginx/snippets", 0755)
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		return err
+	}
+	a.audit("pma.snippet", "success", "auto-created using "+sock)
+	return nil
+}
+
 // ensurePMADefaultVhost writes /etc/nginx/sites-available/hostq-default the
 // first time it's needed. Without an explicit default_server on :80, nginx
 // picks an arbitrary hostQ-managed vhost — one that very likely has SSL and
@@ -24,8 +82,8 @@ import (
 // and returns 404 for everything else, so it can't accidentally serve a real
 // site. Idempotent: if the file already exists, we just confirm the symlink.
 func (a *App) ensurePMADefaultVhost() error {
-	if _, err := os.Stat("/etc/nginx/snippets/hostq-pma.conf"); err != nil {
-		return fmt.Errorf("hostq-pma.conf missing — install phpMyAdmin first")
+	if err := a.ensurePMASnippet(); err != nil {
+		return err
 	}
 	const path = "/etc/nginx/sites-available/hostq-default"
 	const link = "/etc/nginx/sites-enabled/hostq-default"
