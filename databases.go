@@ -43,17 +43,32 @@ func (a *App) listDatabases() []DatabaseInfo {
 	return dbs
 }
 
-// listDatabasesForSite filters databases to those that match the site's
-// auto-generated prefix when site is non-empty. Pattern: hostq_<domain_underscored>.
+// listDatabasesForSite returns every database the panel can associate with
+// the given site. A DB is matched when any of these is true:
+//   - its name matches the auto-derived hostq_<domain_underscored> prefix
+//     (covers DBs created through the per-site Database tab),
+//   - it appears in /etc/hostq/sites/<domain>.dbs.json (explicitly attached
+//     through "Attach existing database"),
+//   - it's referenced by a config file in the site's docroot we know how to
+//     parse (wp-config.php, .env, config.php, includes/config.php,
+//     config/database.php) — covers DBs created out-of-band.
 func (a *App) listDatabasesForSite(site string) []DatabaseInfo {
 	all := a.listDatabases()
 	if site == "" {
 		return all
 	}
 	prefix := dbPrefixForSite(site)
+	attached := a.siteAttachedDBs(site)
+	detected := map[string]bool{}
+	if s, ok := a.findSite(site); ok {
+		detected = a.detectSiteDBs(s)
+	}
 	matched := []DatabaseInfo{}
 	for _, db := range all {
-		if db.Name == prefix || strings.HasPrefix(db.Name, prefix+"_") {
+		if db.Name == prefix ||
+			strings.HasPrefix(db.Name, prefix+"_") ||
+			attached[db.Name] ||
+			detected[db.Name] {
 			matched = append(matched, db)
 		}
 	}
@@ -144,6 +159,9 @@ func (a *App) databaseAction(w http.ResponseWriter, r *http.Request) {
 				sqlIdent(name), sqlString(user), sqlString(password), sqlString(user), sqlString(password), sqlIdent(name), sqlString(user))
 			if err := exec.Command("mysql", "-e", sql).Run(); err == nil {
 				a.rememberCred(user, password, site)
+				if site != "" {
+					_ = a.attachDBToSite(site, name)
+				}
 				a.audit("database.create", "success", name)
 				http.Redirect(w, r, redirectURL+"&created="+name+"&user="+user+"&password="+password, http.StatusSeeOther)
 				return
@@ -213,6 +231,26 @@ func (a *App) databaseAction(w http.ResponseWriter, r *http.Request) {
 				a.forgetCred(user)
 			}
 			a.audit("database.user-delete", status, user)
+		}
+	case "attach":
+		db := safeDBName(r.FormValue("db"))
+		if site == "" || db == "" {
+			break
+		}
+		if err := a.attachDBToSite(site, db); err == nil {
+			a.audit("database.attach", "success", site+"/"+db)
+		} else {
+			a.audit("database.attach", "failure", site+"/"+db)
+		}
+	case "detach":
+		db := safeDBName(r.FormValue("db"))
+		if site == "" || db == "" {
+			break
+		}
+		if err := a.detachDBFromSite(site, db); err == nil {
+			a.audit("database.detach", "success", site+"/"+db)
+		} else {
+			a.audit("database.detach", "failure", site+"/"+db)
 		}
 	case "user-grant":
 		user := safeDBUser(r.FormValue("user"))

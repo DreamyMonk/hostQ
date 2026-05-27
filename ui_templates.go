@@ -862,7 +862,10 @@ location / {
 
   <div class="toolbar">
     <div class="muted">{{len .Databases}} database{{if ne (len .Databases) 1}}s{{end}} on <strong>{{.Site.Domain}}</strong></div>
-    <button class="btn primary" onclick="openModal('m-newdb')">{{icon "plus"}} New database</button>
+    <div class="actions">
+      {{if .AttachableDBs}}<button class="btn" onclick="openModal('m-attachdb')">{{icon "plus"}} Attach existing</button>{{end}}
+      <button class="btn primary" onclick="openModal('m-newdb')">{{icon "plus"}} New database</button>
+    </div>
   </div>
 
   {{range .Databases}}
@@ -872,7 +875,12 @@ location / {
       <div class="actions">
         <a class="btn mini" href="/pma-login?domain={{$.Site.Domain}}&db={{.Name}}&user={{.Name}}" target="_blank">{{icon "terminal"}} Open in phpMyAdmin</a>
         <button class="btn mini" onclick="openAddUser('{{.Name}}')">{{icon "plus"}} Add user</button>
-        <form method="post" action="/databases" data-confirm="Drop database {{.Name}}? This deletes all tables and the matching user.">
+        {{if index $.AttachedDBs .Name}}<form method="post" action="/databases" data-confirm="Unlink {{.Name}} from {{$.Site.Domain}}? The database itself is not deleted." style="display:inline">
+          <input type="hidden" name="site" value="{{$.Site.Domain}}">
+          <input type="hidden" name="db" value="{{.Name}}">
+          <button class="btn mini" name="action" value="detach" title="Unlink from this site (does not drop)">{{icon "x"}} Detach</button>
+        </form>{{end}}
+        <form method="post" action="/databases" data-confirm="Drop database {{.Name}}? This deletes all tables and the matching user." style="display:inline">
           <input type="hidden" name="site" value="{{$.Site.Domain}}">
           <input type="hidden" name="target" value="{{.Name}}">
           <button class="btn mini danger" name="action" value="delete">{{icon "trash"}} Drop</button>
@@ -915,6 +923,20 @@ location / {
       <input type="hidden" name="site" value="{{.Site.Domain}}">
       <div class="field"><label>Suffix</label><input class="input mono" name="name" placeholder="main" required autofocus></div>
       <div class="modal-foot"><button type="button" class="btn" onclick="closeModal('m-newdb')">Cancel</button><button class="btn primary" name="action" value="create">{{icon "check"}} Create</button></div>
+    </form>
+  </div></div>
+
+  <div class="modal-bg" id="m-attachdb"><div class="modal">
+    <h3>{{icon "plus"}} Attach existing database</h3>
+    <p class="muted">Link an already-existing database to <strong>{{.Site.Domain}}</strong>. Useful when the database was created out-of-band (manual mysql CLI, an installer, or before the site was added). The database is not modified — only the panel's mapping is updated.</p>
+    <form method="post" action="/databases">
+      <input type="hidden" name="site" value="{{.Site.Domain}}">
+      <div class="field"><label>Database</label>
+        <select class="input mono" name="db" required>
+          {{range .AttachableDBs}}<option value="{{.Name}}">{{.Name}}</option>{{end}}
+        </select>
+      </div>
+      <div class="modal-foot"><button type="button" class="btn" onclick="closeModal('m-attachdb')">Cancel</button><button class="btn primary" name="action" value="attach">{{icon "check"}} Attach</button></div>
     </form>
   </div></div>
 

@@ -70,8 +70,23 @@ func (a *App) siteManager(w http.ResponseWriter, r *http.Request) {
 	}
 	switch tab {
 	case "database":
-		data["Databases"] = a.listDatabasesForSite(site.Domain)
+		dbs := a.listDatabasesForSite(site.Domain)
+		data["Databases"] = dbs
 		data["DBPrefix"] = dbPrefixForSite(site.Domain)
+		// Build the "attach existing" dropdown: every DB on the server that
+		// isn't already linked to this site.
+		shown := map[string]bool{}
+		for _, db := range dbs {
+			shown[db.Name] = true
+		}
+		available := []DatabaseInfo{}
+		for _, db := range a.listDatabases() {
+			if !shown[db.Name] {
+				available = append(available, db)
+			}
+		}
+		data["AttachableDBs"] = available
+		data["AttachedDBs"] = a.siteAttachedDBs(site.Domain)
 	case "wordpress":
 		installs := a.listWordPress()
 		filtered := []WordPressInfo{}
