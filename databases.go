@@ -150,10 +150,16 @@ func (a *App) databaseAction(w http.ResponseWriter, r *http.Request) {
 	case "create":
 		name := safeDBName(r.FormValue("name"))
 		if name != "" {
-			password := randomToken()[:24]
-			user := name
-			if len(user) > 32 {
-				user = user[:32]
+			user := safeDBUser(r.FormValue("user"))
+			if user == "" {
+				user = name
+				if len(user) > 32 {
+					user = user[:32]
+				}
+			}
+			password := strings.TrimSpace(r.FormValue("password"))
+			if password == "" {
+				password = randomToken()[:24]
 			}
 			sql := fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; CREATE USER IF NOT EXISTS %s@'localhost' IDENTIFIED BY %s; ALTER USER %s@'localhost' IDENTIFIED BY %s; GRANT ALL PRIVILEGES ON %s.* TO %s@'localhost'; FLUSH PRIVILEGES;",
 				sqlIdent(name), sqlString(user), sqlString(password), sqlString(user), sqlString(password), sqlIdent(name), sqlString(user))

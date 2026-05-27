@@ -1164,12 +1164,21 @@ location / {
   {{end}}
 
   <!-- modals -->
-  <div class="modal-bg" id="m-newdb"><div class="modal">
+  <div class="modal-bg" id="m-newdb"><div class="modal" style="max-width:560px">
     <h3>{{icon "plus"}} New database</h3>
-    <p class="muted">Creates a database and a matching user with a 24-char password. Auto-prefixed with <span class="mono">{{.DBPrefix}}_</span>.</p>
+    <p class="muted">Creates a database, a matching user, and a grant. Anything left blank is auto-generated. Prefix <span class="mono">{{.DBPrefix}}_</span> is added so panel-managed databases stand out.</p>
     <form method="post" action="/databases">
       <input type="hidden" name="site" value="{{.Site.Domain}}">
-      <div class="field"><label>Suffix</label><input class="input mono" name="name" placeholder="main" required autofocus></div>
+      <div class="field"><label>Database name <span class="muted" style="font-weight:500">(suffix only; full name becomes <span class="mono">{{.DBPrefix}}_&lt;suffix&gt;</span>)</span></label><input class="input mono" name="name" placeholder="main" required autofocus></div>
+      <div class="row">
+        <div class="field"><label>Username <span class="muted" style="font-weight:500">(optional — defaults to the DB name)</span></label><input class="input mono" name="user" placeholder="auto"></div>
+        <div class="field"><label>Password <span class="muted" style="font-weight:500">(optional — auto-generates 24 chars)</span></label><input class="input mono" name="password" type="text" placeholder="auto"></div>
+      </div>
+      <ul class="muted" style="font-size:11.5px;margin:4px 0 12px;padding-left:18px;line-height:1.55">
+        <li>Letters, digits, and underscore only — username max 32 chars.</li>
+        <li>If you set the password manually, make it 12+ chars with a mix of cases / digits / specials.</li>
+        <li>Full privileges on the new database are granted to the user; FLUSH PRIVILEGES runs automatically.</li>
+      </ul>
       <div class="modal-foot"><button type="button" class="btn" onclick="closeModal('m-newdb')">Cancel</button><button class="btn primary" name="action" value="create">{{icon "check"}} Create</button></div>
     </form>
   </div></div>
@@ -1188,14 +1197,18 @@ location / {
     </form>
   </div></div>
 
-  <div class="modal-bg" id="m-adduser"><div class="modal">
+  <div class="modal-bg" id="m-adduser"><div class="modal" style="max-width:520px">
     <h3>{{icon "plus"}} Add user</h3>
-    <p class="muted">User will receive full privileges on <span class="mono" id="mu-db"></span>.</p>
+    <p class="muted">User receives full privileges on <span class="mono" id="mu-db"></span>.</p>
     <form method="post" action="/databases">
       <input type="hidden" name="site" value="{{.Site.Domain}}">
       <input type="hidden" name="target" id="mu-target">
-      <div class="field"><label>Username (letters, digits, _; max 32)</label><input class="input mono" name="user" placeholder="app_user" required></div>
-      <div class="field"><label>Password</label><input class="input mono" name="password" type="text" placeholder="leave empty to auto-generate"></div>
+      <div class="field"><label>Username</label><input class="input mono" name="user" placeholder="app_user" required></div>
+      <div class="field"><label>Password <span class="muted" style="font-weight:500">(optional — auto-generates 20 chars)</span></label><input class="input mono" name="password" type="text" placeholder="auto"></div>
+      <ul class="muted" style="font-size:11.5px;margin:0 0 12px;padding-left:18px;line-height:1.55">
+        <li>Username: letters, digits, underscore only, max 32 chars.</li>
+        <li>If you set a password, use 12+ characters with mixed cases / digits / specials.</li>
+      </ul>
       <div class="modal-foot"><button type="button" class="btn" onclick="closeModal('m-adduser')">Cancel</button><button class="btn primary" name="action" value="user-create">{{icon "check"}} Add user</button></div>
     </form>
   </div></div>
@@ -2227,23 +2240,36 @@ location / {
 {{end}}
 
 <!-- New database modal -->
-<div class="modal-bg" id="m-dbs-newdb"><div class="modal">
+<div class="modal-bg" id="m-dbs-newdb"><div class="modal" style="max-width:560px">
   <h3>{{icon "plus"}} New database</h3>
-  <p class="muted">Creates a database and a matching user with a 24-char password. Auto-prefixed with <span class="mono">hostq_</span>.</p>
+  <p class="muted">Creates a database, a matching user, and a grant. Anything left blank is auto-generated. Prefix <span class="mono">hostq_</span> is added so panel-managed databases stand out.</p>
   <form method="post" action="/databases">
-    <div class="field"><label>Name</label><input class="input mono" name="name" placeholder="project_name" required autofocus></div>
+    <div class="field"><label>Database name <span class="muted" style="font-weight:500">(becomes <span class="mono">hostq_&lt;name&gt;</span>)</span></label><input class="input mono" name="name" placeholder="project_name" required autofocus></div>
+    <div class="row">
+      <div class="field"><label>Username <span class="muted" style="font-weight:500">(optional)</span></label><input class="input mono" name="user" placeholder="auto"></div>
+      <div class="field"><label>Password <span class="muted" style="font-weight:500">(optional)</span></label><input class="input mono" name="password" type="text" placeholder="auto"></div>
+    </div>
+    <ul class="muted" style="font-size:11.5px;margin:4px 0 12px;padding-left:18px;line-height:1.55">
+      <li>Letters, digits, and underscore only — username max 32 chars.</li>
+      <li>If you set the password manually, make it 12+ chars with a mix of cases / digits / specials.</li>
+      <li>Full privileges on the new database are granted to the user.</li>
+    </ul>
     <div class="modal-foot"><button type="button" class="btn" onclick="closeModal('m-dbs-newdb')">Cancel</button><button class="btn primary" name="action" value="create">{{icon "check"}} Create</button></div>
   </form>
 </div></div>
 
 <!-- Add user modal (populated by JS) -->
-<div class="modal-bg" id="m-dbs-adduser"><div class="modal">
+<div class="modal-bg" id="m-dbs-adduser"><div class="modal" style="max-width:520px">
   <h3>{{icon "plus"}} Add user</h3>
-  <p class="muted">User will receive full privileges on <span class="mono" id="dbs-mu-db"></span>.</p>
+  <p class="muted">User receives full privileges on <span class="mono" id="dbs-mu-db"></span>.</p>
   <form method="post" action="/databases">
     <input type="hidden" name="target" id="dbs-mu-target">
-    <div class="field"><label>Username (letters, digits, _; max 32)</label><input class="input mono" name="user" placeholder="app_user" required></div>
-    <div class="field"><label>Password</label><input class="input mono" name="password" type="text" placeholder="leave empty to auto-generate"></div>
+    <div class="field"><label>Username</label><input class="input mono" name="user" placeholder="app_user" required></div>
+    <div class="field"><label>Password <span class="muted" style="font-weight:500">(optional — auto-generates 20 chars)</span></label><input class="input mono" name="password" type="text" placeholder="auto"></div>
+    <ul class="muted" style="font-size:11.5px;margin:0 0 12px;padding-left:18px;line-height:1.55">
+      <li>Username: letters, digits, underscore only, max 32 chars.</li>
+      <li>If you set a password, use 12+ characters with mixed cases / digits / specials.</li>
+    </ul>
     <div class="modal-foot"><button type="button" class="btn" onclick="closeModal('m-dbs-adduser')">Cancel</button><button class="btn primary" name="action" value="user-create">{{icon "check"}} Add user</button></div>
   </form>
 </div></div>
