@@ -59,13 +59,16 @@ func main() {
 	mux.HandleFunc("/wordpress", app.requireAuth(app.wordpress))
 	mux.HandleFunc("/php", app.requireAuth(app.php))
 	mux.HandleFunc("/ssl", app.requireAuth(app.ssl))
-	mux.HandleFunc("/services", app.requireAuth(app.services))
 	mux.HandleFunc("/cron", app.requireAuth(app.cron))
-	mux.HandleFunc("/account", app.requireAuth(app.account))
-	mux.HandleFunc("/audit", app.requireAuth(app.auditLog))
-	mux.HandleFunc("/redis", app.requireAuth(app.redis))
-	mux.HandleFunc("/security", app.requireAuth(app.security))
-	mux.HandleFunc("/malfix", app.requireAuth(app.malfix))
+	// Admin-scope routes wrap requireAuth with requireAdminAllow so the
+	// optional IP allowlist (managed on /account) also gates them.
+	mux.HandleFunc("/services", app.requireAuth(app.requireAdminAllow(app.services)))
+	mux.HandleFunc("/account", app.requireAuth(app.requireAdminAllow(app.account)))
+	mux.HandleFunc("/audit", app.requireAuth(app.requireAdminAllow(app.auditLog)))
+	mux.HandleFunc("/redis", app.requireAuth(app.requireAdminAllow(app.redis)))
+	mux.HandleFunc("/security", app.requireAuth(app.requireAdminAllow(app.security)))
+	mux.HandleFunc("/malfix", app.requireAuth(app.requireAdminAllow(app.malfix)))
+	mux.HandleFunc("/firewall", app.requireAuth(app.requireAdminAllow(app.firewall)))
 	mux.HandleFunc("/pma-login", app.requireAuth(app.pmaLogin))
 	// When the user types /phpmyadmin/ on the panel host (typically :8090
 	// for direct setup access), Go's catch-all "/" route would render the

@@ -430,7 +430,7 @@ table.flat tbody tr:hover{background:transparent}
     </nav>
     <div class="navgroup">Security</div>
     <nav class="nav">
-      <a href="/security" class="{{if eq .View "security"}}active{{end}}">{{icon "shield"}}<span>Firewall</span></a>
+      <a href="/firewall" class="{{if eq .View "firewall"}}active{{end}}">{{icon "shield"}}<span>Firewall (fail2ban)</span></a>
       <a href="/malfix" class="{{if eq .View "malfix"}}active{{end}}">{{icon "shield"}}<span>Malfix</span></a>
       <a href="/audit" class="{{if eq .View "audit"}}active{{end}}">{{icon "activity"}}<span>Audit Log</span></a>
     </nav>
@@ -480,6 +480,7 @@ table.flat tbody tr:hover{background:transparent}
       {{else if eq .View "account"}}{{template "account" .}}
       {{else if eq .View "audit"}}{{template "audit" .}}
       {{else if eq .View "redis"}}{{template "redis" .}}
+      {{else if eq .View "firewall"}}{{template "firewall" .}}
       {{else if eq .View "fileedit"}}{{template "fileedit" .}}
       {{else if eq .View "siteadd"}}{{template "siteadd" .}}
       {{end}}
@@ -507,7 +508,8 @@ table.flat tbody tr:hover{background:transparent}
   <a data-cat="Pages" data-icon="database" href="/databases">All databases</a>
   <a data-cat="Pages" data-icon="wordpress" href="/wordpress">All WordPress</a>
   <a data-cat="Pages" data-icon="shield" href="/ssl">All certificates</a>
-  <a data-cat="Admin" data-icon="users" href="/account">Account</a>
+  <a data-cat="Admin" data-icon="shield" href="/firewall">Firewall (fail2ban)</a>
+  <a data-cat="Admin" data-icon="users" href="/account">Account &amp; allowlist</a>
   <a data-cat="Admin" data-icon="activity" href="/audit">Audit log</a>
   <a data-cat="Admin" data-icon="logout" href="/logout">Sign out</a>
   {{range .PaletteSites}}<a data-cat="Sites" data-icon="globe" href="/site?domain={{.Domain}}">{{.Domain}}</a>{{end}}
@@ -2566,6 +2568,121 @@ function dbsOpenResetUser(u){ document.getElementById('dbs-ru-user-label').textC
     </form>
   {{end}}
 </div>
+
+<div class="card">
+  <h2>{{icon "shield"}} Admin IP allowlist</h2>
+  <p class="muted" style="margin-top:4px">Restrict the admin scope (<span class="mono">/services</span>, <span class="mono">/account</span>, <span class="mono">/audit</span>, <span class="mono">/firewall</span>, <span class="mono">/security</span>, <span class="mono">/malfix</span>, <span class="mono">/php</span>, <span class="mono">/redis</span>) to specific IPs or CIDRs. User-side pages (sites, files) are unaffected. Loopback (<span class="mono">127.0.0.1</span>) is always allowed for last-resort recovery.</p>
+
+  <div class="row" style="align-items:center;gap:14px;margin:10px 0 0">
+    <div>
+      <strong>Status:</strong>
+      {{if .Allowlist.Enabled}}<span class="badge ok">{{icon "check"}} Enabled</span>{{else}}<span class="badge">Disabled</span>{{end}}
+      <span class="muted" style="margin-left:10px">Your current IP: <span class="mono pill">{{.ClientIP}}</span></span>
+    </div>
+    <form method="post" action="/account" style="margin-left:auto">
+      <input type="hidden" name="enabled" value="{{if .Allowlist.Enabled}}0{{else}}1{{end}}">
+      <button class="btn {{if .Allowlist.Enabled}}danger{{else}}primary{{end}}" name="action" value="allow-toggle">
+        {{if .Allowlist.Enabled}}{{icon "x"}} Disable allowlist{{else}}{{icon "shield"}} Enable allowlist{{end}}
+      </button>
+    </form>
+  </div>
+
+  <hr class="sep">
+
+  <form method="post" action="/account">
+    <div class="row">
+      <div class="field"><label>IP or CIDR</label><input class="input mono" name="cidr" placeholder="203.0.113.5  or  203.0.113.0/24" value="{{.ClientIP}}" required></div>
+      <div class="field"><label>Note <span class="muted" style="font-weight:500">(optional)</span></label><input class="input" name="note" placeholder="Home office"></div>
+    </div>
+    <button class="btn primary" name="action" value="allow-add">{{icon "plus"}} Add entry</button>
+  </form>
+
+  {{if .Allowlist.Entries}}
+  <table style="margin-top:12px">
+    <thead><tr><th>CIDR / IP</th><th>Note</th><th>Added</th><th></th></tr></thead>
+    <tbody>
+      {{range .Allowlist.Entries}}<tr>
+        <td class="mono">{{.CIDR}}</td>
+        <td>{{if .Note}}{{.Note}}{{else}}<span class="muted">—</span>{{end}}</td>
+        <td class="mono muted">{{.Added}}</td>
+        <td style="text-align:right">
+          <form method="post" action="/account" data-confirm="Remove {{.CIDR}} from the allowlist?" style="display:inline">
+            <input type="hidden" name="cidr" value="{{.CIDR}}">
+            <button class="btn danger" name="action" value="allow-remove">{{icon "trash"}} Remove</button>
+          </form>
+        </td>
+      </tr>{{end}}
+    </tbody>
+  </table>
+  {{else}}
+  <p class="muted" style="margin-top:12px">No allowlist entries yet. Add at least one before enabling the allowlist, or only <span class="mono">127.0.0.1</span> will reach the admin area.</p>
+  {{end}}
+</div>
+{{end}}
+
+{{define "firewall"}}
+<div class="page-head">
+  <div><h1>{{icon "shield"}} Firewall · fail2ban</h1><p>Live status of every fail2ban jail, with the current banned IPs and one-click unban.</p></div>
+  <div class="actions">
+    {{if .State.Installed}}
+      {{if .State.Running}}
+        <form method="post" action="/firewall" style="display:inline"><button class="btn" name="action" value="reload">{{icon "refresh"}} Reload config</button></form>
+        <form method="post" action="/firewall" style="display:inline" data-confirm="Stop fail2ban? Banned IPs will be released until it restarts."><button class="btn danger" name="action" value="stop">{{icon "x"}} Stop</button></form>
+      {{else}}
+        <form method="post" action="/firewall" style="display:inline"><button class="btn primary" name="action" value="start">{{icon "check"}} Start fail2ban</button></form>
+      {{end}}
+    {{else}}
+      <form method="post" action="/firewall" style="display:inline"><button class="btn primary" name="action" value="install">{{icon "download"}} Install fail2ban</button></form>
+    {{end}}
+  </div>
+</div>
+
+{{if .Output}}<div class="card credentials">{{icon "info"}} {{.Output}}</div>{{end}}
+
+<div class="card">
+  <h2>{{icon "info"}} Service</h2>
+  <div class="row" style="gap:12px;margin-top:4px">
+    <div>fail2ban-client: {{if .State.Installed}}<span class="badge ok">{{icon "check"}} installed</span>{{else}}<span class="badge bad">not installed</span>{{end}}</div>
+    <div>Daemon: {{if .State.Running}}<span class="badge ok">{{icon "check"}} active</span>{{else}}<span class="badge">inactive</span>{{end}}</div>
+    <div>Jails: <span class="badge">{{len .State.Jails}}</span></div>
+  </div>
+  {{if not .State.Installed}}<p class="muted" style="margin-top:8px">fail2ban isn't installed on this server. Install it to start banning attackers automatically — defaults cover SSH out of the box, with optional jails for nginx auth, recidive, and more.</p>{{end}}
+</div>
+
+{{if .State.Jails}}
+{{range .State.Jails}}
+<div class="card">
+  <h2>{{icon "shield"}} {{.Name}}</h2>
+  <div class="row" style="gap:14px;margin-top:4px">
+    <div>Currently banned: <span class="badge {{if gt .Currently 0}}bad{{else}}ok{{end}}">{{.Currently}}</span></div>
+    <div>Total banned: <span class="badge">{{.Total}}</span></div>
+  </div>
+  {{if .Error}}<p class="muted" style="margin-top:8px">Error: {{.Error}}</p>{{end}}
+  {{if .BannedIPs}}
+  <table style="margin-top:12px">
+    <thead><tr><th>IP</th><th></th></tr></thead>
+    <tbody>
+      {{$jail := .Name}}
+      {{range .BannedIPs}}<tr>
+        <td class="mono">{{.}}</td>
+        <td style="text-align:right">
+          <form method="post" action="/firewall" style="display:inline" data-confirm="Unban {{.}} from {{$jail}}?">
+            <input type="hidden" name="jail" value="{{$jail}}">
+            <input type="hidden" name="ip" value="{{.}}">
+            <button class="btn" name="action" value="unban">{{icon "check"}} Unban</button>
+          </form>
+        </td>
+      </tr>{{end}}
+    </tbody>
+  </table>
+  {{else}}
+  <p class="muted" style="margin-top:8px">No active bans on this jail.</p>
+  {{end}}
+</div>
+{{end}}
+{{else if .State.Installed}}
+<div class="card"><p class="muted">fail2ban is installed but no jails are reporting yet — start the daemon or check <span class="mono">/etc/fail2ban/jail.local</span>.</p></div>
+{{end}}
 {{end}}
 
 {{define "audit"}}

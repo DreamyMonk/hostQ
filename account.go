@@ -208,6 +208,8 @@ func (a *App) account(w http.ResponseWriter, r *http.Request) {
 		"Account":   acc,
 		"Output":    r.URL.Query().Get("output"),
 		"PanelHost": a.loadPanelHostState(),
+		"Allowlist": a.loadAdminAllowlist(),
+		"ClientIP":  clientIP(r),
 	})
 }
 
@@ -224,6 +226,10 @@ func (a *App) accountAction(w http.ResponseWriter, r *http.Request) {
 		return
 	case "panel-host-remove":
 		msg, _ := a.removePanelHostname()
+		http.Redirect(w, r, "/account?output="+queryEscape(msg), http.StatusSeeOther)
+		return
+	case "allow-add", "allow-remove", "allow-toggle":
+		msg := a.allowlistAction(r)
 		http.Redirect(w, r, "/account?output="+queryEscape(msg), http.StatusSeeOther)
 		return
 	}
