@@ -28,9 +28,6 @@ func (a *App) ensurePMASnippet() error {
 		return fmt.Errorf("phpmyadmin package not installed")
 	}
 	const path = "/etc/nginx/snippets/hostq-pma.conf"
-	if _, err := os.Stat(path); err == nil {
-		return nil
-	}
 	sock := ""
 	for _, v := range []string{"8.3", "8.2", "8.4", "8.5"} {
 		s := "/run/php/php" + v + "-fpm.sock"
@@ -41,6 +38,12 @@ func (a *App) ensurePMASnippet() error {
 	}
 	if sock == "" {
 		return fmt.Errorf("no PHP-FPM socket under /run/php — install PHP first")
+	}
+	// If the file is already correct (points at the socket we'd pick), skip.
+	// Otherwise rewrite — covers the case where install.sh wrote the snippet
+	// against a PHP-FPM version that's since been removed or replaced.
+	if data, err := os.ReadFile(path); err == nil && strings.Contains(string(data), "fastcgi_pass unix:"+sock+";") {
+		return nil
 	}
 	content := `# hostQ phpMyAdmin alias. Sites include this from their server block
 # so https://<domain>/phpmyadmin works without a separate vhost.

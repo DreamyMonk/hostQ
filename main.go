@@ -104,7 +104,9 @@ func main() {
 	// the operator can re-trigger from the panel later. We deliberately do
 	// not fail the panel boot on this.
 	if err := app.ensurePMADefaultVhost(); err != nil {
-		log.Printf("pma default vhost not set up yet: %v", err)
+		log.Printf("pma setup skipped: %v", err)
+	} else {
+		log.Printf("pma setup verified: snippet + default vhost in place")
 	}
 
 	log.Printf("hostQ panel listening on http://%s", app.cfg.Addr)
