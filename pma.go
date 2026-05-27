@@ -6,10 +6,63 @@ import (
 	"html"
 	"io"
 	"net/http"
+	"os"
+	"os/exec"
 	"regexp"
 	"strings"
 	"time"
 )
+
+// ensurePMADefaultVhost writes /etc/nginx/sites-available/hostq-default the
+// first time it's needed. Without an explicit default_server on :80, nginx
+// picks an arbitrary hostQ-managed vhost — one that very likely has SSL and
+// returns 301 to https — for any unmatched Host header (e.g. requests to the
+// bare IP). That ricochets into a too-many-redirects loop the first time the
+// user opens /phpmyadmin/ on the IP.
+//
+// The default vhost only exposes /phpmyadmin/ (via the panel-managed snippet)
+// and returns 404 for everything else, so it can't accidentally serve a real
+// site. Idempotent: if the file already exists, we just confirm the symlink.
+func (a *App) ensurePMADefaultVhost() error {
+	if _, err := os.Stat("/etc/nginx/snippets/hostq-pma.conf"); err != nil {
+		return fmt.Errorf("hostq-pma.conf missing — install phpMyAdmin first")
+	}
+	const path = "/etc/nginx/sites-available/hostq-default"
+	const link = "/etc/nginx/sites-enabled/hostq-default"
+	const content = `# hostQ default vhost — auto-created by the panel.
+# Catches requests where the Host header doesn't match any per-site
+# server_name (typically: bare IP access). Exposes /phpmyadmin/ via the
+# managed snippet and 404s everything else so it can't serve a site.
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+    access_log /var/log/nginx/hostq-default.access.log combined;
+
+    include snippets/hostq-pma.conf;
+
+    location / {
+        return 404 "hostQ default vhost. Add a site or use a real domain.\n";
+    }
+}
+`
+	if _, err := os.Stat(path); err != nil {
+		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+			return err
+		}
+		a.audit("pma.default-vhost", "success", "auto-created")
+	}
+	if _, err := os.Lstat(link); err != nil {
+		if err := os.Symlink(path, link); err != nil {
+			return err
+		}
+	}
+	if out, err := exec.Command("nginx", "-t").CombinedOutput(); err != nil {
+		return fmt.Errorf("nginx -t failed: %s", strings.TrimSpace(string(out)))
+	}
+	_ = exec.Command("systemctl", "reload", "nginx").Run()
+	return nil
+}
 
 // pmaLogin signs the panel user into phpMyAdmin without an interactive login.
 //

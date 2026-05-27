@@ -71,7 +71,11 @@ func main() {
 	// for direct setup access), Go's catch-all "/" route would render the
 	// panel dashboard. Redirect to the bare-host URL so nginx serves
 	// phpMyAdmin from /usr/share/phpmyadmin via the hostq-pma snippet.
+	// Also auto-installs the default :80 vhost the first time a redirect
+	// fires — without it, bare-IP /phpmyadmin/ loops because nginx falls
+	// to an arbitrary hostQ-managed vhost that 301s to https.
 	pmaRedirect := func(w http.ResponseWriter, r *http.Request) {
+		_ = app.ensurePMADefaultVhost()
 		host := r.Host
 		if i := strings.LastIndex(host, ":"); i > 0 {
 			host = host[:i]

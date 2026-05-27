@@ -178,6 +178,31 @@ location = /phpmyadmin { return 301 /phpmyadmin/; }
 NGINX
 log "phpMyAdmin Nginx snippet ready (FPM via ${PMA_FPM_SOCK})"
 
+# Default :80 vhost so /phpmyadmin/ works when the user hits a bare IP or any
+# hostname that doesn't match a per-site server_name. Without it, nginx picks
+# one of the hostQ-managed vhosts as the default — and if that vhost has SSL,
+# the HTTP→HTTPS redirect bounces the request into a too-many-redirects loop.
+cat > /etc/nginx/sites-available/hostq-default <<'NGINX'
+# hostQ default vhost — answers any unmatched host on :80 so phpMyAdmin
+# works without a real domain. Only /phpmyadmin/ is exposed; everything
+# else returns a placeholder 404 so this can't accidentally serve a site.
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+    access_log /var/log/nginx/hostq-default.access.log combined;
+
+    include snippets/hostq-pma.conf;
+
+    location / {
+        return 404 "hostQ default vhost. Add a site or use a real domain.\n";
+    }
+}
+NGINX
+ln -sf /etc/nginx/sites-available/hostq-default /etc/nginx/sites-enabled/hostq-default
+nginx -t >/dev/null 2>&1 && systemctl reload nginx || warn "Default vhost write triggered nginx -t errors; check 'sudo nginx -t' output"
+log "Default Nginx vhost ready — /phpmyadmin/ works on any host"
+
 log "Certbot, WP-CLI, Pure-FTPd, and phpMyAdmin installed"
 
 header "Setting up hostQ panel"
