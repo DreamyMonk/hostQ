@@ -207,6 +207,10 @@ func (a *App) siteManager(w http.ResponseWriter, r *http.Request) {
 	case "php":
 		data["PHP"] = a.listPHP()
 		data["PHPExtensions"] = phpExtensions(site.PHPVersion)
+		raw := a.loadSitePHPIni(site.Domain)
+		data["PHPIniRaw"] = raw
+		data["PHPIniValues"] = parseSitePHPIni(raw)
+		data["PHPManagedKeys"] = managedPHPKeys
 	case "security":
 		if report, err := a.loadScanReport(site.Domain); err == nil {
 			data["Scan"] = report
@@ -255,6 +259,29 @@ func (a *App) siteAction(w http.ResponseWriter, r *http.Request) {
 		_ = exec.Command("chown", "-R", "www-data:www-data", filepath.Join(a.cfg.WebRoot, domain)).Run()
 		_ = exec.Command("find", filepath.Join(a.cfg.WebRoot, domain), "-type", "d", "-exec", "chmod", "755", "{}", ";").Run()
 		_ = exec.Command("find", filepath.Join(a.cfg.WebRoot, domain), "-type", "f", "-exec", "chmod", "644", "{}", ";").Run()
+	case "php-save-managed":
+		_ = r.ParseForm()
+		form := map[string]string{}
+		for _, m := range managedPHPKeys {
+			form[m.Key] = r.FormValue("php_" + m.Key)
+		}
+		content := buildSitePHPIniFromForm(a.loadSitePHPIni(domain), form)
+		if err := a.saveSitePHPIni(domain, content); err == nil {
+			a.writeNginxSite(domain, site.Root, site.Cache, site.PHPVersion)
+			a.audit("php.ini-managed", "success", domain)
+		}
+		http.Redirect(w, r, "/site?domain="+domain+"&tab=php&output="+queryEscape("PHP overrides saved + Nginx reloaded."), http.StatusSeeOther)
+		return
+	case "php-save-full":
+		content := r.FormValue("ini")
+		if err := a.saveSitePHPIni(domain, content); err != nil {
+			http.Redirect(w, r, "/site?domain="+domain+"&tab=php&output="+queryEscape("save failed: "+err.Error()), http.StatusSeeOther)
+			return
+		}
+		a.writeNginxSite(domain, site.Root, site.Cache, site.PHPVersion)
+		a.audit("php.ini-full", "success", domain)
+		http.Redirect(w, r, "/site?domain="+domain+"&tab=php&output="+queryEscape("Raw PHP overrides saved + Nginx reloaded."), http.StatusSeeOther)
+		return
 	case "alias-add":
 		alias := strings.ToLower(strings.TrimSpace(r.FormValue("alias")))
 		alias = strings.TrimPrefix(alias, "www.")
@@ -572,15 +599,19 @@ func (a *App) writeNginxSite(domain, root string, cache bool, phpVersion string)
 		defaultLocationSlash = "    # location / is overridden by the site's custom Nginx config.\n"
 	}
 	accessLog := fmt.Sprintf("    access_log /var/log/nginx/%s.access.log combined;\n", domain)
+	// Per-site PHP_VALUE overrides — populated from /etc/hostq/sites/<domain>.php.ini
+	// when the operator edits the PHP overrides on the PHP tab. Empty → no extra
+	// fastcgi_param line is emitted, keeping the vhost output identical to before.
+	phpValueBlock := renderPHPValueBlock(a.loadSitePHPIni(domain))
 	siteBody := fmt.Sprintf(`%s    root %s;
     index index.php index.html;
 %s    location ~ \.php$ {
         include snippets/fastcgi-php.conf;
         fastcgi_pass unix:/run/php/php%s-fpm.sock;
         fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
-        include fastcgi_params;%s
+        include fastcgi_params;%s%s
     }
-%s%s`, accessLog, root, defaultLocationSlash, phpVersion, cacheBlock, pmaInclude, extraInclude)
+%s%s`, accessLog, root, defaultLocationSlash, phpVersion, cacheBlock, phpValueBlock, pmaInclude, extraInclude)
 
 	cacheLabel := "off"
 	if cache {

@@ -1447,6 +1447,73 @@ location / {
       </div>
     </form>
   </div>
+
+  <div class="card">
+    <div class="toolbar" style="margin:0">
+      <div>
+        <h3 style="margin:0">PHP overrides for {{.Site.Domain}}</h3>
+        <p class="muted" style="margin:4px 0 0">Per-site values injected via <span class="mono">fastcgi_param PHP_VALUE</span> in the site's nginx vhost. The system-wide <span class="mono">php.ini</span> is not touched. Other sites on PHP {{.Site.PHPVersion}} keep their own settings.</p>
+      </div>
+      <div class="tabs" style="margin:0;padding:4px">
+        <a id="phpModeManaged" class="active" onclick="phpSetMode('managed');return false" href="#">Managed</a>
+        <a id="phpModeFull" onclick="phpSetMode('full');return false" href="#">Full INI</a>
+      </div>
+    </div>
+    <hr class="sep">
+
+    <form method="post" action="/site-action" id="phpManagedForm">
+      <input type="hidden" name="domain" value="{{.Site.Domain}}">
+      <table>
+        <thead><tr><th style="width:30%">Setting</th><th>Value</th><th class="muted" style="width:42%">Hint</th></tr></thead>
+        <tbody>
+          {{$vals := .PHPIniValues}}
+          {{range .PHPManagedKeys}}<tr>
+            <td><strong class="mono">{{.Key}}</strong><div class="muted" style="font-size:11px;margin-top:2px">{{.Label}}</div></td>
+            <td><input class="input mono" name="php_{{.Key}}" value="{{index $vals .Key}}" placeholder="(default)"></td>
+            <td class="muted" style="font-size:11.5px">{{.Hint}}</td>
+          </tr>{{end}}
+        </tbody>
+      </table>
+      <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+        <button class="btn primary" name="action" value="php-save-managed">{{icon "check"}} Save overrides</button>
+        <span class="muted" style="font-size:12px">Leave a field blank to drop the override and inherit PHP's default. Nginx is reloaded after save.</span>
+      </div>
+    </form>
+
+    <form method="post" action="/site-action" id="phpFullForm" style="display:none">
+      <input type="hidden" name="domain" value="{{.Site.Domain}}">
+      <p class="muted" style="margin:0 0 8px">Raw INI body. One <span class="mono">setting=value</span> per line. Comments start with <span class="mono">;</span> or <span class="mono">#</span>. Saved to <span class="mono">/etc/hostq/sites/{{.Site.Domain}}.php.ini</span>; the managed form above will reflect any keys it knows about after reload.</p>
+      <textarea class="input mono" name="ini" rows="14" spellcheck="false" placeholder="memory_limit=512M
+upload_max_filesize=128M
+post_max_size=128M
+max_execution_time=600
+date.timezone=UTC
+display_errors=Off
+">{{.PHPIniRaw}}</textarea>
+      <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+        <button class="btn primary" name="action" value="php-save-full">{{icon "check"}} Save raw INI</button>
+        <span class="muted" style="font-size:12px">Empty content removes the override file and reverts to PHP defaults.</span>
+      </div>
+    </form>
+
+    <script>
+    (function(){
+      window.phpSetMode = function(mode){
+        var managed = document.getElementById('phpManagedForm');
+        var full    = document.getElementById('phpFullForm');
+        var mTab    = document.getElementById('phpModeManaged');
+        var fTab    = document.getElementById('phpModeFull');
+        if(mode === 'full'){
+          managed.style.display = 'none'; full.style.display = '';
+          mTab.classList.remove('active'); fTab.classList.add('active');
+        } else {
+          managed.style.display = ''; full.style.display = 'none';
+          mTab.classList.add('active'); fTab.classList.remove('active');
+        }
+      };
+    })();
+    </script>
+  </div>
 {{end}}
 
 {{if eq .Tab "backups"}}
