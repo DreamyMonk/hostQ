@@ -68,6 +68,32 @@ func (a *App) siteManager(w http.ResponseWriter, r *http.Request) {
 		"DBPass":   r.URL.Query().Get("dbpass"),
 		"DBName":   r.URL.Query().Get("db"),
 	}
+	if tab == "overview" {
+		// Lightweight per-site "applications detected" data: any WP install
+		// rooted at this site's docroot.
+		var siteWP *WordPressInfo
+		for _, w := range a.listWordPress() {
+			if w.Domain == site.Domain {
+				wp := w
+				siteWP = &wp
+				break
+			}
+		}
+		data["WPOnSite"] = siteWP
+		// Hero card visual: derive a stable hue from the domain so each site
+		// gets a recognisable colour without us needing screenshots.
+		h := 0
+		for _, b := range []byte(site.Domain) {
+			h = (h*31 + int(b)) & 0xffff
+		}
+		data["HeroHue"] = h % 360
+		first := site.Domain
+		if first != "" {
+			first = strings.ToUpper(first[:1])
+		}
+		data["HeroLetter"] = first
+		data["ServerHostname"] = a.systemStats().Hostname
+	}
 	switch tab {
 	case "database":
 		dbs := a.listDatabasesForSite(site.Domain)
@@ -120,6 +146,11 @@ func (a *App) siteManager(w http.ResponseWriter, r *http.Request) {
 		if vhost, err := os.ReadFile(filepath.Join(a.cfg.NginxSitesDir, site.Domain)); err == nil {
 			data["NginxVhost"] = string(vhost)
 		}
+	case "analytics":
+		data["Analytics"] = a.siteAnalytics(site.Domain, 7)
+	case "cache":
+		data["RedisStats"] = a.redisStats()
+		data["FastCGICacheDir"] = "/var/cache/nginx/hostq-fastcgi"
 	}
 	a.render(w, "site", data)
 }
@@ -453,7 +484,8 @@ func (a *App) writeNginxSite(domain, root string, cache bool, phpVersion string)
 	if hasUserLocationSlash(a.loadExtraNginx(domain)) {
 		defaultLocationSlash = "    # location / is overridden by the site's custom Nginx config.\n"
 	}
-	siteBody := fmt.Sprintf(`    root %s;
+	accessLog := fmt.Sprintf("    access_log /var/log/nginx/%s.access.log combined;\n", domain)
+	siteBody := fmt.Sprintf(`%s    root %s;
     index index.php index.html;
 %s    location ~ \.php$ {
         include snippets/fastcgi-php.conf;
@@ -461,7 +493,7 @@ func (a *App) writeNginxSite(domain, root string, cache bool, phpVersion string)
         fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
         include fastcgi_params;%s
     }
-%s%s`, root, defaultLocationSlash, phpVersion, cacheBlock, pmaInclude, extraInclude)
+%s%s`, accessLog, root, defaultLocationSlash, phpVersion, cacheBlock, pmaInclude, extraInclude)
 
 	cacheLabel := "off"
 	if cache {

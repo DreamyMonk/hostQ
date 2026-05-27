@@ -38,6 +38,7 @@ func main() {
 		"hasPrefix": func(s, prefix string) bool {
 			return strings.HasPrefix(s, prefix)
 		},
+		"humanBytes": humanSize,
 	}).Parse(layoutTemplate))
 
 	mux := http.NewServeMux()

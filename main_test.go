@@ -19,9 +19,10 @@ func repoRoot(t *testing.T) string {
 
 func TestLayoutTemplateParses(t *testing.T) {
 	funcs := template.FuncMap{
-		"now":       func() any { return nil },
-		"icon":      func(string) any { return nil },
-		"hasPrefix": func(string, string) bool { return false },
+		"now":        func() any { return nil },
+		"icon":       func(string) any { return nil },
+		"hasPrefix":  func(string, string) bool { return false },
+		"humanBytes": func(int64) string { return "" },
 	}
 	if _, err := template.New("hostq-test").Funcs(funcs).Parse(layoutTemplate); err != nil {
 		t.Fatalf("layout template must parse: %v", err)

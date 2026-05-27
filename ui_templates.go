@@ -200,6 +200,45 @@ tbody tr:hover{background:var(--surface-2)}
 .fm-bulkbar .btn.danger:hover{background:#991b1b}
 .fm-check,.fm-checkall{width:16px;height:16px;cursor:pointer;accent-color:var(--brand-2)}
 
+/* site overview: hero card + tile row + glance panel */
+.hero-card{display:flex;gap:18px;padding:18px;align-items:stretch}
+.hero-thumb{flex:none;width:230px;height:150px;border-radius:12px;display:grid;place-items:center;color:#fff;font-size:70px;font-weight:900;letter-spacing:-.02em;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08),0 8px 24px rgba(15,23,42,.18)}
+.hero-info{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:space-between;gap:10px}
+.hero-domain{display:flex;align-items:center;gap:8px;font-size:22px;font-weight:800;letter-spacing:-.02em;color:var(--ink)}
+.hero-domain svg{width:18px;height:18px}
+.hero-domain .lock-ok{color:#16a34a}
+.hero-domain .lock-bad{color:#dc2626}
+.hero-meta{display:flex;gap:6px;flex-wrap:wrap}
+.hero-path{font-size:12px;color:var(--ink-muted)}
+.hero-actions{display:flex;gap:8px;flex-wrap:wrap}
+@media (max-width:760px){.hero-card{flex-direction:column}.hero-thumb{width:100%}}
+
+.tiles-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px}
+.tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:18px 12px;background:var(--card);border:1px solid var(--card-line);border-radius:12px;color:var(--ink);font-weight:600;font-size:13px;text-decoration:none;transition:transform .12s ease,box-shadow .12s ease,border-color .12s ease}
+.tile:hover{transform:translateY(-2px);border-color:var(--card-line-2);box-shadow:var(--shadow-lg)}
+.tile-ic{width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#eef5ff,#dbe7ff);color:#2563eb;display:grid;place-items:center}
+.tile-ic svg{width:20px;height:20px}
+[data-theme="dark"] .tile-ic{background:linear-gradient(135deg,#1b2540,#0e1730);color:#7da9ff}
+
+.app-row{display:flex;align-items:center;gap:14px;padding:10px 4px}
+.app-icon{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;color:#fff;font-weight:900;font-size:18px;flex:none}
+.app-meta{flex:1;min-width:0}
+
+.glance-card table.flat td{padding:9px 4px;font-size:13px}
+.glance-card table.flat td:first-child{color:var(--ink-muted)}
+
+/* analytics tab */
+.an-headline{display:flex;gap:30px;flex-wrap:wrap;padding:14px 0 6px}
+.an-headline .item{display:flex;flex-direction:column;gap:4px}
+.an-headline .label{color:var(--ink-muted);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.an-headline .val{font-size:28px;font-weight:800;letter-spacing:-.02em;color:var(--ink);line-height:1}
+.an-chart{width:100%;height:260px;display:block}
+.an-chart .grid line{stroke:var(--card-line);stroke-dasharray:2 4}
+.an-chart .axis text{font-size:10px;fill:var(--ink-muted);font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.an-chart .bar{fill:url(#anBarFill)}
+.an-chart .line{fill:none;stroke:#3b82f6;stroke-width:2}
+.an-chart .dot{fill:#3b82f6}
+
 /* in-browser code editor */
 .edit-toolbar{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--card);border:1px solid var(--card-line);border-radius:10px 10px 0 0;border-bottom:none}
 .edit-toolbar .grow{flex:1}
@@ -702,6 +741,8 @@ document.addEventListener('keydown',function(e){
   <a href="/site?domain={{.Site.Domain}}&tab=wordpress" class="{{if eq .Tab "wordpress"}}active{{end}}">{{icon "wordpress"}} WordPress</a>
   <a href="/site?domain={{.Site.Domain}}&tab=ssl"       class="{{if eq .Tab "ssl"}}active{{end}}">{{icon "shield"}} SSL</a>
   <a href="/site?domain={{.Site.Domain}}&tab=php"       class="{{if eq .Tab "php"}}active{{end}}">{{icon "cpu"}} PHP</a>
+  <a href="/site?domain={{.Site.Domain}}&tab=cache"     class="{{if eq .Tab "cache"}}active{{end}}">{{icon "activity"}} Cache</a>
+  <a href="/site?domain={{.Site.Domain}}&tab=analytics" class="{{if eq .Tab "analytics"}}active{{end}}">{{icon "activity"}} Analytics</a>
   <a href="/files?path=/{{.Site.Domain}}/htdocs">{{icon "folderOpen"}} Files</a>
   <a href="/site?domain={{.Site.Domain}}&tab=nginx"     class="{{if eq .Tab "nginx"}}active{{end}}">{{icon "server"}} Nginx</a>
   <a href="/site?domain={{.Site.Domain}}&tab=security"  class="{{if eq .Tab "security"}}active{{end}}">{{icon "shield"}} Security</a>
@@ -709,39 +750,189 @@ document.addEventListener('keydown',function(e){
 </div>
 
 {{if eq .Tab "overview"}}
-  <div class="grid-2">
-    <div class="card">
-      <h3>Quick actions</h3>
-      <div class="actions">
-        <a class="btn" href="/files?path=/{{.Site.Domain}}/htdocs">{{icon "folderOpen"}} Files</a>
-        <a class="btn" href="/site?domain={{.Site.Domain}}&tab=database">{{icon "database"}} Database</a>
-        <a class="btn" href="/site?domain={{.Site.Domain}}&tab=wordpress">{{icon "wordpress"}} WordPress</a>
-        <a class="btn" href="/site?domain={{.Site.Domain}}&tab=ssl">{{icon "shield"}} SSL</a>
-        <a class="btn" href="/site?domain={{.Site.Domain}}&tab=security">{{icon "shield"}} Security scan</a>
+  <div class="card hero-card">
+    <div class="hero-thumb" style="background:linear-gradient(135deg,hsl({{.HeroHue}},65%,38%),hsl({{.HeroHue}},75%,58%))">{{.HeroLetter}}</div>
+    <div class="hero-info">
+      <div>
+        <div class="hero-domain">
+          {{if .Site.SSL}}<span class="lock-ok">{{icon "shield"}}</span>{{else}}<span class="lock-bad">{{icon "alert"}}</span>{{end}}
+          <span>{{.Site.Domain}}</span>
+        </div>
+        <div class="hero-path mono">{{.Site.Root}}</div>
+      </div>
+      <div class="hero-meta">
+        {{if .Site.Enabled}}<span class="badge ok">{{icon "check"}} live</span>{{else}}<span class="badge bad">{{icon "x"}} disabled</span>{{end}}
+        {{if .Site.SSL}}<span class="badge ok">{{icon "shield"}} SSL</span>{{end}}
+        {{if .Site.Cache}}<span class="badge info">cache</span>{{end}}
+        <span class="badge">PHP {{.Site.PHPVersion}}</span>
+      </div>
+      <div class="hero-actions">
+        <a class="btn primary" href="http{{if .Site.SSL}}s{{end}}://{{.Site.Domain}}" target="_blank">{{icon "globe"}} Preview</a>
+        {{if .WPOnSite}}<a class="btn" href="/wordpress?manage={{.Site.Domain}}">{{icon "wordpress"}} WP Admin</a>{{end}}
         <a class="btn" href="/site?domain={{.Site.Domain}}&tab=backups">{{icon "archive"}} Backups</a>
       </div>
     </div>
+  </div>
+
+  <div class="tiles-row">
+    <a class="tile" href="/site?domain={{.Site.Domain}}&tab=backups"><span class="tile-ic">{{icon "archive"}}</span><span>Backups</span></a>
+    <a class="tile" href="/files?path=/{{.Site.Domain}}/htdocs"><span class="tile-ic">{{icon "folderOpen"}}</span><span>File manager</span></a>
+    <a class="tile" href="/site?domain={{.Site.Domain}}&tab=database"><span class="tile-ic">{{icon "database"}}</span><span>Database</span></a>
+    <a class="tile" href="/site?domain={{.Site.Domain}}&tab=ssl"><span class="tile-ic">{{icon "shield"}}</span><span>SSL</span></a>
+    <a class="tile" href="/site?domain={{.Site.Domain}}&tab=analytics"><span class="tile-ic">{{icon "activity"}}</span><span>Analytics</span></a>
+    <a class="tile" href="/site?domain={{.Site.Domain}}&tab=security"><span class="tile-ic">{{icon "alert"}}</span><span>Security</span></a>
+  </div>
+
+  <div class="grid-2">
     <div class="card">
-      <h3>Site controls</h3>
-      <div class="actions">
-        <form method="post" action="/site-action"><input type="hidden" name="domain" value="{{.Site.Domain}}">
-          {{if .Site.Enabled}}<button class="btn" name="action" value="disable">{{icon "power"}} Disable</button>
-          {{else}}<button class="btn primary" name="action" value="enable">{{icon "power"}} Enable</button>{{end}}
-        </form>
-        <form method="post" action="/site-action"><input type="hidden" name="domain" value="{{.Site.Domain}}">
-          {{if .Site.Cache}}<button class="btn" name="action" value="cache-off">Cache: off</button>
-          {{else}}<button class="btn" name="action" value="cache-on">Cache: on</button>{{end}}
-        </form>
-        <form method="post" action="/site-action"><input type="hidden" name="domain" value="{{.Site.Domain}}">
-          <button class="btn" name="action" value="permissions">{{icon "shield"}} Fix permissions</button>
-        </form>
-        <form method="post" action="/site-action" data-confirm="Permanently delete this site, its document root, and Nginx vhost?">
-          <input type="hidden" name="domain" value="{{.Site.Domain}}">
-          <button class="btn danger" name="action" value="delete">{{icon "trash"}} Delete site</button>
-        </form>
-      </div>
+      <h3>Applications</h3>
+      {{if .WPOnSite}}
+        <div class="app-row">
+          <div class="app-icon" style="background:linear-gradient(135deg,#21759b,#4a8bb5)">W</div>
+          <div class="app-meta">
+            <strong>WordPress</strong>{{if .WPOnSite.Version}} <span class="badge">{{.WPOnSite.Version}}</span>{{end}}
+            <div class="muted mono" style="font-size:11.5px;margin-top:2px">{{.WPOnSite.Path}}</div>
+          </div>
+          <a class="btn mini" href="/wordpress?manage={{.Site.Domain}}">Manage</a>
+        </div>
+      {{else}}
+        <p class="muted" style="margin:0">No application detected. Install WordPress from the <a href="/site?domain={{.Site.Domain}}&tab=wordpress" style="color:#2563eb;font-weight:700">WordPress tab</a> or upload your own files into <span class="mono">{{.Site.Root}}</span>.</p>
+      {{end}}
+    </div>
+    <div class="card glance-card">
+      <h3>At a glance</h3>
+      <table class="flat">
+        <tbody>
+          <tr><td>Web server</td><td><span class="badge info">Nginx</span></td></tr>
+          <tr><td>PHP version</td><td><span class="badge">{{.Site.PHPVersion}}</span></td></tr>
+          <tr><td>SSL</td><td>{{if .Site.SSL}}<span class="badge ok">{{icon "check"}} on</span>{{else}}<span class="badge bad">off</span>{{end}}</td></tr>
+          <tr><td>FastCGI cache</td><td>{{if .Site.Cache}}<span class="badge ok">on</span>{{else}}<span class="badge">off</span>{{end}}</td></tr>
+          <tr><td>Document root</td><td class="mono" style="font-size:11.5px">{{.Site.Root}}</td></tr>
+          <tr><td>Host</td><td>{{.ServerHostname}}</td></tr>
+        </tbody>
+      </table>
     </div>
   </div>
+
+  <div class="card">
+    <h3>Site controls</h3>
+    <div class="actions">
+      <form method="post" action="/site-action" style="display:inline"><input type="hidden" name="domain" value="{{.Site.Domain}}">
+        {{if .Site.Enabled}}<button class="btn" name="action" value="disable">{{icon "power"}} Disable</button>
+        {{else}}<button class="btn primary" name="action" value="enable">{{icon "power"}} Enable</button>{{end}}
+      </form>
+      <form method="post" action="/site-action" style="display:inline"><input type="hidden" name="domain" value="{{.Site.Domain}}">
+        <button class="btn" name="action" value="permissions">{{icon "shield"}} Fix permissions</button>
+      </form>
+      <form method="post" action="/site-action" data-confirm="Permanently delete this site, its document root, and Nginx vhost?" style="display:inline">
+        <input type="hidden" name="domain" value="{{.Site.Domain}}">
+        <button class="btn danger" name="action" value="delete">{{icon "trash"}} Delete site</button>
+      </form>
+    </div>
+  </div>
+{{end}}
+
+{{if eq .Tab "cache"}}
+  <div class="card">
+    <h3>FastCGI page cache</h3>
+    <p class="muted">Nginx caches whole PHP responses for anonymous traffic so cache hits never invoke PHP. This is the local-process equivalent of Varnish — same outcome at zero extra daemons.</p>
+    <div class="actions" style="margin-top:8px">
+      <form method="post" action="/site-action" style="display:inline"><input type="hidden" name="domain" value="{{.Site.Domain}}">
+        {{if .Site.Cache}}<button class="btn" name="action" value="cache-off">{{icon "x"}} Turn off</button>
+        {{else}}<button class="btn primary" name="action" value="cache-on">{{icon "check"}} Turn on</button>{{end}}
+      </form>
+      <form method="post" action="/site-nginx" data-confirm="Purge the FastCGI cache (all sites) and reload Nginx?" style="display:inline">
+        <input type="hidden" name="domain" value="{{.Site.Domain}}">
+        <button class="btn" name="action" value="flush">{{icon "refresh"}} Flush page cache</button>
+      </form>
+      <span class="muted" style="font-size:12px;align-self:center">Cache files live at <span class="mono">{{.FastCGICacheDir}}</span></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Redis object cache</h3>
+    {{if .RedisStats.Active}}
+      <p class="muted">Redis is running on 127.0.0.1:6379. Plug it into WordPress with the <span class="mono">redis-cache</span> plugin, or call it directly via <span class="mono">phpredis</span> in your app.</p>
+      <div class="grid" style="margin-top:10px">
+        <div class="stat"><div class="label">{{icon "cpu"}} Memory</div><div class="val">{{.RedisStats.UsedMemory}}</div><div class="sub">peak {{.RedisStats.PeakMemory}}</div></div>
+        <div class="stat"><div class="label">{{icon "box"}} Keys</div><div class="val">{{.RedisStats.TotalKeys}}</div><div class="sub">db0</div></div>
+        <div class="stat"><div class="label">{{icon "check"}} Hit rate</div><div class="val">{{.RedisStats.HitRate}}</div><div class="sub">since boot</div></div>
+      </div>
+      <div class="actions" style="margin-top:10px">
+        <form method="post" action="/redis" data-confirm="Flush ALL Redis keys?" style="display:inline">
+          <button class="btn danger" name="action" value="flush">{{icon "trash"}} Flush Redis</button>
+        </form>
+        <a class="btn" href="/redis">{{icon "settings"}} Full Redis page</a>
+      </div>
+    {{else}}
+      <div class="card empty" style="margin:0">
+        <div class="empty-ic">{{icon "activity"}}</div>
+        <div>
+          <h3 style="margin:0 0 4px;color:var(--ink)">Redis is not running</h3>
+          <p class="muted" style="margin:0 0 10px">Start it from the Redis page — first-time use auto-installs the apt package.</p>
+          <a class="btn primary" href="/redis">{{icon "play"}} Open Redis page</a>
+        </div>
+      </div>
+    {{end}}
+  </div>
+{{end}}
+
+{{if eq .Tab "analytics"}}
+  <div class="toolbar">
+    <div class="muted">{{.Analytics.Window}} · parsed from <span class="mono">/var/log/nginx/{{.Site.Domain}}.access.log</span></div>
+    <a class="btn" href="/site?domain={{.Site.Domain}}&tab=analytics">{{icon "refresh"}} Refresh</a>
+  </div>
+  {{if not .Analytics.HasLog}}
+    <div class="card empty">
+      <div class="empty-ic">{{icon "activity"}}</div>
+      <div>
+        <h3 style="margin:0 0 4px;color:var(--ink)">No log file yet</h3>
+        <p class="muted" style="margin:0">Per-site access logs land at <span class="mono">/var/log/nginx/{{.Site.Domain}}.access.log</span> once the vhost is rewritten. If you just upgraded the panel, toggle the site Disable + Enable from Overview (or any cache/PHP action) to regenerate the vhost — the log file will appear on the next request.</p>
+      </div>
+    </div>
+  {{else}}
+    <div class="card">
+      <div class="an-headline">
+        <div class="item"><div class="label">Total hits</div><div class="val">{{.Analytics.TotalHits}}</div></div>
+        <div class="item"><div class="label">Unique IPs</div><div class="val">{{.Analytics.UniqueHits}}</div></div>
+        <div class="item"><div class="label">Bandwidth</div><div class="val">{{.Analytics.HumanBytes}}</div></div>
+      </div>
+      <svg class="an-chart" viewBox="0 0 700 260" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="anBarFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#3b82f6" stop-opacity=".85"/>
+            <stop offset="100%" stop-color="#06b6d4" stop-opacity=".75"/>
+          </linearGradient>
+        </defs>
+        <g class="grid">
+          <line x1="40" x2="690" y1="40"  y2="40"/>
+          <line x1="40" x2="690" y1="100" y2="100"/>
+          <line x1="40" x2="690" y1="160" y2="160"/>
+          <line x1="40" x2="690" y1="220" y2="220"/>
+        </g>
+        <g class="axis">
+          {{range .Analytics.Bars}}
+            <rect class="bar" x="{{.BarX}}" y="{{.Y}}" width="32" height="{{.H}}" rx="3"/>
+            <text x="{{.X}}" y="240" text-anchor="middle">{{.Label}}</text>
+            {{if gt .Hits 0}}<text x="{{.X}}" y="{{.LabelY}}" text-anchor="middle" style="font-weight:700;fill:var(--ink)">{{.Hits}}</text>{{end}}
+          {{end}}
+        </g>
+      </svg>
+    </div>
+    <div class="card" style="padding:0">
+      <table>
+        <thead><tr><th>Date</th><th>Hits</th><th>Unique IPs</th><th>Bandwidth</th></tr></thead>
+        <tbody>
+          {{range .Analytics.Days}}<tr>
+            <td class="mono">{{.Date}}</td>
+            <td>{{.Hits}}</td>
+            <td>{{.Unique}}</td>
+            <td class="muted">{{if gt .Bytes 0}}{{humanBytes .Bytes}}{{else}}—{{end}}</td>
+          </tr>{{end}}
+        </tbody>
+      </table>
+    </div>
+  {{end}}
 {{end}}
 
 {{if eq .Tab "nginx"}}
