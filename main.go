@@ -67,6 +67,27 @@ func main() {
 	mux.HandleFunc("/security", app.requireAuth(app.security))
 	mux.HandleFunc("/malfix", app.requireAuth(app.malfix))
 	mux.HandleFunc("/pma-login", app.requireAuth(app.pmaLogin))
+	// When the user types /phpmyadmin/ on the panel host (typically :8090
+	// for direct setup access), Go's catch-all "/" route would render the
+	// panel dashboard. Redirect to the bare-host URL so nginx serves
+	// phpMyAdmin from /usr/share/phpmyadmin via the hostq-pma snippet.
+	pmaRedirect := func(w http.ResponseWriter, r *http.Request) {
+		host := r.Host
+		if i := strings.LastIndex(host, ":"); i > 0 {
+			host = host[:i]
+		}
+		scheme := "http"
+		if r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https") {
+			scheme = "https"
+		}
+		target := scheme + "://" + host + "/phpmyadmin/"
+		if q := r.URL.RawQuery; q != "" {
+			target += "?" + q
+		}
+		http.Redirect(w, r, target, http.StatusFound)
+	}
+	mux.HandleFunc("/phpmyadmin", pmaRedirect)
+	mux.HandleFunc("/phpmyadmin/", pmaRedirect)
 	// /packages was merged into /services in v0.11. Keep a redirect for
 	// bookmarks and old release notes.
 	mux.HandleFunc("/packages", func(w http.ResponseWriter, r *http.Request) {

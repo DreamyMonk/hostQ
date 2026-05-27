@@ -433,6 +433,7 @@ table.flat tbody tr:hover{background:transparent}
       <a href="/cron" class="{{if eq .View "cron"}}active{{end}}">{{icon "clock"}}<span>Cron</span></a>
       <a href="/php" class="{{if eq .View "php"}}active{{end}}">{{icon "cpu"}}<span>PHP Versions</span></a>
       <a href="/redis" class="{{if eq .View "redis"}}active{{end}}">{{icon "activity"}}<span>Redis Cache</span></a>
+      <a href="/phpmyadmin/" target="_blank" rel="noopener">{{icon "database"}}<span>phpMyAdmin ↗</span></a>
     </nav>
     <div class="navgroup">Advanced</div>
     <nav class="nav">
