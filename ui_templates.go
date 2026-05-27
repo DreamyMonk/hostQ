@@ -421,32 +421,47 @@ table.flat tbody tr:hover{background:transparent}
       <span class="mark">{{icon "logo"}}</span>
       <span>hostQ<small>control panel</small></span>
     </div>
+    {{if .IsAdmin}}
+    <div class="navgroup">Admin</div>
+    <nav class="nav">
+      <a href="/services" class="{{if eq .View "services"}}active{{end}}">{{icon "server"}}<span>Services &amp; Packages</span></a>
+      <a href="/php" class="{{if eq .View "php"}}active{{end}}">{{icon "cpu"}}<span>PHP Versions</span></a>
+      <a href="/redis" class="{{if eq .View "redis"}}active{{end}}">{{icon "activity"}}<span>Redis Cache</span></a>
+    </nav>
+    <div class="navgroup">Security</div>
+    <nav class="nav">
+      <a href="/security" class="{{if eq .View "security"}}active{{end}}">{{icon "shield"}}<span>Firewall</span></a>
+      <a href="/malfix" class="{{if eq .View "malfix"}}active{{end}}">{{icon "shield"}}<span>Malfix</span></a>
+      <a href="/audit" class="{{if eq .View "audit"}}active{{end}}">{{icon "activity"}}<span>Audit Log</span></a>
+    </nav>
+    <div class="navgroup">Panel</div>
+    <nav class="nav">
+      <a href="/account" class="{{if eq .View "account"}}active{{end}}">{{icon "users"}}<span>Account</span></a>
+      <a href="/" >{{icon "layout"}}<span>← Back to panel</span></a>
+      <a href="/logout">{{icon "logout"}}<span>Sign out</span></a>
+    </nav>
+    {{else}}
     <div class="navgroup">Main</div>
     <nav class="nav">
       <a href="/" class="{{if eq .View "dashboard"}}active{{end}}">{{icon "layout"}}<span>Dashboard</span></a>
       <a href="/sites" class="{{if or (eq .View "sites") (eq .View "site")}}active{{end}}">{{icon "globe"}}<span>Sites</span></a>
       <a href="/files?path=/" class="{{if eq .View "files"}}active{{end}}">{{icon "folder"}}<span>File Manager</span></a>
     </nav>
-    <div class="navgroup">Server</div>
-    <nav class="nav">
-      <a href="/services" class="{{if eq .View "services"}}active{{end}}">{{icon "server"}}<span>Services</span></a>
-      <a href="/cron" class="{{if eq .View "cron"}}active{{end}}">{{icon "clock"}}<span>Cron</span></a>
-      <a href="/php" class="{{if eq .View "php"}}active{{end}}">{{icon "cpu"}}<span>PHP Versions</span></a>
-      <a href="/redis" class="{{if eq .View "redis"}}active{{end}}">{{icon "activity"}}<span>Redis Cache</span></a>
-      <a href="/phpmyadmin/" target="_blank" rel="noopener">{{icon "database"}}<span>phpMyAdmin ↗</span></a>
-    </nav>
-    <div class="navgroup">Advanced</div>
+    <div class="navgroup">Hosting</div>
     <nav class="nav">
       <a href="/databases" class="{{if eq .View "databases"}}active{{end}}">{{icon "database"}}<span>All Databases</span></a>
       <a href="/wordpress" class="{{if eq .View "wordpress"}}active{{end}}">{{icon "wordpress"}}<span>All WordPress</span></a>
       <a href="/ssl" class="{{if eq .View "ssl"}}active{{end}}">{{icon "shield"}}<span>All Certificates</span></a>
+      <a href="/backups" class="{{if eq .View "backups"}}active{{end}}">{{icon "database"}}<span>Backups</span></a>
+      <a href="/cron" class="{{if eq .View "cron"}}active{{end}}">{{icon "clock"}}<span>Cron</span></a>
+      <a href="/phpmyadmin/" target="_blank" rel="noopener">{{icon "database"}}<span>phpMyAdmin ↗</span></a>
     </nav>
-    <div class="navgroup">Admin</div>
+    <div class="navgroup">System</div>
     <nav class="nav">
-      <a href="/account" class="{{if eq .View "account"}}active{{end}}">{{icon "users"}}<span>Account</span></a>
-      <a href="/audit" class="{{if eq .View "audit"}}active{{end}}">{{icon "activity"}}<span>Audit Log</span></a>
+      <a href="/services">{{icon "server"}}<span>Admin area →</span></a>
       <a href="/logout">{{icon "logout"}}<span>Sign out</span></a>
     </nav>
+    {{end}}
     <div class="side-foot">
       <div class="row"><span>{{now.Format "Mon Jan 02"}}</span><span>{{now.Format "15:04"}}</span></div>
     </div>
