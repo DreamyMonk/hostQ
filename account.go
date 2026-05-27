@@ -50,6 +50,16 @@ func (a *App) savePanelHostState(s PanelHostState) error {
 
 // writePanelProxyVhost emits the nginx vhost that proxies <hostname> to the
 // panel on 127.0.0.1:8090 and exposes /phpmyadmin/ via the managed snippet.
+// If a Let's Encrypt cert already exists for the hostname, the file emits
+// both a port 80 → 443 redirect block and a full HTTPS server block with
+// the pma include in it. Otherwise it's HTTP-only.
+//
+// We deliberately overwrite anything certbot --nginx added — certbot's
+// auto-modify creates a fresh server block without our `include
+// snippets/hostq-pma.conf;` line, so /phpmyadmin/ would 404 on the
+// HTTPS side. The panel keeps re-emitting in our own shape every time
+// the setup is touched (or re-run after certbot), so both protocol
+// blocks always carry the include.
 func (a *App) writePanelProxyVhost(hostname string) error {
 	if !domainRe.MatchString(hostname) {
 		return fmt.Errorf("invalid hostname")
@@ -58,13 +68,8 @@ func (a *App) writePanelProxyVhost(hostname string) error {
 	if _, err := os.Stat("/etc/nginx/snippets/hostq-pma.conf"); err == nil {
 		pmaInclude = "    include snippets/hostq-pma.conf;\n"
 	}
-	content := fmt.Sprintf(`# hostQ panel proxy — auto-managed. Bind the panel UI to %s
-# and expose /phpmyadmin/ on the same origin so SSO works.
-server {
-    listen 80;
-    listen [::]:80;
-    server_name %s;
-    access_log /var/log/nginx/hostq-panel.access.log combined;
+	// Shared server body — pma include + proxy_pass location.
+	body := fmt.Sprintf(`    access_log /var/log/nginx/hostq-panel.access.log combined;
 
     client_max_body_size 512m;
 %s
@@ -79,8 +84,44 @@ server {
         proxy_send_timeout 600s;
         proxy_buffering off;
     }
+`, pmaInclude)
+
+	hasSSL := a.certExists(hostname)
+	var content string
+	if hasSSL {
+		sslIncludes := ""
+		if _, err := os.Stat("/etc/letsencrypt/options-ssl-nginx.conf"); err == nil {
+			sslIncludes += "    include /etc/letsencrypt/options-ssl-nginx.conf;\n"
+		}
+		if _, err := os.Stat("/etc/letsencrypt/ssl-dhparams.pem"); err == nil {
+			sslIncludes += "    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;\n"
+		}
+		content = fmt.Sprintf(`# hostQ panel proxy — auto-managed. Bind the panel UI to %s
+# and expose /phpmyadmin/ on the same origin so SSO works.
+server {
+    listen 80;
+    listen [::]:80;
+    server_name %s;
+    return 301 https://$host$request_uri;
 }
-`, hostname, hostname, pmaInclude)
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name %s;
+    ssl_certificate /etc/letsencrypt/live/%s/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/%s/privkey.pem;
+%s%s}
+`, hostname, hostname, hostname, hostname, hostname, sslIncludes, body)
+	} else {
+		content = fmt.Sprintf(`# hostQ panel proxy — auto-managed. Bind the panel UI to %s
+# and expose /phpmyadmin/ on the same origin so SSO works.
+server {
+    listen 80;
+    listen [::]:80;
+    server_name %s;
+%s}
+`, hostname, hostname, body)
+	}
 	if err := os.WriteFile(panelVhostPath, []byte(content), 0644); err != nil {
 		return err
 	}
@@ -120,10 +161,21 @@ func (a *App) setupPanelHostname(hostname, email string, withSSL bool) (string, 
 			a.audit("panel.host-ssl", "failure", hostname)
 			return "Vhost created (HTTP only). Certbot failed: " + tail(string(out), 240), err
 		}
+		// Certbot's --nginx auto-edit creates a fresh server block on :443
+		// without our `include snippets/hostq-pma.conf;` line, so /phpmyadmin/
+		// would 404 on HTTPS while working on HTTP. Re-write the vhost in
+		// our own shape now that the cert exists — writePanelProxyVhost
+		// detects the cert and emits both 80-redirect + 443 blocks with the
+		// pma include in both.
+		_ = a.writePanelProxyVhost(hostname)
+		if out2, err := exec.Command("nginx", "-t").CombinedOutput(); err != nil {
+			return "Cert installed but post-certbot vhost rewrite failed: " + tail(string(out2), 240), err
+		}
+		_ = exec.Command("systemctl", "reload", "nginx").Run()
 		state.SSL = true
 		_ = a.savePanelHostState(state)
 		a.audit("panel.host-ssl", "success", hostname)
-		return "Panel hostname ready at https://" + hostname + "/ — SSL installed.", nil
+		return "Panel hostname ready at https://" + hostname + "/ — SSL installed, phpMyAdmin wired up.", nil
 	}
 	_ = a.savePanelHostState(state)
 	a.audit("panel.host-set", "success", hostname)
