@@ -39,27 +39,35 @@ func (a *App) ensurePMASnippet() error {
 	if sock == "" {
 		return fmt.Errorf("no PHP-FPM socket under /run/php — install PHP first")
 	}
-	// If the file is already correct (points at the socket we'd pick), skip.
-	// Otherwise rewrite — covers the case where install.sh wrote the snippet
-	// against a PHP-FPM version that's since been removed or replaced.
-	if data, err := os.ReadFile(path); err == nil && strings.Contains(string(data), "fastcgi_pass unix:"+sock+";") {
+	// If the file is already correct (points at the socket we'd pick AND
+	// uses the root-based form), skip. Otherwise rewrite. The root marker
+	// matters because earlier installs wrote an alias+try_files snippet
+	// that 404s on /phpmyadmin/ (well-known nginx gotcha) — we need to
+	// upgrade those automatically.
+	if data, err := os.ReadFile(path); err == nil &&
+		strings.Contains(string(data), "fastcgi_pass unix:"+sock+";") &&
+		strings.Contains(string(data), "root /usr/share/;") {
 		return nil
 	}
-	content := `# hostQ phpMyAdmin alias. Sites include this from their server block
+	// Uses root + try_files instead of alias + try_files because the latter
+	// is a well-known nginx issue (try_files doesn't follow alias mapping
+	// so the index.php lookup always misses and the location 404s). With
+	// root, nginx concatenates "/usr/share/" + "/phpmyadmin/..." cleanly.
+	content := `# hostQ phpMyAdmin snippet. Sites include this from their server block
 # so https://<domain>/phpmyadmin works without a separate vhost.
-location ^~ /phpmyadmin/ {
-    alias /usr/share/phpmyadmin/;
-    index index.php;
-    try_files $uri $uri/ /phpmyadmin/index.php?$args;
+location ^~ /phpmyadmin {
+    root /usr/share/;
+    index index.php index.html;
+    try_files $uri $uri/ =404;
+
     location ~ ^/phpmyadmin/(.+\.php)$ {
-        alias /usr/share/phpmyadmin/$1;
         include snippets/fastcgi-php.conf;
         fastcgi_pass unix:` + sock + `;
-        fastcgi_param SCRIPT_FILENAME $request_filename;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
         include fastcgi_params;
     }
-    location ~* ^/phpmyadmin/(.+\.(jpg|jpeg|gif|css|png|js|ico|html|xml|txt|woff|woff2|svg|map))$ {
-        alias /usr/share/phpmyadmin/$1;
+    location ~* ^/phpmyadmin/.+\.(jpg|jpeg|gif|css|png|js|ico|html|xml|txt|woff|woff2|svg|map)$ {
+        root /usr/share/;
         access_log off;
         expires 1d;
     }
