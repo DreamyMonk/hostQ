@@ -88,8 +88,24 @@ func (a *App) ensurePMADefaultVhost() error {
 	if err := a.ensurePMASnippet(); err != nil {
 		return err
 	}
+	// Debian/Ubuntu's nginx ships an /etc/nginx/sites-enabled/default vhost
+	// that also claims `listen 80 default_server` + `server_name _;`. When
+	// both exist, nginx warns "conflicting server name '_'" and ignores
+	// whichever loaded second. sites-enabled is read alphabetically, so the
+	// stock "default" wins over "hostq-default" — and our snippet never gets
+	// reached. Two-pronged fix below: disable the stock default if it's
+	// still enabled, and symlink ours under a "00-" prefix so future
+	// re-enables of the stock one still lose.
+	if _, err := os.Lstat("/etc/nginx/sites-enabled/default"); err == nil {
+		_ = os.Remove("/etc/nginx/sites-enabled/default")
+		a.audit("pma.default-vhost", "success", "disabled stock /etc/nginx/sites-enabled/default")
+	}
 	const path = "/etc/nginx/sites-available/hostq-default"
-	const link = "/etc/nginx/sites-enabled/hostq-default"
+	// "00-" prefix so sites-enabled loads us before any other vhost — that
+	// guarantees we own the default_server flag on :80 even if a future
+	// package install re-creates Debian's default link.
+	const link = "/etc/nginx/sites-enabled/00-hostq-default"
+	const oldLink = "/etc/nginx/sites-enabled/hostq-default"
 	const content = `# hostQ default vhost — auto-created by the panel.
 # Catches requests where the Host header doesn't match any per-site
 # server_name (typically: bare IP access). Exposes /phpmyadmin/ via the
@@ -112,6 +128,10 @@ server {
 			return err
 		}
 		a.audit("pma.default-vhost", "success", "auto-created")
+	}
+	// Migrate from the old un-prefixed symlink to the new "00-" prefix.
+	if _, err := os.Lstat(oldLink); err == nil {
+		_ = os.Remove(oldLink)
 	}
 	if _, err := os.Lstat(link); err != nil {
 		if err := os.Symlink(path, link); err != nil {
