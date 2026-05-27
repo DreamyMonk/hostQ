@@ -45,6 +45,76 @@ func (a *App) sites(w http.ResponseWriter, r *http.Request) {
 	a.render(w, "sites", map[string]any{"Title": "Sites", "Sites": a.listSites()})
 }
 
+// docrootRe accepts a relative path under the site's parent like "htdocs",
+// "public", "public_html", "www", "src/public", etc. Rejects ".." or absolute
+// paths so the caller can't escape /var/www/<domain>/.
+var docrootRe = regexp.MustCompile(`^[a-zA-Z0-9._][a-zA-Z0-9._-]*(/[a-zA-Z0-9._-]+)*$`)
+
+// siteAdd renders the mode-picker page (Blank vs Install WordPress) and
+// handles the create + optional WP install in one shot.
+func (a *App) siteAdd(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		a.render(w, "siteadd", map[string]any{"Title": "Add website"})
+		return
+	}
+	domain := strings.ToLower(strings.TrimSpace(r.FormValue("domain")))
+	domain = strings.TrimPrefix(domain, "www.")
+	if !domainRe.MatchString(domain) {
+		a.render(w, "siteadd", map[string]any{"Title": "Add website", "Error": "Invalid domain", "Domain": r.FormValue("domain")})
+		return
+	}
+	docroot := strings.TrimSpace(r.FormValue("docroot"))
+	docroot = strings.Trim(docroot, "/")
+	if docroot == "" {
+		docroot = "htdocs"
+	}
+	if !docrootRe.MatchString(docroot) {
+		a.render(w, "siteadd", map[string]any{"Title": "Add website", "Error": "Invalid document root", "Domain": domain})
+		return
+	}
+	root := filepath.Join(a.cfg.WebRoot, domain, docroot)
+	_ = os.MkdirAll(root, 0755)
+
+	mode := r.FormValue("mode")
+	if mode != "wordpress" {
+		mode = "blank"
+	}
+
+	if mode == "blank" {
+		index := filepath.Join(root, "index.html")
+		if _, err := os.Stat(index); err != nil {
+			_ = os.WriteFile(index, []byte("<h1>"+template.HTMLEscapeString(domain)+"</h1><p>Managed by hostQ</p>"), 0644)
+		}
+		a.writeNginxSite(domain, root, false, "8.4")
+		a.audit("site.create", "success", domain)
+		http.Redirect(w, r, "/site?domain="+domain, http.StatusSeeOther)
+		return
+	}
+
+	// WordPress one-shot: create the site shell, then run wp-cli through the
+	// shared installer (DB + core + config) and surface its log on the WP
+	// page if anything fails.
+	a.writeNginxSite(domain, root, false, "8.4")
+	a.audit("site.create", "success", domain)
+	wpTitle := strings.TrimSpace(r.FormValue("wp_title"))
+	if wpTitle == "" {
+		wpTitle = domain
+	}
+	out, err := a.installWordPress(WPInstallParams{
+		Domain:     domain,
+		Root:       root,
+		Title:      wpTitle,
+		AdminUser:  safeName(r.FormValue("wp_user")),
+		AdminPass:  strings.TrimSpace(r.FormValue("wp_pass")),
+		AdminEmail: strings.TrimSpace(r.FormValue("wp_email")),
+	})
+	if err != nil {
+		http.Redirect(w, r, "/wordpress?output="+queryEscape(out), http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, "/site?domain="+domain+"&output="+queryEscape("Site created and WordPress installed."), http.StatusSeeOther)
+}
+
 func (a *App) siteManager(w http.ResponseWriter, r *http.Request) {
 	domain := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("domain")))
 	site, ok := a.findSite(domain)
@@ -151,6 +221,8 @@ func (a *App) siteManager(w http.ResponseWriter, r *http.Request) {
 	case "cache":
 		data["RedisStats"] = a.redisStats()
 		data["FastCGICacheDir"] = "/var/cache/nginx/hostq-fastcgi"
+	case "domains":
+		data["Aliases"] = a.loadAliases(site.Domain)
 	}
 	a.render(w, "site", data)
 }
@@ -183,6 +255,21 @@ func (a *App) siteAction(w http.ResponseWriter, r *http.Request) {
 		_ = exec.Command("chown", "-R", "www-data:www-data", filepath.Join(a.cfg.WebRoot, domain)).Run()
 		_ = exec.Command("find", filepath.Join(a.cfg.WebRoot, domain), "-type", "d", "-exec", "chmod", "755", "{}", ";").Run()
 		_ = exec.Command("find", filepath.Join(a.cfg.WebRoot, domain), "-type", "f", "-exec", "chmod", "644", "{}", ";").Run()
+	case "alias-add":
+		alias := strings.ToLower(strings.TrimSpace(r.FormValue("alias")))
+		alias = strings.TrimPrefix(alias, "www.")
+		if err := a.addAlias(domain, alias); err == nil {
+			a.writeNginxSite(domain, site.Root, site.Cache, site.PHPVersion)
+		}
+		http.Redirect(w, r, "/site?domain="+domain+"&tab=domains", http.StatusSeeOther)
+		return
+	case "alias-remove":
+		alias := strings.ToLower(strings.TrimSpace(r.FormValue("alias")))
+		if err := a.removeAlias(domain, alias); err == nil {
+			a.writeNginxSite(domain, site.Root, site.Cache, site.PHPVersion)
+		}
+		http.Redirect(w, r, "/site?domain="+domain+"&tab=domains", http.StatusSeeOther)
+		return
 	case "backup":
 		_, _ = a.createSiteBackup(site)
 	case "delete":
@@ -505,13 +592,20 @@ func (a *App) writeNginxSite(domain, root string, cache bool, phpVersion string)
 	// versions only wrote port 80, so any panel action that called this
 	// helper (cache toggle, PHP switch, WordPress install) silently wiped
 	// the SSL config certbot had injected.
+	// Aliases — extra hostnames the user attached via the Domains tab. They
+	// land in server_name on every block so the existing vhost serves them
+	// too (no extra docroot, no extra cert — alias semantics).
+	aliasSuffix := ""
+	if aliases := a.loadAliases(domain); len(aliases) > 0 {
+		aliasSuffix = " " + strings.Join(aliases, " ")
+	}
 	hasSSL := a.certExists(domain)
 	sslLabel := "off"
 	port80 := fmt.Sprintf(`server {
     listen 80;
-    server_name %s www.%s;
+    server_name %s www.%s%s;
 %s}
-`, domain, domain, siteBody)
+`, domain, domain, aliasSuffix, siteBody)
 	port443 := ""
 	if hasSSL {
 		sslLabel = "on"
@@ -524,17 +618,17 @@ func (a *App) writeNginxSite(domain, root string, cache bool, phpVersion string)
 		}
 		port80 = fmt.Sprintf(`server {
     listen 80;
-    server_name %s www.%s;
+    server_name %s www.%s%s;
     return 301 https://$host$request_uri;
 }
-`, domain, domain)
+`, domain, domain, aliasSuffix)
 		port443 = fmt.Sprintf(`server {
     listen 443 ssl http2;
-    server_name %s www.%s;
+    server_name %s www.%s%s;
     ssl_certificate /etc/letsencrypt/live/%s/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/%s/privkey.pem;
 %s%s}
-`, domain, domain, domain, domain, sslIncludes, siteBody)
+`, domain, domain, aliasSuffix, domain, domain, sslIncludes, siteBody)
 	}
 	conf := fmt.Sprintf("# hostQ managed - %s\n# hostQ fastcgi cache: %s\n# hostQ ssl: %s\n%s%s",
 		domain, cacheLabel, sslLabel, port80, port443)

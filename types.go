@@ -26,6 +26,8 @@ type Site struct {
 	SSL        bool
 	Cache      bool
 	PHPVersion string
+	SizeBytes  int64
+	SizeHuman  string
 }
 
 type FileItem struct {

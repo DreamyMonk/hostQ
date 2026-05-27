@@ -200,6 +200,24 @@ tbody tr:hover{background:var(--surface-2)}
 .fm-bulkbar .btn.danger:hover{background:#991b1b}
 .fm-check,.fm-checkall{width:16px;height:16px;cursor:pointer;accent-color:var(--brand-2)}
 
+/* mode picker (Add site, Add domain) */
+.mode-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:16px}
+.mode-card{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px 18px;background:var(--card);border:2px solid var(--card-line);border-radius:12px;color:var(--ink);font-weight:700;font-size:14px;text-align:center;cursor:pointer;transition:border-color .12s,background .12s,transform .05s}
+.mode-card:hover{border-color:#9bb3d6}
+.mode-card input[type="radio"]{position:absolute;opacity:0;pointer-events:none}
+.mode-card input[type="radio"]:checked + .mode-body{color:var(--brand-2)}
+.mode-card.checked{border-color:var(--brand-2);background:linear-gradient(180deg,rgba(37,99,235,.06),transparent)}
+[data-theme="dark"] .mode-card.checked{background:linear-gradient(180deg,rgba(59,130,246,.18),transparent)}
+.mode-card .mode-ic{width:48px;height:48px;border-radius:10px;background:var(--surface-2);color:var(--ink-muted);display:grid;place-items:center}
+.mode-card.checked .mode-ic{background:linear-gradient(135deg,#3b82f6,#06b6d4);color:#fff}
+.mode-card .mode-title{font-size:15px;font-weight:800;letter-spacing:-.01em}
+.mode-card .mode-desc{color:var(--ink-muted);font-size:12px;font-weight:500;line-height:1.45}
+
+/* alias list */
+.alias-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--card-line);font-size:13px}
+.alias-row:last-child{border-bottom:none}
+.alias-row .mono{color:var(--ink)}
+
 /* site overview: hero card + tile row + glance panel */
 .hero-card{display:flex;gap:18px;padding:18px;align-items:stretch}
 .hero-thumb{flex:none;width:230px;height:150px;border-radius:12px;display:grid;place-items:center;color:#fff;font-size:70px;font-weight:900;letter-spacing:-.02em;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08),0 8px 24px rgba(15,23,42,.18)}
@@ -456,6 +474,7 @@ table.flat tbody tr:hover{background:transparent}
       {{else if eq .View "audit"}}{{template "audit" .}}
       {{else if eq .View "redis"}}{{template "redis" .}}
       {{else if eq .View "fileedit"}}{{template "fileedit" .}}
+      {{else if eq .View "siteadd"}}{{template "siteadd" .}}
       {{end}}
     </div>
   </main>
@@ -686,19 +705,10 @@ document.addEventListener('keydown',function(e){
 
 {{define "sites"}}
 <div class="page-head">
-  <div><h1>Sites</h1><p>Create, enable, and manage your web sites.</p></div>
+  <div><h1>Sites</h1><p>{{len .Sites}} site{{if ne (len .Sites) 1}}s{{end}} on this server.</p></div>
+  <a class="btn primary" href="/sites/add">{{icon "plus"}} Add website</a>
 </div>
 {{if .Error}}<div class="alert bad">{{icon "alert"}} {{.Error}}</div>{{end}}
-<div class="card">
-  <h3>Add new site</h3>
-  <form method="post">
-    <div class="row">
-      <input class="input" name="domain" placeholder="example.com" required>
-      <button class="btn primary">{{icon "plus"}} Add site</button>
-    </div>
-    <p class="muted" style="margin-top:8px">An Nginx vhost and document root will be created. PHP 8.4 by default — change later in PHP Manager.</p>
-  </form>
-</div>
 <div class="card" style="padding:0">
   <table>
     <thead><tr><th>Domain</th><th>Document root</th><th>PHP</th><th>Cache</th><th>SSL</th><th>Status</th><th class="right-col">Action</th></tr></thead>
@@ -739,6 +749,7 @@ document.addEventListener('keydown',function(e){
   <a href="/site?domain={{.Site.Domain}}&tab=overview"  class="{{if eq .Tab "overview"}}active{{end}}">{{icon "layout"}} Overview</a>
   <a href="/site?domain={{.Site.Domain}}&tab=database"  class="{{if eq .Tab "database"}}active{{end}}">{{icon "database"}} Database</a>
   <a href="/site?domain={{.Site.Domain}}&tab=wordpress" class="{{if eq .Tab "wordpress"}}active{{end}}">{{icon "wordpress"}} WordPress</a>
+  <a href="/site?domain={{.Site.Domain}}&tab=domains"   class="{{if eq .Tab "domains"}}active{{end}}">{{icon "globe"}} Domains</a>
   <a href="/site?domain={{.Site.Domain}}&tab=ssl"       class="{{if eq .Tab "ssl"}}active{{end}}">{{icon "shield"}} SSL</a>
   <a href="/site?domain={{.Site.Domain}}&tab=php"       class="{{if eq .Tab "php"}}active{{end}}">{{icon "cpu"}} PHP</a>
   <a href="/site?domain={{.Site.Domain}}&tab=cache"     class="{{if eq .Tab "cache"}}active{{end}}">{{icon "activity"}} Cache</a>
@@ -933,6 +944,52 @@ document.addEventListener('keydown',function(e){
       </table>
     </div>
   {{end}}
+{{end}}
+
+{{if eq .Tab "domains"}}
+  <div class="card">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <h3 style="margin:0">{{icon "globe"}} {{.Site.Domain}}</h3>
+      <span class="badge ok">primary</span>
+      <span class="muted mono" style="font-size:11.5px">www.{{.Site.Domain}} is included automatically</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Aliases</h3>
+    <p class="muted">Extra hostnames that serve the same content as the primary. Added to <span class="mono">server_name</span> on every panel-managed vhost — no separate docroot, no separate SSL. For a different docroot, add a new site instead (subdomain or addon).</p>
+    {{if .Aliases}}
+      <div style="margin-top:8px">
+        {{range .Aliases}}
+        <div class="alias-row">
+          <span class="mono">{{.}}</span>
+          <form method="post" action="/site-action" data-confirm="Remove alias {{.}} from {{$.Site.Domain}}?" style="display:inline">
+            <input type="hidden" name="domain" value="{{$.Site.Domain}}">
+            <input type="hidden" name="alias" value="{{.}}">
+            <button class="btn mini danger" name="action" value="alias-remove">{{icon "x"}} Remove</button>
+          </form>
+        </div>
+        {{end}}
+      </div>
+    {{else}}
+      <p class="muted" style="margin:6px 0 0">No aliases yet.</p>
+    {{end}}
+    <hr class="sep">
+    <form method="post" action="/site-action">
+      <input type="hidden" name="domain" value="{{.Site.Domain}}">
+      <div class="row">
+        <div class="field"><label>Add alias hostname</label><input class="input mono" name="alias" placeholder="example.org" required pattern="^[a-zA-Z0-9][a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"></div>
+        <button class="btn primary" name="action" value="alias-add" style="align-self:flex-end">{{icon "plus"}} Add alias</button>
+      </div>
+    </form>
+    <p class="muted" style="font-size:12px;margin:8px 0 0">After adding an alias, point its DNS A record at this server and (if you want HTTPS on the alias) re-run SSL with both hostnames: <span class="mono">certbot --nginx --expand -d {{.Site.Domain}} -d &lt;alias&gt;</span>.</p>
+  </div>
+
+  <div class="card">
+    <h3>Subdomain / Addon domain</h3>
+    <p class="muted">Subdomains and addon domains each need their own document root, so the panel treats them as new sites. Open <a href="/sites/add" style="color:#2563eb;font-weight:700">Add website</a> and use a hostname like <span class="mono">blog.{{.Site.Domain}}</span> (subdomain) or any unrelated domain (addon). DNS still needs to point at this box.</p>
+    <a class="btn" href="/sites/add">{{icon "plus"}} Open Add website</a>
+  </div>
 {{end}}
 
 {{if eq .Tab "nginx"}}
@@ -2387,6 +2444,101 @@ function dbsOpenResetUser(u){ document.getElementById('dbs-ru-user-label').textC
     </tbody>
   </table>
 </div>
+{{end}}
+
+{{define "siteadd"}}
+<div class="page-head">
+  <div><h1>{{icon "globe"}} Add website</h1><p>Create a new vhost. Start with an empty docroot or install WordPress in one shot.</p></div>
+  <a class="btn" href="/sites">{{icon "chevronUp"}} Back</a>
+</div>
+{{if .Error}}<div class="alert bad">{{icon "alert"}} {{.Error}}</div>{{end}}
+<form method="post" action="/sites/add">
+  <div class="card">
+    <h3>How do you want to start?</h3>
+    <div class="mode-row" id="modePicker">
+      <label class="mode-card checked" data-mode="blank">
+        <input type="radio" name="mode" value="blank" checked>
+        <div class="mode-body" style="display:flex;flex-direction:column;align-items:center;gap:10px">
+          <div class="mode-ic">{{icon "folder"}}</div>
+          <div class="mode-title">Start from scratch</div>
+          <div class="mode-desc">Empty docroot with a placeholder index.html. Upload your own files or deploy via FTP / git.</div>
+        </div>
+      </label>
+      <label class="mode-card" data-mode="wordpress">
+        <input type="radio" name="mode" value="wordpress">
+        <div class="mode-body" style="display:flex;flex-direction:column;align-items:center;gap:10px">
+          <div class="mode-ic">{{icon "wordpress"}}</div>
+          <div class="mode-title">Install WordPress</div>
+          <div class="mode-desc">Download WP, create a database, run install. Ready to log in when the page reloads.</div>
+        </div>
+      </label>
+    </div>
+
+    <div class="row">
+      <div class="field"><label>Domain</label><input class="input mono" name="domain" placeholder="example.com" value="{{.Domain}}" required autofocus></div>
+      <div class="field"><label>Document root <span class="muted" style="font-weight:500">(under /var/www/&lt;domain&gt;/)</span></label><input class="input mono" name="docroot" placeholder="htdocs" value="htdocs"></div>
+    </div>
+  </div>
+
+  <div class="card" id="wpFields" style="display:none">
+    <h3>WordPress admin account</h3>
+    <p class="muted">You'll use these credentials to sign in to <span class="mono">/wp-admin</span>.</p>
+    <div class="row">
+      <div class="field"><label>Site title</label><input class="input" name="wp_title" placeholder="My WordPress site"></div>
+      <div class="field"><label>Admin email</label><input class="input" name="wp_email" type="email" placeholder="admin@example.com"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Admin username</label><input class="input mono" name="wp_user" placeholder="admin"></div>
+      <div class="field"><label>Admin password <span class="muted" style="font-weight:500">(10+ chars)</span></label><input class="input mono" name="wp_pass" type="text" minlength="10" placeholder="strong password"></div>
+    </div>
+    <ul class="muted" style="font-size:12px;margin:6px 0 0;padding-left:18px">
+      <li>At least one lowercase character</li>
+      <li>At least one uppercase character</li>
+      <li>At least one number</li>
+      <li>At least one special character</li>
+      <li>10 characters minimum</li>
+    </ul>
+  </div>
+
+  <div class="actions" style="margin-top:12px">
+    <a class="btn" href="/sites">Cancel</a>
+    <button class="btn primary" type="submit">{{icon "plus"}} Add website</button>
+  </div>
+</form>
+<script>
+(function(){
+  var cards = document.querySelectorAll('.mode-card');
+  var wpFields = document.getElementById('wpFields');
+  function refresh(){
+    cards.forEach(function(c){
+      var r = c.querySelector('input[type=radio]');
+      c.classList.toggle('checked', r.checked);
+    });
+    var picked = document.querySelector('.mode-card input[type=radio]:checked');
+    if(picked && picked.value === 'wordpress'){
+      wpFields.style.display = '';
+      ['wp_title','wp_user','wp_pass','wp_email'].forEach(function(n){
+        var i = document.querySelector('[name="'+n+'"]');
+        if(i) i.required = true;
+      });
+    } else {
+      wpFields.style.display = 'none';
+      ['wp_title','wp_user','wp_pass','wp_email'].forEach(function(n){
+        var i = document.querySelector('[name="'+n+'"]');
+        if(i) i.required = false;
+      });
+    }
+  }
+  cards.forEach(function(c){
+    c.addEventListener('click', function(){
+      var r = c.querySelector('input[type=radio]');
+      r.checked = true;
+      refresh();
+    });
+  });
+  refresh();
+})();
+</script>
 {{end}}
 
 {{define "fileedit"}}

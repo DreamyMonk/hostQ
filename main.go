@@ -46,6 +46,7 @@ func main() {
 	mux.HandleFunc("/login", app.login)
 	mux.HandleFunc("/logout", app.logout)
 	mux.HandleFunc("/sites", app.requireAuth(app.sites))
+	mux.HandleFunc("/sites/add", app.requireAuth(app.siteAdd))
 	mux.HandleFunc("/site", app.requireAuth(app.siteManager))
 	mux.HandleFunc("/site-action", app.requireAuth(app.siteAction))
 	mux.HandleFunc("/site-nginx", app.requireAuth(app.siteNginx))
