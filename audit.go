@@ -27,7 +27,7 @@ func (a *App) render(w http.ResponseWriter, view string, data map[string]any) {
 	// security, account, audit, server-wide PHP/Redis) get their own
 	// scope without changing the overall sidebar look.
 	switch view {
-	case "services", "security", "malfix", "account", "audit", "php", "redis", "firewall":
+	case "services", "security", "malfix", "account", "audit", "php", "redis", "firewall", "cron":
 		data["IsAdmin"] = true
 	default:
 		data["IsAdmin"] = false

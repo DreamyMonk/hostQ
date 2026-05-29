@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Design tokens — one source of truth. Component code references `bg-surface`,
+ * `text-ink`, etc; theme switching just flips these variables.
+ *
+ * Light is the default; .dark on <html> swaps the values. next-themes
+ * toggles the class.
+ */
+@layer base {
+  :root {
+    --canvas: 220 20% 98%;
+    --surface: 0 0% 100%;
+    --elevated: 220 20% 99%;
+    --border: 220 14% 92%;
+    --border-strong: 220 14% 86%;
+    --ink: 222 22% 12%;
+    --muted: 220 10% 46%;
+    --faint: 220 10% 64%;
+    --accent: 221 83% 53%;
+    --accent-fg: 0 0% 100%;
+    --success: 142 71% 35%;
+    --warning: 35 92% 45%;
+    --danger: 0 72% 45%;
+  }
+
+  .dark {
+    --canvas: 222 24% 5%;
+    --surface: 222 24% 8%;
+    --elevated: 222 22% 11%;
+    --border: 222 18% 16%;
+    --border-strong: 222 18% 22%;
+    --ink: 220 20% 96%;
+    --muted: 220 12% 64%;
+    --faint: 220 12% 44%;
+    --accent: 217 91% 60%;
+    --accent-fg: 0 0% 100%;
+    --success: 142 71% 45%;
+    --warning: 35 92% 55%;
+    --danger: 0 72% 60%;
+  }
+
+  * {
+    @apply border-border;
+  }
+  html, body {
+    @apply bg-canvas text-ink;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection {
+    background: hsl(var(--accent) / 0.18);
+  }
+}
+
+@layer utilities {
+  .text-balance { text-wrap: balance; }
+}

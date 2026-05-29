@@ -449,6 +449,7 @@ table.flat tbody tr:hover{background:transparent}
       <a href="/services" class="{{if eq .View "services"}}active{{end}}">{{icon "server"}}<span>Services &amp; Packages</span></a>
       <a href="/php" class="{{if eq .View "php"}}active{{end}}">{{icon "cpu"}}<span>PHP Versions</span></a>
       <a href="/redis" class="{{if eq .View "redis"}}active{{end}}">{{icon "activity"}}<span>Redis Cache</span></a>
+      <a href="/cron" class="{{if eq .View "cron"}}active{{end}}">{{icon "clock"}}<span>Cron Jobs</span></a>
     </nav>
     <div class="navgroup">Security</div>
     <nav class="nav">

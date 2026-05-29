@@ -59,9 +59,9 @@ func main() {
 	mux.HandleFunc("/wordpress", app.requireAuth(app.wordpress))
 	mux.HandleFunc("/php", app.requireAuth(app.php))
 	mux.HandleFunc("/ssl", app.requireAuth(app.ssl))
-	mux.HandleFunc("/cron", app.requireAuth(app.cron))
 	// Admin-scope routes wrap requireAuth with requireAdminAllow so the
 	// optional IP allowlist (managed on /account) also gates them.
+	mux.HandleFunc("/cron", app.requireAuth(app.requireAdminAllow(app.cron)))
 	mux.HandleFunc("/services", app.requireAuth(app.requireAdminAllow(app.services)))
 	mux.HandleFunc("/account", app.requireAuth(app.requireAdminAllow(app.account)))
 	mux.HandleFunc("/audit", app.requireAuth(app.requireAdminAllow(app.auditLog)))

@@ -41,6 +41,7 @@ var adminScopePrefixes = []string{
 	"/php",
 	"/redis",
 	"/firewall",
+	"/cron",
 }
 
 func (a *App) loadAdminAllowlist() AdminAllowlist {
