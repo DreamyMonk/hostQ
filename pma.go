@@ -6,10 +6,152 @@ import (
 	"html"
 	"io"
 	"net/http"
+	"os"
+	"os/exec"
 	"regexp"
 	"strings"
 	"time"
 )
+
+// ensurePMASnippet writes /etc/nginx/snippets/hostq-pma.conf when missing.
+// install.sh wrote this on first boot, but operators who install phpMyAdmin
+// later (via the Services & Packages page or apt directly) won't get the
+// snippet automatically — and without the snippet every /phpmyadmin/ request
+// 404s.
+//
+// We pick the first available PHP-FPM socket (prefer 8.3 — phpMyAdmin's
+// upstream test target), falling back through 8.2/8.4/8.5. If no FPM is
+// installed yet, return an error so the caller can skip the rest of the
+// setup.
+func (a *App) ensurePMASnippet() error {
+	if _, err := os.Stat("/usr/share/phpmyadmin/index.php"); err != nil {
+		return fmt.Errorf("phpmyadmin package not installed")
+	}
+	const path = "/etc/nginx/snippets/hostq-pma.conf"
+	sock := ""
+	for _, v := range []string{"8.3", "8.2", "8.4", "8.5"} {
+		s := "/run/php/php" + v + "-fpm.sock"
+		if _, err := os.Stat(s); err == nil {
+			sock = s
+			break
+		}
+	}
+	if sock == "" {
+		return fmt.Errorf("no PHP-FPM socket under /run/php — install PHP first")
+	}
+	// If the file is already correct (points at the socket we'd pick AND
+	// uses the root-based form), skip. Otherwise rewrite. The root marker
+	// matters because earlier installs wrote an alias+try_files snippet
+	// that 404s on /phpmyadmin/ (well-known nginx gotcha) — we need to
+	// upgrade those automatically.
+	if data, err := os.ReadFile(path); err == nil &&
+		strings.Contains(string(data), "fastcgi_pass unix:"+sock+";") &&
+		strings.Contains(string(data), "root /usr/share/;") {
+		return nil
+	}
+	// Uses root + try_files instead of alias + try_files because the latter
+	// is a well-known nginx issue (try_files doesn't follow alias mapping
+	// so the index.php lookup always misses and the location 404s). With
+	// root, nginx concatenates "/usr/share/" + "/phpmyadmin/..." cleanly.
+	content := `# hostQ phpMyAdmin snippet. Sites include this from their server block
+# so https://<domain>/phpmyadmin works without a separate vhost.
+location ^~ /phpmyadmin {
+    root /usr/share/;
+    index index.php index.html;
+    try_files $uri $uri/ =404;
+
+    location ~ ^/phpmyadmin/(.+\.php)$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:` + sock + `;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        include fastcgi_params;
+    }
+    location ~* ^/phpmyadmin/.+\.(jpg|jpeg|gif|css|png|js|ico|html|xml|txt|woff|woff2|svg|map)$ {
+        root /usr/share/;
+        access_log off;
+        expires 1d;
+    }
+}
+location = /phpmyadmin { return 301 /phpmyadmin/; }
+`
+	_ = os.MkdirAll("/etc/nginx/snippets", 0755)
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		return err
+	}
+	a.audit("pma.snippet", "success", "auto-created using "+sock)
+	return nil
+}
+
+// ensurePMADefaultVhost writes /etc/nginx/sites-available/hostq-default the
+// first time it's needed. Without an explicit default_server on :80, nginx
+// picks an arbitrary hostQ-managed vhost — one that very likely has SSL and
+// returns 301 to https — for any unmatched Host header (e.g. requests to the
+// bare IP). That ricochets into a too-many-redirects loop the first time the
+// user opens /phpmyadmin/ on the IP.
+//
+// The default vhost only exposes /phpmyadmin/ (via the panel-managed snippet)
+// and returns 404 for everything else, so it can't accidentally serve a real
+// site. Idempotent: if the file already exists, we just confirm the symlink.
+func (a *App) ensurePMADefaultVhost() error {
+	if err := a.ensurePMASnippet(); err != nil {
+		return err
+	}
+	// Debian/Ubuntu's nginx ships an /etc/nginx/sites-enabled/default vhost
+	// that also claims `listen 80 default_server` + `server_name _;`. When
+	// both exist, nginx warns "conflicting server name '_'" and ignores
+	// whichever loaded second. sites-enabled is read alphabetically, so the
+	// stock "default" wins over "hostq-default" — and our snippet never gets
+	// reached. Two-pronged fix below: disable the stock default if it's
+	// still enabled, and symlink ours under a "00-" prefix so future
+	// re-enables of the stock one still lose.
+	if _, err := os.Lstat("/etc/nginx/sites-enabled/default"); err == nil {
+		_ = os.Remove("/etc/nginx/sites-enabled/default")
+		a.audit("pma.default-vhost", "success", "disabled stock /etc/nginx/sites-enabled/default")
+	}
+	const path = "/etc/nginx/sites-available/hostq-default"
+	// "00-" prefix so sites-enabled loads us before any other vhost — that
+	// guarantees we own the default_server flag on :80 even if a future
+	// package install re-creates Debian's default link.
+	const link = "/etc/nginx/sites-enabled/00-hostq-default"
+	const oldLink = "/etc/nginx/sites-enabled/hostq-default"
+	const content = `# hostQ default vhost — auto-created by the panel.
+# Catches requests where the Host header doesn't match any per-site
+# server_name (typically: bare IP access). Exposes /phpmyadmin/ via the
+# managed snippet and 404s everything else so it can't serve a site.
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+    access_log /var/log/nginx/hostq-default.access.log combined;
+
+    include snippets/hostq-pma.conf;
+
+    location / {
+        return 404 "hostQ default vhost. Add a site or use a real domain.\n";
+    }
+}
+`
+	if _, err := os.Stat(path); err != nil {
+		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+			return err
+		}
+		a.audit("pma.default-vhost", "success", "auto-created")
+	}
+	// Migrate from the old un-prefixed symlink to the new "00-" prefix.
+	if _, err := os.Lstat(oldLink); err == nil {
+		_ = os.Remove(oldLink)
+	}
+	if _, err := os.Lstat(link); err != nil {
+		if err := os.Symlink(path, link); err != nil {
+			return err
+		}
+	}
+	if out, err := exec.Command("nginx", "-t").CombinedOutput(); err != nil {
+		return fmt.Errorf("nginx -t failed: %s", strings.TrimSpace(string(out)))
+	}
+	_ = exec.Command("systemctl", "reload", "nginx").Run()
+	return nil
+}
 
 // pmaLogin signs the panel user into phpMyAdmin without an interactive login.
 //
@@ -122,13 +264,19 @@ button.link{background:none;border:none;color:#60a5fa;text-decoration:underline;
 
 func renderPMAFallback(w http.ResponseWriter, user, db, domain string) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	backLabel := "Back to site"
+	backHref := "/site?domain=" + html.EscapeString(domain) + "&tab=database"
+	if strings.TrimSpace(domain) == "" {
+		backLabel = "Back to databases"
+		backHref = "/databases"
+	}
 	fmt.Fprintf(w, `<!doctype html><html><body style="font-family:sans-serif;padding:40px;max-width:520px;margin:auto;line-height:1.55">
 <h2>No saved password for <code>%s</code></h2>
 <p>This database user wasn't created or reset through hostQ, so no password is remembered for auto-login.</p>
-<p>Reset the user's password from <strong>Site → Database</strong> and then click phpMyAdmin again, or open phpMyAdmin manually below.</p>
-<p><a href="/phpmyadmin/?db=%s" style="display:inline-block;background:#2563eb;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none">Open phpMyAdmin</a> &nbsp; <a href="/site?domain=%s&tab=database">Back to site</a></p>
+<p>Reset the user's password from the Databases page and then click phpMyAdmin again, or open phpMyAdmin manually below.</p>
+<p><a href="/phpmyadmin/?db=%s" style="display:inline-block;background:#2563eb;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none">Open phpMyAdmin</a> &nbsp; <a href="%s">%s</a></p>
 </body></html>`,
-		html.EscapeString(user), html.EscapeString(db), html.EscapeString(domain))
+		html.EscapeString(user), html.EscapeString(db), backHref, html.EscapeString(backLabel))
 }
 
 var pmaTokenRe = regexp.MustCompile(`name=["']token["'][^>]*value=["']([^"']+)["']|value=["']([^"']+)["'][^>]*name=["']token["']`)

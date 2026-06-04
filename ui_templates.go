@@ -67,12 +67,12 @@ const layoutTemplate = `
 <style>
 :root{
   --bg:#0a0f1c;--panel:#0d1424;--panel-2:#172033;--text:#e6eaf2;--muted:#7d8aa3;--line:#172033;
-  --card:#ffffff;--card-line:#eef1f6;--card-line-2:#e6eaf0;--ink:#0b1220;--ink-muted:#5b6b85;
-  --page:#f6f8fb;--surface:#fff;--surface-2:#fbfcfe;--surface-hover:#f4f6fb;
+  --card:#ffffff;--card-line:#edf0f5;--card-line-2:#e1e6ee;--ink:#0b1220;--ink-muted:#64748b;
+  --page:#f7f8fb;--surface:#fff;--surface-2:#fafbfd;--surface-hover:#f3f5f9;
   --brand:#3b82f6;--brand-2:#2563eb;--accent:#06b6d4;
   --ok:#16a34a;--bad:#dc2626;--warn:#d97706;
-  --radius:10px;--shadow:0 1px 1px rgba(15,23,42,.03),0 1px 3px rgba(15,23,42,.04);
-  --shadow-lg:0 10px 30px rgba(15,23,42,.08);
+  --radius:8px;--shadow:0 1px 2px rgba(15,23,42,.04);
+  --shadow-lg:0 8px 24px rgba(15,23,42,.07);
 }
 [data-theme="dark"]{
   --card:#0f1729;--card-line:#1c2640;--card-line-2:#243153;--ink:#e6eaf2;--ink-muted:#8e9bb5;
@@ -81,23 +81,23 @@ const layoutTemplate = `
   --shadow-lg:0 12px 40px rgba(0,0,0,.45);
 }
 *{box-sizing:border-box}
-html,body{margin:0;padding:0;background:var(--page);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,sans-serif;font-size:13.5px;line-height:1.55;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+html,body{margin:0;padding:0;background:var(--page);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,sans-serif;font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;letter-spacing:-.005em}
 a{color:inherit;text-decoration:none}
 button{font-family:inherit;font-size:inherit}
 svg{flex:none;vertical-align:middle}
-.mono{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12.5px}
+.mono{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px}
 .muted{color:var(--ink-muted)}
 .ok{color:var(--ok)}.bad{color:var(--bad)}.warn{color:var(--warn)}
 
 /* shell */
-.shell{display:grid;grid-template-columns:232px 1fr;min-height:100vh}
-aside.side{background:var(--bg);color:var(--text);padding:16px 10px;position:sticky;top:0;height:100vh;overflow-y:auto;border-right:1px solid #0a1020;display:flex;flex-direction:column}
+.shell{display:grid;grid-template-columns:216px 1fr;min-height:100vh}
+aside.side{background:var(--bg);color:var(--text);padding:14px 8px;position:sticky;top:0;height:100vh;overflow-y:auto;border-right:1px solid #0a1020;display:flex;flex-direction:column}
 .brand{display:flex;align-items:center;gap:10px;padding:6px 8px 16px;font-weight:800;font-size:16px;color:#fff;letter-spacing:-.01em}
 .brand .mark{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,#3b82f6,#06b6d4);display:grid;place-items:center;color:#fff;box-shadow:0 4px 12px rgba(59,130,246,.30)}
 .brand .mark svg{color:#fff;width:16px;height:16px}
 .brand small{display:block;font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.10em;text-transform:uppercase;margin-top:1px}
 .navgroup{margin:14px 0 4px;padding:0 10px;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#5b6477}
-.nav a{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:7px;color:#c5cde0;font-weight:600;font-size:13px;margin-bottom:1px;transition:background .12s,color .12s}
+.nav a{display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:6px;color:#c5cde0;font-weight:500;font-size:12.5px;margin-bottom:1px;transition:background .12s,color .12s}
 .nav a:hover{background:rgba(255,255,255,.04);color:#fff}
 .nav a.active{background:rgba(59,130,246,.14);color:#fff}
 .nav a svg{opacity:.85;width:16px;height:16px}
@@ -106,82 +106,97 @@ aside.side{background:var(--bg);color:var(--text);padding:16px 10px;position:sti
 
 /* topbar */
 main.main{min-width:0}
-.topbar{position:sticky;top:0;z-index:10;background:var(--surface);border-bottom:1px solid var(--card-line);height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 22px}
-.topbar h1{margin:0;font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px;letter-spacing:-.01em;color:var(--ink)}
+.topbar{position:sticky;top:0;z-index:10;background:rgba(255,255,255,.85);backdrop-filter:saturate(180%) blur(10px);border-bottom:1px solid var(--card-line);height:48px;display:flex;align-items:center;justify-content:space-between;padding:0 18px}
+[data-theme="dark"] .topbar{background:rgba(15,23,41,.85)}
+.topbar h1{margin:0;font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:8px;letter-spacing:-.01em;color:var(--ink)}
 .topbar h1 svg{opacity:.5;width:14px;height:14px}
 .topbar .right{display:flex;align-items:center;gap:8px;color:var(--ink-muted);font-size:12.5px}
 .topbar .right .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:var(--surface-hover);color:var(--ink-muted);font-weight:600;font-size:12px}
 .topbar .right .chip svg{width:12px;height:12px}
-.iconbtn{width:32px;height:32px;border-radius:8px;border:1px solid var(--card-line);background:var(--surface);color:var(--ink-muted);display:grid;place-items:center;cursor:pointer;transition:background .12s,color .12s,border-color .12s}
+.iconbtn{width:28px;height:28px;border-radius:7px;border:1px solid var(--card-line);background:var(--surface);color:var(--ink-muted);display:grid;place-items:center;cursor:pointer;transition:background .12s,color .12s,border-color .12s}
 .iconbtn:hover{background:var(--surface-hover);color:var(--ink);border-color:var(--card-line-2)}
 .iconbtn svg{width:14px;height:14px}
 .kbd{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:10.5px;padding:1px 5px;border-radius:4px;border:1px solid var(--card-line);background:var(--surface-2);color:var(--ink-muted)}
-.searchbtn{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;border:1px solid var(--card-line);background:var(--surface);color:var(--ink-muted);font-size:12.5px;cursor:pointer;transition:background .12s,border-color .12s}
+.searchbtn{display:flex;align-items:center;gap:6px;padding:5px 9px;border-radius:7px;border:1px solid var(--card-line);background:var(--surface);color:var(--ink-muted);font-size:12px;cursor:pointer;transition:background .12s,border-color .12s}
 .searchbtn:hover{background:var(--surface-hover);border-color:var(--card-line-2)}
 .searchbtn .kbd{margin-left:4px}
-.content{padding:22px}
+.content{padding:18px 20px}
 
 /* cards */
-.card{background:var(--card);border:1px solid var(--card-line);border-radius:12px;padding:18px;margin-bottom:12px;box-shadow:var(--shadow);color:var(--ink)}
-.card h2{margin:0 0 4px;font-size:15px;font-weight:700;letter-spacing:-.01em;color:var(--ink)}
-.card h3{margin:0 0 10px;font-size:12px;font-weight:700;color:var(--ink-muted);text-transform:uppercase;letter-spacing:.08em}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
-.grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:12px}
+.card{background:var(--card);border:1px solid var(--card-line);border-radius:10px;padding:14px 16px;margin-bottom:10px;box-shadow:var(--shadow);color:var(--ink)}
+.card h2{margin:0 0 2px;font-size:13.5px;font-weight:600;letter-spacing:-.01em;color:var(--ink)}
+.card h3{margin:0 0 8px;font-size:10.5px;font-weight:700;color:var(--ink-muted);text-transform:uppercase;letter-spacing:.08em}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:10px}
 
 /* stat cards */
-.stat{display:flex;flex-direction:column;gap:6px;background:var(--card);border:1px solid var(--card-line);border-radius:12px;padding:16px 18px;box-shadow:var(--shadow);transition:transform .12s,box-shadow .12s;color:var(--ink)}
-.stat:hover{transform:translateY(-1px);box-shadow:var(--shadow-lg)}
-.stat .label{display:flex;align-items:center;gap:8px;color:var(--ink-muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em}
-.stat .label svg{opacity:.7;width:14px;height:14px}
-.stat .val{font-size:24px;font-weight:800;color:var(--ink);letter-spacing:-.02em;line-height:1.1}
-.stat .sub{font-size:12px;color:var(--ink-muted)}
+.stat{display:flex;flex-direction:column;gap:4px;background:var(--card);border:1px solid var(--card-line);border-radius:10px;padding:12px 14px;box-shadow:var(--shadow);transition:border-color .12s;color:var(--ink)}
+.stat:hover{border-color:var(--card-line-2)}
+.stat .label{display:flex;align-items:center;gap:6px;color:var(--ink-muted);font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.08em}
+.stat .label svg{opacity:.6;width:12px;height:12px}
+.stat .val{font-size:19px;font-weight:700;color:var(--ink);letter-spacing:-.02em;line-height:1.1}
+.stat .sub{font-size:11.5px;color:var(--ink-muted)}
 .bar{height:5px;border-radius:99px;background:#eef2f7;overflow:hidden;margin-top:4px}
 .bar > div{height:100%;background:linear-gradient(90deg,#3b82f6,#06b6d4);transition:width .5s ease}
 
-/* buttons */
-.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--card-line);background:var(--surface);color:var(--ink);border-radius:8px;padding:7px 12px;font-weight:600;font-size:13px;cursor:pointer;transition:background .12s,border-color .12s,transform .05s,box-shadow .12s}
+/* buttons — compact, single height, refined */
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--card-line);background:var(--surface);color:var(--ink);border-radius:7px;padding:5px 10px;font-weight:500;font-size:12.5px;cursor:pointer;transition:background .12s,border-color .12s,color .12s;line-height:1.4;white-space:nowrap}
 .btn:hover{background:var(--surface-hover);border-color:var(--card-line-2)}
-.btn:active{transform:translateY(1px)}
-.btn svg{width:14px;height:14px}
-.btn.primary{background:var(--brand-2);border-color:var(--brand-2);color:#fff;box-shadow:0 1px 2px rgba(37,99,235,.25)}
-.btn.primary:hover{background:#1d4ed8;border-color:#1d4ed8;box-shadow:0 2px 6px rgba(37,99,235,.35)}
-.btn.ghost{background:transparent;border-color:transparent}
-.btn.ghost:hover{background:#f1f5f9}
-.btn.danger{color:#b91c1c;border-color:#fde2e2;background:#fff7f7}
-.btn.danger:hover{background:#fee2e2;border-color:#fbcfcf}
-.btn.mini{padding:4px 9px;font-size:12px;border-radius:6px}
-.btn.icon{padding:7px;border-radius:8px}
-.actions{display:flex;gap:6px;flex-wrap:wrap}
+.btn:active{background:var(--surface-2)}
+.btn svg{width:13px;height:13px;opacity:.75}
+.btn.primary{background:var(--ink);border-color:var(--ink);color:#fff}
+.btn.primary:hover{background:#000;border-color:#000}
+.btn.primary svg{opacity:1}
+.btn.brand{background:var(--brand-2);border-color:var(--brand-2);color:#fff}
+.btn.brand:hover{background:#1d4ed8;border-color:#1d4ed8}
+.btn.brand svg{opacity:1}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--ink-muted)}
+.btn.ghost:hover{background:var(--surface-hover);color:var(--ink)}
+.btn.danger{color:#b91c1c;border-color:#f5d0d0;background:transparent}
+.btn.danger:hover{background:#fef2f2;border-color:#e5b1b1}
+.btn.danger svg{opacity:.85}
+.btn.mini{padding:3px 8px;font-size:11.5px;border-radius:6px}
+.btn.icon{padding:5px;border-radius:7px;width:26px;height:26px;justify-content:center}
+.btn.icon svg{width:13px;height:13px}
+[data-theme="dark"] .btn.primary{background:#fff;border-color:#fff;color:#0b1220}
+[data-theme="dark"] .btn.primary:hover{background:#e6eaf2;border-color:#e6eaf2}
+[data-theme="dark"] .btn.danger{color:#fca5a5;border-color:#502020;background:transparent}
+[data-theme="dark"] .btn.danger:hover{background:#3a1010;border-color:#7f2424}
+/* tooltip for icon-only buttons */
+.btn[title]:hover::after,.iconbtn[title]:hover::after{content:attr(title);position:absolute;bottom:-28px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:500;white-space:nowrap;pointer-events:none;z-index:50;box-shadow:var(--shadow-lg)}
+.btn[title],.iconbtn[title]{position:relative}
+.actions{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
 
-/* inputs */
-.input,select.input,textarea.input{width:100%;border:1px solid var(--card-line);background:var(--surface);border-radius:8px;padding:8px 11px;font-size:13.5px;color:var(--ink);outline:none;transition:border-color .12s,box-shadow .12s}
+/* inputs — clean, compact */
+.input,select.input,textarea.input{width:100%;border:1px solid var(--card-line);background:var(--surface);border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--ink);outline:none;transition:border-color .12s,box-shadow .12s;line-height:1.5}
 .input:hover{border-color:var(--card-line-2)}
-.input:focus{border-color:#93c5fd;box-shadow:0 0 0 3px rgba(59,130,246,.12)}
-.input::placeholder{color:var(--ink-muted);opacity:.7}
-.field{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
-.field label{font-size:11.5px;font-weight:700;color:var(--ink-muted);letter-spacing:.01em}
-.row{display:flex;gap:10px;flex-wrap:wrap}
+.input:focus{border-color:#93c5fd;box-shadow:0 0 0 3px rgba(59,130,246,.10)}
+.input::placeholder{color:var(--ink-muted);opacity:.55}
+.field{display:flex;flex-direction:column;gap:4px;margin-bottom:8px}
+.field label{font-size:11px;font-weight:600;color:var(--ink-muted);letter-spacing:.005em}
+.row{display:flex;gap:8px;flex-wrap:wrap}
 .row > *{flex:1;min-width:160px}
 
-/* table */
-table{width:100%;border-collapse:separate;border-spacing:0;background:var(--card);border:1px solid var(--card-line);border-radius:12px;overflow:hidden;color:var(--ink)}
-th,td{padding:11px 14px;text-align:left;font-size:13px;border-bottom:1px solid var(--card-line);vertical-align:middle}
-th{font-size:11px;font-weight:700;color:var(--ink-muted);text-transform:uppercase;letter-spacing:.08em;background:var(--surface-2)}
+/* table — denser, lighter */
+table{width:100%;border-collapse:separate;border-spacing:0;background:var(--card);border:1px solid var(--card-line);border-radius:10px;overflow:hidden;color:var(--ink)}
+th,td{padding:8px 12px;text-align:left;font-size:12.5px;border-bottom:1px solid var(--card-line);vertical-align:middle}
+th{font-size:10.5px;font-weight:600;color:var(--ink-muted);text-transform:uppercase;letter-spacing:.07em;background:var(--surface-2)}
 tbody tr:last-child td{border-bottom:none}
 tbody tr:hover{background:var(--surface-2)}
 
-/* badges */
-.badge{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--card-line);border-radius:999px;padding:2px 9px;font-size:11px;font-weight:700;background:var(--surface);color:var(--ink-muted);letter-spacing:.01em}
-.badge svg{width:11px;height:11px}
+/* badges — flatter, smaller */
+.badge{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--card-line);border-radius:5px;padding:1px 7px;font-size:10.5px;font-weight:600;background:var(--surface-2);color:var(--ink-muted);letter-spacing:.005em}
+.badge svg{width:10px;height:10px}
 .badge.ok{color:#166534;border-color:#bbf7d0;background:#f0fdf4}
 .badge.bad{color:#991b1b;border-color:#fde2e2;background:#fef2f2}
 .badge.warn{color:#92400e;border-color:#fde68a;background:#fffbeb}
 .badge.info{color:#1e40af;border-color:#cfdcfb;background:#eff5ff}
 
-/* page heading */
-.page-head{display:flex;justify-content:space-between;align-items:flex-end;margin:0 0 18px;gap:10px;flex-wrap:wrap}
-.page-head h1{margin:0;font-size:22px;font-weight:800;letter-spacing:-.02em;color:#0b1220}
-.page-head p{margin:4px 0 0;color:var(--ink-muted);font-size:13px}
+/* page heading — tighter */
+.page-head{display:flex;justify-content:space-between;align-items:flex-end;margin:0 0 14px;gap:10px;flex-wrap:wrap}
+.page-head h1{margin:0;font-size:17px;font-weight:600;letter-spacing:-.015em;color:var(--ink);display:flex;align-items:center;gap:8px}
+.page-head h1 svg{width:16px;height:16px;opacity:.55}
+.page-head p{margin:3px 0 0;color:var(--ink-muted);font-size:12px;max-width:60ch}
 
 /* file manager */
 .crumbs{display:flex;align-items:center;gap:4px;flex-wrap:wrap;background:#fff;border:1px solid var(--card-line);border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:13px}
@@ -199,6 +214,100 @@ tbody tr:hover{background:var(--surface-2)}
 .fm-bulkbar .btn.danger{background:#7f1d1d;border-color:#991b1b;color:#fff}
 .fm-bulkbar .btn.danger:hover{background:#991b1b}
 .fm-check,.fm-checkall{width:16px;height:16px;cursor:pointer;accent-color:var(--brand-2)}
+
+/* mode picker (Add site, Add domain) */
+.mode-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:16px}
+.mode-card{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px 18px;background:var(--card);border:2px solid var(--card-line);border-radius:12px;color:var(--ink);font-weight:700;font-size:14px;text-align:center;cursor:pointer;transition:border-color .12s,background .12s,transform .05s}
+.mode-card:hover{border-color:#9bb3d6}
+.mode-card input[type="radio"]{position:absolute;opacity:0;pointer-events:none}
+.mode-card input[type="radio"]:checked + .mode-body{color:var(--brand-2)}
+.mode-card.checked{border-color:var(--brand-2);background:linear-gradient(180deg,rgba(37,99,235,.06),transparent)}
+[data-theme="dark"] .mode-card.checked{background:linear-gradient(180deg,rgba(59,130,246,.18),transparent)}
+.mode-card .mode-ic{width:48px;height:48px;border-radius:10px;background:var(--surface-2);color:var(--ink-muted);display:grid;place-items:center}
+.mode-card.checked .mode-ic{background:linear-gradient(135deg,#3b82f6,#06b6d4);color:#fff}
+.mode-card .mode-title{font-size:15px;font-weight:800;letter-spacing:-.01em}
+.mode-card .mode-desc{color:var(--ink-muted);font-size:12px;font-weight:500;line-height:1.45}
+
+/* alias list */
+.alias-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--card-line);font-size:13px}
+.alias-row:last-child{border-bottom:none}
+.alias-row .mono{color:var(--ink)}
+
+/* site overview: hero card + tile row + glance panel */
+.hero-card{display:flex;gap:14px;padding:14px;align-items:stretch}
+.hero-thumb{flex:none;width:160px;height:110px;border-radius:10px;display:grid;place-items:center;color:#fff;font-size:46px;font-weight:700;letter-spacing:-.02em;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
+.hero-info{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:space-between;gap:8px}
+.hero-domain{display:flex;align-items:center;gap:8px;font-size:17px;font-weight:600;letter-spacing:-.015em;color:var(--ink)}
+.hero-domain svg{width:14px;height:14px}
+.hero-domain .lock-ok{color:#16a34a}
+.hero-domain .lock-bad{color:#dc2626}
+.hero-meta{display:flex;gap:6px;flex-wrap:wrap}
+.hero-path{font-size:12px;color:var(--ink-muted)}
+.hero-actions{display:flex;gap:8px;flex-wrap:wrap}
+@media (max-width:760px){.hero-card{flex-direction:column}.hero-thumb{width:100%}}
+
+.tiles-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:12px}
+.tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:14px 10px;background:var(--card);border:1px solid var(--card-line);border-radius:10px;color:var(--ink);font-weight:500;font-size:12px;text-decoration:none;transition:border-color .12s ease,background .12s ease}
+.tile:hover{border-color:var(--card-line-2);background:var(--surface-2)}
+.tile-ic{width:32px;height:32px;border-radius:8px;background:var(--surface-2);color:var(--ink);display:grid;place-items:center}
+.tile-ic svg{width:16px;height:16px}
+[data-theme="dark"] .tile-ic{background:linear-gradient(135deg,#1b2540,#0e1730);color:#7da9ff}
+
+.app-row{display:flex;align-items:center;gap:14px;padding:10px 4px}
+.app-icon{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;color:#fff;font-weight:900;font-size:18px;flex:none}
+.app-meta{flex:1;min-width:0}
+
+.glance-card table.flat td{padding:9px 4px;font-size:13px}
+.glance-card table.flat td:first-child{color:var(--ink-muted)}
+
+/* analytics tab */
+.an-headline{display:flex;gap:30px;flex-wrap:wrap;padding:14px 0 6px}
+.an-headline .item{display:flex;flex-direction:column;gap:4px}
+.an-headline .label{color:var(--ink-muted);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.an-headline .val{font-size:28px;font-weight:800;letter-spacing:-.02em;color:var(--ink);line-height:1}
+.an-chart{width:100%;height:260px;display:block}
+.an-chart .grid line{stroke:var(--card-line);stroke-dasharray:2 4}
+.an-chart .axis text{font-size:10px;fill:var(--ink-muted);font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.an-chart .bar{fill:url(#anBarFill)}
+.an-chart .line{fill:none;stroke:#3b82f6;stroke-width:2}
+.an-chart .dot{fill:#3b82f6}
+
+/* in-browser code editor */
+.edit-toolbar{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--card);border:1px solid var(--card-line);border-radius:10px 10px 0 0;border-bottom:none}
+.edit-toolbar .grow{flex:1}
+.edit-toolbar .meta{color:var(--ink-muted);font-size:12px}
+.edit-toolbar .meta strong{color:var(--ink);font-weight:700}
+.edit-wrapper{display:flex}
+.edit-gutter{flex:none;width:54px;padding:14px 8px 14px 0;background:var(--surface-2);color:var(--ink-muted);border:1px solid var(--card-line);border-right:none;border-radius:0 0 0 10px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:13px;line-height:1.5;text-align:right;user-select:none;overflow:hidden;white-space:pre;font-variant-numeric:tabular-nums}
+.edit-area{
+  flex:1;min-width:0;min-height:65vh;resize:vertical;
+  border:1px solid var(--card-line);border-radius:0 0 10px 0;
+  padding:14px 16px;
+  font-family:ui-monospace,SFMono-Regular,Consolas,monospace;
+  font-size:13px;line-height:1.5;
+  background:var(--card);color:var(--ink);
+  outline:none;tab-size:2;
+  white-space:pre-wrap;
+}
+.edit-area:focus{border-color:#93c5fd;box-shadow:0 0 0 3px rgba(59,130,246,.12)}
+.edit-area.nowrap{white-space:pre}
+
+/* destination input + Browse button row */
+.pick-row{display:flex;gap:6px}
+.pick-row .input{flex:1;min-width:0}
+
+/* directory picker */
+.dp-crumbs{display:flex;flex-wrap:wrap;gap:2px;align-items:center;padding:6px 10px;background:var(--surface-2);border:1px solid var(--card-line);border-radius:8px;margin-bottom:8px;font-size:12.5px;min-height:32px}
+.dp-crumbs a{padding:2px 7px;border-radius:5px;color:var(--ink);font-weight:600;cursor:pointer}
+.dp-crumbs a:hover{background:var(--surface-hover);color:var(--brand-2)}
+.dp-crumbs .sep{color:var(--ink-muted);margin:0 1px}
+.dp-list{max-height:300px;overflow:auto;border:1px solid var(--card-line);border-radius:8px;background:var(--card)}
+.dp-row{display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--card-line);font-size:13px;color:var(--ink)}
+.dp-row:last-child{border-bottom:none}
+.dp-row:hover{background:var(--surface-hover)}
+.dp-row.up{font-weight:600;color:var(--ink-muted)}
+.dp-row .ic{width:24px;height:24px;border-radius:5px;background:#fef3c7;color:#b45309;display:grid;place-items:center;flex:none}
+[data-theme="dark"] .dp-row .ic{background:rgba(180,83,9,.22);color:#fbbf24}
 
 /* upload progress */
 .upbar{height:10px;border-radius:99px;background:var(--surface-2);overflow:hidden;border:1px solid var(--card-line)}
@@ -219,13 +328,20 @@ tbody tr:hover{background:var(--surface-2)}
 .ctxmenu .sep{height:1px;background:var(--card-line);margin:4px 2px}
 .ctxmenu .danger{color:#b91c1c}
 
-/* modal */
-.modal-bg{position:fixed;inset:0;background:rgba(7,11,21,.55);backdrop-filter:blur(4px);z-index:900;display:none;align-items:center;justify-content:center;padding:20px}
+/* modal — polished step container */
+.modal-bg{position:fixed;inset:0;background:rgba(7,11,21,.45);backdrop-filter:blur(6px);z-index:900;display:none;align-items:center;justify-content:center;padding:20px;animation:fadeIn .15s ease}
 .modal-bg.show{display:flex}
-.modal{background:var(--card);color:var(--ink);border:1px solid var(--card-line);border-radius:12px;padding:20px;width:100%;max-width:480px;box-shadow:var(--shadow-lg)}
-.modal h3{margin:0 0 4px;font-size:16px;font-weight:800;color:var(--ink)}
-.modal p.muted{margin:0 0 14px}
-.modal .modal-foot{display:flex;gap:8px;justify-content:flex-end;margin-top:6px}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.modal{background:var(--card);color:var(--ink);border:1px solid var(--card-line);border-radius:12px;padding:18px 20px;width:100%;max-width:460px;box-shadow:0 20px 60px rgba(0,0,0,.18),0 4px 12px rgba(0,0,0,.06);animation:slideIn .18s ease}
+@keyframes slideIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.modal h3{margin:0 0 2px;font-size:14px;font-weight:600;color:var(--ink);letter-spacing:-.01em}
+.modal p.muted{margin:0 0 12px;font-size:12px}
+.modal .modal-foot{display:flex;gap:6px;justify-content:flex-end;margin-top:8px}
+/* steps inside modal — for step-by-step flows */
+.steps{display:flex;align-items:center;gap:6px;margin:0 0 14px}
+.step-dot{width:18px;height:18px;border-radius:99px;background:var(--surface-2);color:var(--ink-muted);font-size:10px;font-weight:600;display:grid;place-items:center;border:1px solid var(--card-line)}
+.step-dot.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.step-line{flex:1;height:1px;background:var(--card-line)}
 
 /* command palette */
 .modal.palette{max-width:560px;padding:0;overflow:hidden}
@@ -247,23 +363,23 @@ tbody tr:hover{background:var(--surface-2)}
 .login-card h1{font-size:22px;margin:6px 0 2px;display:flex;align-items:center;gap:10px}
 .login-card .brand-pill{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,#3b82f6,#06b6d4);color:#fff;display:grid;place-items:center}
 
-/* alerts */
-.alert{padding:10px 12px;border-radius:8px;border:1px solid;display:flex;align-items:center;gap:8px;font-weight:600;margin-bottom:12px}
-.alert.ok{color:#166534;border-color:#bbf7d0;background:#f0fdf4}
-.alert.bad{color:#991b1b;border-color:#fecaca;background:#fef2f2}
-.alert.info{color:#1e40af;border-color:#bfdbfe;background:#eff6ff}
+/* alerts — softer, less shouty */
+.alert{padding:8px 12px;border-radius:8px;border:1px solid;display:flex;align-items:center;gap:8px;font-weight:500;font-size:12.5px;margin-bottom:10px}
+.alert.ok{color:#166534;border-color:#d3edd6;background:#f4faf5}
+.alert.bad{color:#991b1b;border-color:#f1c8c8;background:#fbf3f3}
+.alert.info{color:#1e40af;border-color:#cfdcf4;background:#f3f6fc}
 
 pre.mono{background:#0b1220;color:#e2e8f0;padding:14px;border-radius:8px;overflow:auto;font-size:12px;white-space:pre-wrap}
 hr.sep{border:none;border-top:1px solid var(--card-line);margin:14px 0}
 
 /* site-head — sticky-ish header for /site */
-.site-head{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;margin:0 0 16px}
-.site-head-main{display:flex;align-items:center;gap:12px;min-width:0}
-.site-head-main h1{margin:0;font-size:22px;font-weight:800;letter-spacing:-.02em}
-.site-head-main p{margin:2px 0 0;font-size:12px}
-.site-back{width:34px;height:34px;border-radius:8px;border:1px solid var(--card-line);background:#fff;display:grid;place-items:center;color:#475569;flex:none;transition:background .12s,color .12s}
-.site-back:hover{background:#f4f6fb;color:#0b1220}
-.site-back svg{transform:rotate(-90deg);width:14px;height:14px}
+.site-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 14px}
+.site-head-main{display:flex;align-items:center;gap:10px;min-width:0}
+.site-head-main h1{margin:0;font-size:18px;font-weight:600;letter-spacing:-.015em}
+.site-head-main p{margin:2px 0 0;font-size:11.5px}
+.site-back{width:28px;height:28px;border-radius:7px;border:1px solid var(--card-line);background:var(--surface);display:grid;place-items:center;color:var(--ink-muted);flex:none;transition:background .12s,color .12s}
+.site-back:hover{background:var(--surface-hover);color:var(--ink)}
+.site-back svg{transform:rotate(-90deg);width:12px;height:12px}
 .site-head-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 
 /* per-card toolbar (between tab + cards) */
@@ -290,13 +406,13 @@ table.flat tbody tr:hover{background:transparent}
 .empty-ic{width:42px;height:42px;border-radius:10px;background:#eff5ff;color:#2563eb;display:grid;place-items:center;flex:none}
 .empty-ic svg{width:20px;height:20px}
 
-/* tabbed site manager */
-.tabs{display:flex;gap:2px;background:#fff;border:1px solid var(--card-line);border-radius:10px;padding:5px;margin-bottom:14px;overflow-x:auto;flex-wrap:wrap;box-shadow:var(--shadow)}
-.tabs a{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:7px;color:#475569;font-weight:600;font-size:13px;white-space:nowrap;transition:background .12s,color .12s}
-.tabs a:hover{background:#f4f6fb;color:#0b1220}
-.tabs a.active{background:#0b1220;color:#fff}
-.tabs a.active svg{color:#fff;opacity:.9}
-.tabs a svg{width:14px;height:14px}
+/* tabbed site manager — flatter, underline style */
+.tabs{display:flex;gap:0;background:transparent;border:none;border-bottom:1px solid var(--card-line);border-radius:0;padding:0;margin-bottom:14px;overflow-x:auto;box-shadow:none}
+.tabs a{display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:0;color:var(--ink-muted);font-weight:500;font-size:12.5px;white-space:nowrap;transition:color .12s,border-color .12s;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs a:hover{color:var(--ink)}
+.tabs a.active{background:transparent;color:var(--ink);border-bottom-color:var(--ink)}
+.tabs a.active svg{color:var(--ink);opacity:1}
+.tabs a svg{width:13px;height:13px;opacity:.6}
 
 /* toast notifications */
 .toasts{position:fixed;top:18px;right:18px;display:flex;flex-direction:column;gap:8px;z-index:9999;pointer-events:none;max-width:calc(100% - 36px)}
@@ -327,31 +443,39 @@ table.flat tbody tr:hover{background:transparent}
       <span class="mark">{{icon "logo"}}</span>
       <span>hostQ<small>control panel</small></span>
     </div>
+    {{if .IsAdmin}}
+    <div class="navgroup">Admin</div>
+    <nav class="nav">
+      <a href="/services" class="{{if eq .View "services"}}active{{end}}">{{icon "server"}}<span>Services &amp; Packages</span></a>
+      <a href="/php" class="{{if eq .View "php"}}active{{end}}">{{icon "cpu"}}<span>PHP Versions</span></a>
+      <a href="/redis" class="{{if eq .View "redis"}}active{{end}}">{{icon "activity"}}<span>Redis Cache</span></a>
+      <a href="/cron" class="{{if eq .View "cron"}}active{{end}}">{{icon "clock"}}<span>Cron Jobs</span></a>
+    </nav>
+    <div class="navgroup">Security</div>
+    <nav class="nav">
+      <a href="/firewall" class="{{if eq .View "firewall"}}active{{end}}">{{icon "shield"}}<span>Firewall (fail2ban)</span></a>
+      <a href="/malfix" class="{{if eq .View "malfix"}}active{{end}}">{{icon "shield"}}<span>Malfix</span></a>
+      <a href="/audit" class="{{if eq .View "audit"}}active{{end}}">{{icon "activity"}}<span>Audit Log</span></a>
+    </nav>
+    <div class="navgroup">Panel</div>
+    <nav class="nav">
+      <a href="/account" class="{{if eq .View "account"}}active{{end}}">{{icon "users"}}<span>Account</span></a>
+      <a href="/" >{{icon "layout"}}<span>← Back to panel</span></a>
+      <a href="/logout">{{icon "logout"}}<span>Sign out</span></a>
+    </nav>
+    {{else}}
     <div class="navgroup">Main</div>
     <nav class="nav">
       <a href="/" class="{{if eq .View "dashboard"}}active{{end}}">{{icon "layout"}}<span>Dashboard</span></a>
       <a href="/sites" class="{{if or (eq .View "sites") (eq .View "site")}}active{{end}}">{{icon "globe"}}<span>Sites</span></a>
       <a href="/files?path=/" class="{{if eq .View "files"}}active{{end}}">{{icon "folder"}}<span>File Manager</span></a>
     </nav>
-    <div class="navgroup">Server</div>
+    <div class="navgroup">System</div>
     <nav class="nav">
-      <a href="/services" class="{{if eq .View "services"}}active{{end}}">{{icon "server"}}<span>Services</span></a>
-      <a href="/cron" class="{{if eq .View "cron"}}active{{end}}">{{icon "clock"}}<span>Cron</span></a>
-      <a href="/php" class="{{if eq .View "php"}}active{{end}}">{{icon "cpu"}}<span>PHP Versions</span></a>
-      <a href="/redis" class="{{if eq .View "redis"}}active{{end}}">{{icon "activity"}}<span>Redis Cache</span></a>
-    </nav>
-    <div class="navgroup">Advanced</div>
-    <nav class="nav">
-      <a href="/databases" class="{{if eq .View "databases"}}active{{end}}">{{icon "database"}}<span>All Databases</span></a>
-      <a href="/wordpress" class="{{if eq .View "wordpress"}}active{{end}}">{{icon "wordpress"}}<span>All WordPress</span></a>
-      <a href="/ssl" class="{{if eq .View "ssl"}}active{{end}}">{{icon "shield"}}<span>All Certificates</span></a>
-    </nav>
-    <div class="navgroup">Admin</div>
-    <nav class="nav">
-      <a href="/account" class="{{if eq .View "account"}}active{{end}}">{{icon "users"}}<span>Account</span></a>
-      <a href="/audit" class="{{if eq .View "audit"}}active{{end}}">{{icon "activity"}}<span>Audit Log</span></a>
+      <a href="/services">{{icon "server"}}<span>Admin area →</span></a>
       <a href="/logout">{{icon "logout"}}<span>Sign out</span></a>
     </nav>
+    {{end}}
     <div class="side-foot">
       <div class="row"><span>{{now.Format "Mon Jan 02"}}</span><span>{{now.Format "15:04"}}</span></div>
     </div>
@@ -379,6 +503,9 @@ table.flat tbody tr:hover{background:transparent}
       {{else if eq .View "account"}}{{template "account" .}}
       {{else if eq .View "audit"}}{{template "audit" .}}
       {{else if eq .View "redis"}}{{template "redis" .}}
+      {{else if eq .View "firewall"}}{{template "firewall" .}}
+      {{else if eq .View "fileedit"}}{{template "fileedit" .}}
+      {{else if eq .View "siteadd"}}{{template "siteadd" .}}
       {{end}}
     </div>
   </main>
@@ -404,7 +531,8 @@ table.flat tbody tr:hover{background:transparent}
   <a data-cat="Pages" data-icon="database" href="/databases">All databases</a>
   <a data-cat="Pages" data-icon="wordpress" href="/wordpress">All WordPress</a>
   <a data-cat="Pages" data-icon="shield" href="/ssl">All certificates</a>
-  <a data-cat="Admin" data-icon="users" href="/account">Account</a>
+  <a data-cat="Admin" data-icon="shield" href="/firewall">Firewall (fail2ban)</a>
+  <a data-cat="Admin" data-icon="users" href="/account">Account &amp; allowlist</a>
   <a data-cat="Admin" data-icon="activity" href="/audit">Audit log</a>
   <a data-cat="Admin" data-icon="logout" href="/logout">Sign out</a>
   {{range .PaletteSites}}<a data-cat="Sites" data-icon="globe" href="/site?domain={{.Domain}}">{{.Domain}}</a>{{end}}
@@ -522,15 +650,21 @@ document.addEventListener('submit',function(e){
   var m=(e.submitter&&e.submitter.getAttribute('data-confirm'))||e.target.getAttribute('data-confirm');
   if(m && !confirm(m)){ e.preventDefault(); }
 });
-// Generic modal helpers
+// Generic modal helpers. Modals marked with the "persistent" class survive
+// backdrop clicks and Escape — used for the upload progress modal so an
+// accidental side-click doesn't hide an in-flight transfer.
 function openModal(id){ var el=document.getElementById(id); if(el){ el.classList.add('show'); } }
 function closeModal(id){ var el=document.getElementById(id); if(el){ el.classList.remove('show'); } }
 document.addEventListener('click',function(e){
-  if(e.target.classList && e.target.classList.contains('modal-bg')){ e.target.classList.remove('show'); }
+  if(e.target.classList && e.target.classList.contains('modal-bg') && !e.target.classList.contains('persistent')){
+    e.target.classList.remove('show');
+  }
 });
 document.addEventListener('keydown',function(e){
   if(e.key==='Escape'){
-    document.querySelectorAll('.modal-bg.show').forEach(function(m){ m.classList.remove('show'); });
+    document.querySelectorAll('.modal-bg.show').forEach(function(m){
+      if(!m.classList.contains('persistent')){ m.classList.remove('show'); }
+    });
   }
 });
 </script>
@@ -603,19 +737,10 @@ document.addEventListener('keydown',function(e){
 
 {{define "sites"}}
 <div class="page-head">
-  <div><h1>Sites</h1><p>Create, enable, and manage your web sites.</p></div>
+  <div><h1>Sites</h1><p>{{len .Sites}} site{{if ne (len .Sites) 1}}s{{end}} on this server.</p></div>
+  <a class="btn primary" href="/sites/add">{{icon "plus"}} Add website</a>
 </div>
 {{if .Error}}<div class="alert bad">{{icon "alert"}} {{.Error}}</div>{{end}}
-<div class="card">
-  <h3>Add new site</h3>
-  <form method="post">
-    <div class="row">
-      <input class="input" name="domain" placeholder="example.com" required>
-      <button class="btn primary">{{icon "plus"}} Add site</button>
-    </div>
-    <p class="muted" style="margin-top:8px">An Nginx vhost and document root will be created. PHP 8.4 by default — change later in PHP Manager.</p>
-  </form>
-</div>
 <div class="card" style="padding:0">
   <table>
     <thead><tr><th>Domain</th><th>Document root</th><th>PHP</th><th>Cache</th><th>SSL</th><th>Status</th><th class="right-col">Action</th></tr></thead>
@@ -656,47 +781,290 @@ document.addEventListener('keydown',function(e){
   <a href="/site?domain={{.Site.Domain}}&tab=overview"  class="{{if eq .Tab "overview"}}active{{end}}">{{icon "layout"}} Overview</a>
   <a href="/site?domain={{.Site.Domain}}&tab=database"  class="{{if eq .Tab "database"}}active{{end}}">{{icon "database"}} Database</a>
   <a href="/site?domain={{.Site.Domain}}&tab=wordpress" class="{{if eq .Tab "wordpress"}}active{{end}}">{{icon "wordpress"}} WordPress</a>
+  <a href="/site?domain={{.Site.Domain}}&tab=domains"   class="{{if eq .Tab "domains"}}active{{end}}">{{icon "globe"}} Domains</a>
   <a href="/site?domain={{.Site.Domain}}&tab=ssl"       class="{{if eq .Tab "ssl"}}active{{end}}">{{icon "shield"}} SSL</a>
   <a href="/site?domain={{.Site.Domain}}&tab=php"       class="{{if eq .Tab "php"}}active{{end}}">{{icon "cpu"}} PHP</a>
+  <a href="/site?domain={{.Site.Domain}}&tab=cache"     class="{{if eq .Tab "cache"}}active{{end}}">{{icon "activity"}} Cache</a>
+  <a href="/site?domain={{.Site.Domain}}&tab=analytics" class="{{if eq .Tab "analytics"}}active{{end}}">{{icon "activity"}} Analytics</a>
   <a href="/files?path=/{{.Site.Domain}}/htdocs">{{icon "folderOpen"}} Files</a>
+  <a href="/site?domain={{.Site.Domain}}&tab=nginx"     class="{{if eq .Tab "nginx"}}active{{end}}">{{icon "server"}} Nginx</a>
   <a href="/site?domain={{.Site.Domain}}&tab=security"  class="{{if eq .Tab "security"}}active{{end}}">{{icon "shield"}} Security</a>
   <a href="/site?domain={{.Site.Domain}}&tab=backups"   class="{{if eq .Tab "backups"}}active{{end}}">{{icon "archive"}} Backups</a>
 </div>
 
 {{if eq .Tab "overview"}}
-  <div class="grid-2">
-    <div class="card">
-      <h3>Quick actions</h3>
-      <div class="actions">
-        <a class="btn" href="/files?path=/{{.Site.Domain}}/htdocs">{{icon "folderOpen"}} Files</a>
-        <a class="btn" href="/site?domain={{.Site.Domain}}&tab=database">{{icon "database"}} Database</a>
-        <a class="btn" href="/site?domain={{.Site.Domain}}&tab=wordpress">{{icon "wordpress"}} WordPress</a>
-        <a class="btn" href="/site?domain={{.Site.Domain}}&tab=ssl">{{icon "shield"}} SSL</a>
-        <a class="btn" href="/site?domain={{.Site.Domain}}&tab=security">{{icon "shield"}} Security scan</a>
+  <div class="card hero-card">
+    <div class="hero-thumb" style="background:linear-gradient(135deg,hsl({{.HeroHue}},65%,38%),hsl({{.HeroHue}},75%,58%))">{{.HeroLetter}}</div>
+    <div class="hero-info">
+      <div>
+        <div class="hero-domain">
+          {{if .Site.SSL}}<span class="lock-ok">{{icon "shield"}}</span>{{else}}<span class="lock-bad">{{icon "alert"}}</span>{{end}}
+          <span>{{.Site.Domain}}</span>
+        </div>
+        <div class="hero-path mono">{{.Site.Root}}</div>
+      </div>
+      <div class="hero-meta">
+        {{if .Site.Enabled}}<span class="badge ok">{{icon "check"}} live</span>{{else}}<span class="badge bad">{{icon "x"}} disabled</span>{{end}}
+        {{if .Site.SSL}}<span class="badge ok">{{icon "shield"}} SSL</span>{{end}}
+        {{if .Site.Cache}}<span class="badge info">cache</span>{{end}}
+        <span class="badge">PHP {{.Site.PHPVersion}}</span>
+      </div>
+      <div class="hero-actions">
+        <a class="btn primary" href="http{{if .Site.SSL}}s{{end}}://{{.Site.Domain}}" target="_blank">{{icon "globe"}} Preview</a>
+        {{if .WPOnSite}}<a class="btn" href="/wordpress?manage={{.Site.Domain}}">{{icon "wordpress"}} WP Admin</a>{{end}}
         <a class="btn" href="/site?domain={{.Site.Domain}}&tab=backups">{{icon "archive"}} Backups</a>
       </div>
     </div>
+  </div>
+
+  <div class="tiles-row">
+    <a class="tile" href="/site?domain={{.Site.Domain}}&tab=backups"><span class="tile-ic">{{icon "archive"}}</span><span>Backups</span></a>
+    <a class="tile" href="/files?path=/{{.Site.Domain}}/htdocs"><span class="tile-ic">{{icon "folderOpen"}}</span><span>File manager</span></a>
+    <a class="tile" href="/site?domain={{.Site.Domain}}&tab=database"><span class="tile-ic">{{icon "database"}}</span><span>Database</span></a>
+    <a class="tile" href="/site?domain={{.Site.Domain}}&tab=ssl"><span class="tile-ic">{{icon "shield"}}</span><span>SSL</span></a>
+    <a class="tile" href="/site?domain={{.Site.Domain}}&tab=analytics"><span class="tile-ic">{{icon "activity"}}</span><span>Analytics</span></a>
+    <a class="tile" href="/site?domain={{.Site.Domain}}&tab=security"><span class="tile-ic">{{icon "alert"}}</span><span>Security</span></a>
+  </div>
+
+  <div class="grid-2">
     <div class="card">
-      <h3>Site controls</h3>
-      <div class="actions">
-        <form method="post" action="/site-action"><input type="hidden" name="domain" value="{{.Site.Domain}}">
-          {{if .Site.Enabled}}<button class="btn" name="action" value="disable">{{icon "power"}} Disable</button>
-          {{else}}<button class="btn primary" name="action" value="enable">{{icon "power"}} Enable</button>{{end}}
-        </form>
-        <form method="post" action="/site-action"><input type="hidden" name="domain" value="{{.Site.Domain}}">
-          {{if .Site.Cache}}<button class="btn" name="action" value="cache-off">Cache: off</button>
-          {{else}}<button class="btn" name="action" value="cache-on">Cache: on</button>{{end}}
-        </form>
-        <form method="post" action="/site-action"><input type="hidden" name="domain" value="{{.Site.Domain}}">
-          <button class="btn" name="action" value="permissions">{{icon "shield"}} Fix permissions</button>
-        </form>
-        <form method="post" action="/site-action" data-confirm="Permanently delete this site, its document root, and Nginx vhost?">
-          <input type="hidden" name="domain" value="{{.Site.Domain}}">
-          <button class="btn danger" name="action" value="delete">{{icon "trash"}} Delete site</button>
-        </form>
-      </div>
+      <h3>Applications</h3>
+      {{if .WPOnSite}}
+        <div class="app-row">
+          <div class="app-icon" style="background:linear-gradient(135deg,#21759b,#4a8bb5)">W</div>
+          <div class="app-meta">
+            <strong>WordPress</strong>{{if .WPOnSite.Version}} <span class="badge">{{.WPOnSite.Version}}</span>{{end}}
+            <div class="muted mono" style="font-size:11.5px;margin-top:2px">{{.WPOnSite.Path}}</div>
+          </div>
+          <a class="btn mini" href="/wordpress?manage={{.Site.Domain}}">Manage</a>
+        </div>
+      {{else}}
+        <p class="muted" style="margin:0">No application detected. Install WordPress from the <a href="/site?domain={{.Site.Domain}}&tab=wordpress" style="color:#2563eb;font-weight:700">WordPress tab</a> or upload your own files into <span class="mono">{{.Site.Root}}</span>.</p>
+      {{end}}
+    </div>
+    <div class="card glance-card">
+      <h3>At a glance</h3>
+      <table class="flat">
+        <tbody>
+          <tr><td>Web server</td><td><span class="badge info">Nginx</span></td></tr>
+          <tr><td>PHP version</td><td><span class="badge">{{.Site.PHPVersion}}</span></td></tr>
+          <tr><td>SSL</td><td>{{if .Site.SSL}}<span class="badge ok">{{icon "check"}} on</span>{{else}}<span class="badge bad">off</span>{{end}}</td></tr>
+          <tr><td>FastCGI cache</td><td>{{if .Site.Cache}}<span class="badge ok">on</span>{{else}}<span class="badge">off</span>{{end}}</td></tr>
+          <tr><td>Document root</td><td class="mono" style="font-size:11.5px">{{.Site.Root}}</td></tr>
+          <tr><td>Host</td><td>{{.ServerHostname}}</td></tr>
+        </tbody>
+      </table>
     </div>
   </div>
+
+  <div class="card">
+    <h3>Site controls</h3>
+    <div class="actions">
+      <form method="post" action="/site-action" style="display:inline"><input type="hidden" name="domain" value="{{.Site.Domain}}">
+        {{if .Site.Enabled}}<button class="btn" name="action" value="disable">{{icon "power"}} Disable</button>
+        {{else}}<button class="btn primary" name="action" value="enable">{{icon "power"}} Enable</button>{{end}}
+      </form>
+      <form method="post" action="/site-action" style="display:inline"><input type="hidden" name="domain" value="{{.Site.Domain}}">
+        <button class="btn" name="action" value="permissions">{{icon "shield"}} Fix permissions</button>
+      </form>
+      <form method="post" action="/site-action" data-confirm="Permanently delete this site, its document root, and Nginx vhost?" style="display:inline">
+        <input type="hidden" name="domain" value="{{.Site.Domain}}">
+        <button class="btn danger" name="action" value="delete">{{icon "trash"}} Delete site</button>
+      </form>
+    </div>
+  </div>
+{{end}}
+
+{{if eq .Tab "cache"}}
+  <div class="card">
+    <h3>FastCGI page cache</h3>
+    <p class="muted">Nginx caches whole PHP responses for anonymous traffic so cache hits never invoke PHP. This is the local-process equivalent of Varnish — same outcome at zero extra daemons.</p>
+    <div class="actions" style="margin-top:8px">
+      <form method="post" action="/site-action" style="display:inline"><input type="hidden" name="domain" value="{{.Site.Domain}}">
+        {{if .Site.Cache}}<button class="btn" name="action" value="cache-off">{{icon "x"}} Turn off</button>
+        {{else}}<button class="btn primary" name="action" value="cache-on">{{icon "check"}} Turn on</button>{{end}}
+      </form>
+      <form method="post" action="/site-nginx" data-confirm="Purge the FastCGI cache (all sites) and reload Nginx?" style="display:inline">
+        <input type="hidden" name="domain" value="{{.Site.Domain}}">
+        <button class="btn" name="action" value="flush">{{icon "refresh"}} Flush page cache</button>
+      </form>
+      <span class="muted" style="font-size:12px;align-self:center">Cache files live at <span class="mono">{{.FastCGICacheDir}}</span></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Redis object cache</h3>
+    {{if .RedisStats.Active}}
+      <p class="muted">Redis is running on 127.0.0.1:6379. Plug it into WordPress with the <span class="mono">redis-cache</span> plugin, or call it directly via <span class="mono">phpredis</span> in your app.</p>
+      <div class="grid" style="margin-top:10px">
+        <div class="stat"><div class="label">{{icon "cpu"}} Memory</div><div class="val">{{.RedisStats.UsedMemory}}</div><div class="sub">peak {{.RedisStats.PeakMemory}}</div></div>
+        <div class="stat"><div class="label">{{icon "box"}} Keys</div><div class="val">{{.RedisStats.TotalKeys}}</div><div class="sub">db0</div></div>
+        <div class="stat"><div class="label">{{icon "check"}} Hit rate</div><div class="val">{{.RedisStats.HitRate}}</div><div class="sub">since boot</div></div>
+      </div>
+      <div class="actions" style="margin-top:10px">
+        <form method="post" action="/redis" data-confirm="Flush ALL Redis keys?" style="display:inline">
+          <button class="btn danger" name="action" value="flush">{{icon "trash"}} Flush Redis</button>
+        </form>
+        <a class="btn" href="/redis">{{icon "settings"}} Full Redis page</a>
+      </div>
+    {{else}}
+      <div class="card empty" style="margin:0">
+        <div class="empty-ic">{{icon "activity"}}</div>
+        <div>
+          <h3 style="margin:0 0 4px;color:var(--ink)">Redis is not running</h3>
+          <p class="muted" style="margin:0 0 10px">Start it from the Redis page — first-time use auto-installs the apt package.</p>
+          <a class="btn primary" href="/redis">{{icon "play"}} Open Redis page</a>
+        </div>
+      </div>
+    {{end}}
+  </div>
+{{end}}
+
+{{if eq .Tab "analytics"}}
+  <div class="toolbar">
+    <div class="muted">{{.Analytics.Window}} · parsed from <span class="mono">/var/log/nginx/{{.Site.Domain}}.access.log</span></div>
+    <a class="btn" href="/site?domain={{.Site.Domain}}&tab=analytics">{{icon "refresh"}} Refresh</a>
+  </div>
+  {{if not .Analytics.HasLog}}
+    <div class="card empty">
+      <div class="empty-ic">{{icon "activity"}}</div>
+      <div>
+        <h3 style="margin:0 0 4px;color:var(--ink)">No log file yet</h3>
+        <p class="muted" style="margin:0">Per-site access logs land at <span class="mono">/var/log/nginx/{{.Site.Domain}}.access.log</span> once the vhost is rewritten. If you just upgraded the panel, toggle the site Disable + Enable from Overview (or any cache/PHP action) to regenerate the vhost — the log file will appear on the next request.</p>
+      </div>
+    </div>
+  {{else}}
+    <div class="card">
+      <div class="an-headline">
+        <div class="item"><div class="label">Total hits</div><div class="val">{{.Analytics.TotalHits}}</div></div>
+        <div class="item"><div class="label">Unique IPs</div><div class="val">{{.Analytics.UniqueHits}}</div></div>
+        <div class="item"><div class="label">Bandwidth</div><div class="val">{{.Analytics.HumanBytes}}</div></div>
+      </div>
+      <svg class="an-chart" viewBox="0 0 700 260" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="anBarFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#3b82f6" stop-opacity=".85"/>
+            <stop offset="100%" stop-color="#06b6d4" stop-opacity=".75"/>
+          </linearGradient>
+        </defs>
+        <g class="grid">
+          <line x1="40" x2="690" y1="40"  y2="40"/>
+          <line x1="40" x2="690" y1="100" y2="100"/>
+          <line x1="40" x2="690" y1="160" y2="160"/>
+          <line x1="40" x2="690" y1="220" y2="220"/>
+        </g>
+        <g class="axis">
+          {{range .Analytics.Bars}}
+            <rect class="bar" x="{{.BarX}}" y="{{.Y}}" width="32" height="{{.H}}" rx="3"/>
+            <text x="{{.X}}" y="240" text-anchor="middle">{{.Label}}</text>
+            {{if gt .Hits 0}}<text x="{{.X}}" y="{{.LabelY}}" text-anchor="middle" style="font-weight:700;fill:var(--ink)">{{.Hits}}</text>{{end}}
+          {{end}}
+        </g>
+      </svg>
+    </div>
+    <div class="card" style="padding:0">
+      <table>
+        <thead><tr><th>Date</th><th>Hits</th><th>Unique IPs</th><th>Bandwidth</th></tr></thead>
+        <tbody>
+          {{range .Analytics.Days}}<tr>
+            <td class="mono">{{.Date}}</td>
+            <td>{{.Hits}}</td>
+            <td>{{.Unique}}</td>
+            <td class="muted">{{if gt .Bytes 0}}{{humanBytes .Bytes}}{{else}}—{{end}}</td>
+          </tr>{{end}}
+        </tbody>
+      </table>
+    </div>
+  {{end}}
+{{end}}
+
+{{if eq .Tab "domains"}}
+  <div class="card">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <h3 style="margin:0">{{icon "globe"}} {{.Site.Domain}}</h3>
+      <span class="badge ok">primary</span>
+      <span class="muted mono" style="font-size:11.5px">www.{{.Site.Domain}} is included automatically</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Aliases</h3>
+    <p class="muted">Extra hostnames that serve the same content as the primary. Added to <span class="mono">server_name</span> on every panel-managed vhost — no separate docroot, no separate SSL. For a different docroot, add a new site instead (subdomain or addon).</p>
+    {{if .Aliases}}
+      <div style="margin-top:8px">
+        {{range .Aliases}}
+        <div class="alias-row">
+          <span class="mono">{{.}}</span>
+          <form method="post" action="/site-action" data-confirm="Remove alias {{.}} from {{$.Site.Domain}}?" style="display:inline">
+            <input type="hidden" name="domain" value="{{$.Site.Domain}}">
+            <input type="hidden" name="alias" value="{{.}}">
+            <button class="btn mini danger" name="action" value="alias-remove">{{icon "x"}} Remove</button>
+          </form>
+        </div>
+        {{end}}
+      </div>
+    {{else}}
+      <p class="muted" style="margin:6px 0 0">No aliases yet.</p>
+    {{end}}
+    <hr class="sep">
+    <form method="post" action="/site-action">
+      <input type="hidden" name="domain" value="{{.Site.Domain}}">
+      <div class="row">
+        <div class="field"><label>Add alias hostname</label><input class="input mono" name="alias" placeholder="example.org" required pattern="^[a-zA-Z0-9][a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"></div>
+        <button class="btn primary" name="action" value="alias-add" style="align-self:flex-end">{{icon "plus"}} Add alias</button>
+      </div>
+    </form>
+    <p class="muted" style="font-size:12px;margin:8px 0 0">After adding an alias, point its DNS A record at this server and (if you want HTTPS on the alias) re-run SSL with both hostnames: <span class="mono">certbot --nginx --expand -d {{.Site.Domain}} -d &lt;alias&gt;</span>.</p>
+  </div>
+
+  <div class="card">
+    <h3>Subdomain / Addon domain</h3>
+    <p class="muted">Subdomains and addon domains each need their own document root, so the panel treats them as new sites. Open <a href="/sites/add" style="color:#2563eb;font-weight:700">Add website</a> and use a hostname like <span class="mono">blog.{{.Site.Domain}}</span> (subdomain) or any unrelated domain (addon). DNS still needs to point at this box.</p>
+    <a class="btn" href="/sites/add">{{icon "plus"}} Open Add website</a>
+  </div>
+{{end}}
+
+{{if eq .Tab "nginx"}}
+  <div class="toolbar">
+    <div class="muted">Drop in custom Nginx directives (rewrite rules, location blocks, headers) so they survive every panel-driven vhost rewrite.</div>
+    <form method="post" action="/site-nginx" style="display:inline">
+      <input type="hidden" name="domain" value="{{.Site.Domain}}">
+      <button class="btn" name="action" value="flush" data-confirm="Purge the shared FastCGI cache and reload Nginx?">{{icon "refresh"}} Flush cache</button>
+    </form>
+  </div>
+  <div class="card">
+    <h3>Custom Nginx config block</h3>
+    <p class="muted">These directives are included inside every <span class="mono">server { ... }</span> block hostQ writes for {{.Site.Domain}} (both port 80 and port 443 when SSL is on). Use this to add the rewrite rules your <span class="mono">.htaccess</span> used to handle on Apache — Nginx does not read <span class="mono">.htaccess</span>.</p>
+    <form method="post" action="/site-nginx">
+      <input type="hidden" name="domain" value="{{.Site.Domain}}">
+      <input type="hidden" name="action" value="save">
+      <textarea class="input mono" name="nginx" rows="14" spellcheck="false" placeholder="# Catch-all front controller (route everything missing through index.php)
+location / {
+    try_files $uri $uri/ /index.php?$args;
+}
+
+# Example: friendly URLs that pass the path to PHP via ?route=
+# rewrite ^/shop/?$               /index.php?route=shop          last;
+# rewrite ^/shop/([^/]+)/?$       /index.php?route=shop&cat=$1   last;
+# rewrite ^/product/([^/]+)/?$    /index.php?route=product&slug=$1 last;
+
+# Example: security headers
+# add_header X-Content-Type-Options nosniff always;
+# add_header Referrer-Policy strict-origin-when-cross-origin always;
+">{{.NginxExtra}}</textarea>
+      <div style="margin-top:10px;display:flex;gap:8px">
+        <button class="btn primary" type="submit">{{icon "check"}} Save &amp; reload</button>
+      </div>
+      <p class="muted" style="font-size:12px;margin-top:8px">If <span class="mono">nginx -t</span> rejects your edit hostQ rolls back automatically — the running config keeps working and the toast tells you what nginx complained about.</p>
+    </form>
+  </div>
+  {{if .NginxVhost}}
+  <div class="card">
+    <h3>Current rendered vhost (read-only)</h3>
+    <p class="muted" style="margin:0 0 10px">Shows the actual <span class="mono">/etc/nginx/sites-available/{{.Site.Domain}}</span> hostQ generated, including your custom config + the phpMyAdmin snippet + the SSL block.</p>
+    <pre class="mono" style="background:var(--surface-2);color:var(--ink);padding:14px;border-radius:8px;font-size:12px;line-height:1.55;overflow:auto;max-height:340px;border:1px solid var(--card-line);white-space:pre">{{.NginxVhost}}</pre>
+  </div>
+  {{end}}
 {{end}}
 
 {{if eq .Tab "security"}}
@@ -774,7 +1142,10 @@ document.addEventListener('keydown',function(e){
 
   <div class="toolbar">
     <div class="muted">{{len .Databases}} database{{if ne (len .Databases) 1}}s{{end}} on <strong>{{.Site.Domain}}</strong></div>
-    <button class="btn primary" onclick="openModal('m-newdb')">{{icon "plus"}} New database</button>
+    <div class="actions">
+      {{if .AttachableDBs}}<button class="btn" onclick="openModal('m-attachdb')">{{icon "plus"}} Attach existing</button>{{end}}
+      <button class="btn primary" onclick="openModal('m-newdb')">{{icon "plus"}} New database</button>
+    </div>
   </div>
 
   {{range .Databases}}
@@ -784,7 +1155,12 @@ document.addEventListener('keydown',function(e){
       <div class="actions">
         <a class="btn mini" href="/pma-login?domain={{$.Site.Domain}}&db={{.Name}}&user={{.Name}}" target="_blank">{{icon "terminal"}} Open in phpMyAdmin</a>
         <button class="btn mini" onclick="openAddUser('{{.Name}}')">{{icon "plus"}} Add user</button>
-        <form method="post" action="/databases" data-confirm="Drop database {{.Name}}? This deletes all tables and the matching user.">
+        {{if index $.AttachedDBs .Name}}<form method="post" action="/databases" data-confirm="Unlink {{.Name}} from {{$.Site.Domain}}? The database itself is not deleted." style="display:inline">
+          <input type="hidden" name="site" value="{{$.Site.Domain}}">
+          <input type="hidden" name="db" value="{{.Name}}">
+          <button class="btn mini" name="action" value="detach" title="Unlink from this site (does not drop)">{{icon "x"}} Detach</button>
+        </form>{{end}}
+        <form method="post" action="/databases" data-confirm="Drop database {{.Name}}? This deletes all tables and the matching user." style="display:inline">
           <input type="hidden" name="site" value="{{$.Site.Domain}}">
           <input type="hidden" name="target" value="{{.Name}}">
           <button class="btn mini danger" name="action" value="delete">{{icon "trash"}} Drop</button>
@@ -820,24 +1196,51 @@ document.addEventListener('keydown',function(e){
   {{end}}
 
   <!-- modals -->
-  <div class="modal-bg" id="m-newdb"><div class="modal">
+  <div class="modal-bg" id="m-newdb"><div class="modal" style="max-width:560px">
     <h3>{{icon "plus"}} New database</h3>
-    <p class="muted">Creates a database and a matching user with a 24-char password. Auto-prefixed with <span class="mono">{{.DBPrefix}}_</span>.</p>
+    <p class="muted">Creates a database, a matching user, and a grant. Anything left blank is auto-generated. Prefix <span class="mono">{{.DBPrefix}}_</span> is added so panel-managed databases stand out.</p>
     <form method="post" action="/databases">
       <input type="hidden" name="site" value="{{.Site.Domain}}">
-      <div class="field"><label>Suffix</label><input class="input mono" name="name" placeholder="main" required autofocus></div>
+      <div class="field"><label>Database name <span class="muted" style="font-weight:500">(suffix only; full name becomes <span class="mono">{{.DBPrefix}}_&lt;suffix&gt;</span>)</span></label><input class="input mono" name="name" placeholder="main" required autofocus></div>
+      <div class="row">
+        <div class="field"><label>Username <span class="muted" style="font-weight:500">(optional — defaults to the DB name)</span></label><input class="input mono" name="user" placeholder="auto"></div>
+        <div class="field"><label>Password <span class="muted" style="font-weight:500">(optional — auto-generates 24 chars)</span></label><input class="input mono" name="password" type="text" placeholder="auto"></div>
+      </div>
+      <ul class="muted" style="font-size:11.5px;margin:4px 0 12px;padding-left:18px;line-height:1.55">
+        <li>Letters, digits, and underscore only — username max 32 chars.</li>
+        <li>If you set the password manually, make it 12+ chars with a mix of cases / digits / specials.</li>
+        <li>Full privileges on the new database are granted to the user; FLUSH PRIVILEGES runs automatically.</li>
+      </ul>
       <div class="modal-foot"><button type="button" class="btn" onclick="closeModal('m-newdb')">Cancel</button><button class="btn primary" name="action" value="create">{{icon "check"}} Create</button></div>
     </form>
   </div></div>
 
-  <div class="modal-bg" id="m-adduser"><div class="modal">
+  <div class="modal-bg" id="m-attachdb"><div class="modal">
+    <h3>{{icon "plus"}} Attach existing database</h3>
+    <p class="muted">Link an already-existing database to <strong>{{.Site.Domain}}</strong>. Useful when the database was created out-of-band (manual mysql CLI, an installer, or before the site was added). The database is not modified — only the panel's mapping is updated.</p>
+    <form method="post" action="/databases">
+      <input type="hidden" name="site" value="{{.Site.Domain}}">
+      <div class="field"><label>Database</label>
+        <select class="input mono" name="db" required>
+          {{range .AttachableDBs}}<option value="{{.Name}}">{{.Name}}</option>{{end}}
+        </select>
+      </div>
+      <div class="modal-foot"><button type="button" class="btn" onclick="closeModal('m-attachdb')">Cancel</button><button class="btn primary" name="action" value="attach">{{icon "check"}} Attach</button></div>
+    </form>
+  </div></div>
+
+  <div class="modal-bg" id="m-adduser"><div class="modal" style="max-width:520px">
     <h3>{{icon "plus"}} Add user</h3>
-    <p class="muted">User will receive full privileges on <span class="mono" id="mu-db"></span>.</p>
+    <p class="muted">User receives full privileges on <span class="mono" id="mu-db"></span>.</p>
     <form method="post" action="/databases">
       <input type="hidden" name="site" value="{{.Site.Domain}}">
       <input type="hidden" name="target" id="mu-target">
-      <div class="field"><label>Username (letters, digits, _; max 32)</label><input class="input mono" name="user" placeholder="app_user" required></div>
-      <div class="field"><label>Password</label><input class="input mono" name="password" type="text" placeholder="leave empty to auto-generate"></div>
+      <div class="field"><label>Username</label><input class="input mono" name="user" placeholder="app_user" required></div>
+      <div class="field"><label>Password <span class="muted" style="font-weight:500">(optional — auto-generates 20 chars)</span></label><input class="input mono" name="password" type="text" placeholder="auto"></div>
+      <ul class="muted" style="font-size:11.5px;margin:0 0 12px;padding-left:18px;line-height:1.55">
+        <li>Username: letters, digits, underscore only, max 32 chars.</li>
+        <li>If you set a password, use 12+ characters with mixed cases / digits / specials.</li>
+      </ul>
       <div class="modal-foot"><button type="button" class="btn" onclick="closeModal('m-adduser')">Cancel</button><button class="btn primary" name="action" value="user-create">{{icon "check"}} Add user</button></div>
     </form>
   </div></div>
@@ -1033,6 +1436,114 @@ document.addEventListener('keydown',function(e){
       </div>
       <p class="muted" style="margin-top:8px">Currently using <strong>PHP {{.Site.PHPVersion}}</strong>. The vhost is rewritten and nginx reloaded.</p>
     </form>
+  </div>
+
+  <div class="card">
+    <div class="toolbar" style="margin:0">
+      <div>
+        <h3 style="margin:0">PHP {{.Site.PHPVersion}} extensions</h3>
+        <p class="muted" style="margin:4px 0 0">Tick what you want enabled, untick what you don't, then click <strong>Apply changes</strong>. Missing packages are installed via apt and enabled in one step. PHP-FPM is reloaded at the end.</p>
+      </div>
+      <span class="badge warn" title="PHP modules live per PHP version, not per site">{{icon "alert"}} affects every site on PHP {{.Site.PHPVersion}}</span>
+    </div>
+    <hr class="sep">
+    <form method="post" action="/site-php-ext">
+      <input type="hidden" name="domain" value="{{.Site.Domain}}">
+      <table>
+        <thead><tr><th style="width:38px"><input type="checkbox" id="extAll" onchange="document.querySelectorAll('.extbox').forEach(function(c){c.checked=this.checked}.bind(this))"></th><th>Extension</th><th>Status</th><th>Apt package</th><th class="right-col"></th></tr></thead>
+        <tbody>
+          {{range .PHPExtensions}}<tr>
+            <td><input type="checkbox" class="extbox" name="ext_{{.Name}}" {{if .Enabled}}checked{{end}}></td>
+            <td><strong class="mono">{{.Name}}</strong>{{if .Common}} <span class="badge info" style="margin-left:6px">common</span>{{end}}</td>
+            <td>
+              {{if .Loaded}}<span class="badge ok">{{icon "check"}} loaded</span>
+              {{else if .Enabled}}<span class="badge ok">{{icon "check"}} enabled</span>
+              {{else if .Installed}}<span class="badge">installed · disabled</span>
+              {{else}}<span class="badge">not installed</span>{{end}}
+            </td>
+            <td class="mono muted" style="font-size:11.5px">{{.Apt}}</td>
+            <td class="right-col">
+              {{if .Installed}}<form method="post" action="/site-php-ext" data-confirm="Uninstall {{.Apt}}? Other sites on PHP {{$.Site.PHPVersion}} will lose this extension too." style="display:inline">
+                <input type="hidden" name="domain" value="{{$.Site.Domain}}">
+                <input type="hidden" name="ext" value="{{.Name}}">
+                <button class="btn mini danger" name="action" value="uninstall">{{icon "trash"}}</button>
+              </form>{{end}}
+            </td>
+          </tr>{{else}}<tr><td colspan="5" class="muted">No extensions reported for PHP {{$.Site.PHPVersion}}. Is the FPM package installed?</td></tr>{{end}}
+        </tbody>
+      </table>
+      <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+        <button class="btn primary" name="action" value="apply">{{icon "check"}} Apply changes</button>
+        <span class="muted" style="font-size:12px">Reloads php{{.Site.PHPVersion}}-fpm when done.</span>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="toolbar" style="margin:0">
+      <div>
+        <h3 style="margin:0">PHP overrides for {{.Site.Domain}}</h3>
+        <p class="muted" style="margin:4px 0 0">Per-site values injected via <span class="mono">fastcgi_param PHP_VALUE</span> in the site's nginx vhost. The system-wide <span class="mono">php.ini</span> is not touched. Other sites on PHP {{.Site.PHPVersion}} keep their own settings.</p>
+      </div>
+      <div class="tabs" style="margin:0;padding:4px">
+        <a id="phpModeManaged" class="active" onclick="phpSetMode('managed');return false" href="#">Managed</a>
+        <a id="phpModeFull" onclick="phpSetMode('full');return false" href="#">Full INI</a>
+      </div>
+    </div>
+    <hr class="sep">
+
+    <form method="post" action="/site-action" id="phpManagedForm">
+      <input type="hidden" name="domain" value="{{.Site.Domain}}">
+      <table>
+        <thead><tr><th style="width:30%">Setting</th><th>Value</th><th class="muted" style="width:42%">Hint</th></tr></thead>
+        <tbody>
+          {{$vals := .PHPIniValues}}
+          {{range .PHPManagedKeys}}<tr>
+            <td><strong class="mono">{{.Key}}</strong><div class="muted" style="font-size:11px;margin-top:2px">{{.Label}}</div></td>
+            <td><input class="input mono" name="php_{{.Key}}" value="{{index $vals .Key}}" placeholder="(default)"></td>
+            <td class="muted" style="font-size:11.5px">{{.Hint}}</td>
+          </tr>{{end}}
+        </tbody>
+      </table>
+      <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+        <button class="btn primary" name="action" value="php-save-managed">{{icon "check"}} Save overrides</button>
+        <span class="muted" style="font-size:12px">Leave a field blank to drop the override and inherit PHP's default. Nginx is reloaded after save.</span>
+      </div>
+    </form>
+
+    <form method="post" action="/site-action" id="phpFullForm" style="display:none">
+      <input type="hidden" name="domain" value="{{.Site.Domain}}">
+      <p class="muted" style="margin:0 0 8px">Raw INI body. One <span class="mono">setting=value</span> per line. Comments start with <span class="mono">;</span> or <span class="mono">#</span>. Saved to <span class="mono">/etc/hostq/sites/{{.Site.Domain}}.php.ini</span>; the managed form above will reflect any keys it knows about after reload.</p>
+      <textarea class="input mono" name="ini" rows="14" spellcheck="false" placeholder="memory_limit=512M
+upload_max_filesize=128M
+post_max_size=128M
+max_execution_time=600
+date.timezone=UTC
+display_errors=Off
+">{{.PHPIniRaw}}</textarea>
+      <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+        <button class="btn primary" name="action" value="php-save-full">{{icon "check"}} Save raw INI</button>
+        <span class="muted" style="font-size:12px">Empty content removes the override file and reverts to PHP defaults.</span>
+      </div>
+    </form>
+
+    <script>
+    (function(){
+      window.phpSetMode = function(mode){
+        var managed = document.getElementById('phpManagedForm');
+        var full    = document.getElementById('phpFullForm');
+        var mTab    = document.getElementById('phpModeManaged');
+        var fTab    = document.getElementById('phpModeFull');
+        if(mode === 'full'){
+          managed.style.display = 'none'; full.style.display = '';
+          mTab.classList.remove('active'); fTab.classList.add('active');
+        } else {
+          managed.style.display = ''; full.style.display = 'none';
+          mTab.classList.add('active'); fTab.classList.remove('active');
+        }
+      };
+    })();
+    </script>
   </div>
 {{end}}
 
@@ -1255,6 +1766,8 @@ document.addEventListener('keydown',function(e){
   <button type="button" class="btn mini" onclick="fmBulkClear()">Clear</button>
   <div class="grow"></div>
   <button type="button" class="btn mini" onclick="fmBulkOpen('chmod')">{{icon "shield"}} Chmod</button>
+  <button type="button" class="btn mini" onclick="fmBulkWritable()">{{icon "check"}} Writable</button>
+  <button type="button" class="btn mini" onclick="fmBulkOpen('copy')">{{icon "copy"}} Copy</button>
   <button type="button" class="btn mini" onclick="fmBulkOpen('move')">{{icon "move"}} Move</button>
   <button type="button" class="btn mini danger" onclick="fmBulkDelete()">{{icon "trash"}} Delete</button>
 </div>
@@ -1276,10 +1789,10 @@ document.addEventListener('keydown',function(e){
         <td class="muted mono">{{.Mode}}</td>
         <td class="muted">{{.ModTime}}</td>
         <td class="right-col">
-          {{if eq .Kind "file"}}<a class="btn mini" href="/files?path={{$.Path}}&download={{.Path}}">{{icon "download"}}</a>{{end}}
-          <button class="btn mini" onclick="fmAction('rename', this)">{{icon "edit"}}</button>
-          <button class="btn mini" onclick="fmAction('chmod', this)">{{icon "shield"}}</button>
-          <button class="btn mini danger" onclick="fmAction('delete', this)">{{icon "trash"}}</button>
+          {{if eq .Kind "file"}}<a class="btn mini" href="/file-edit?path={{.Path}}" title="Edit in browser">{{icon "terminal"}}</a><a class="btn mini" href="/files?path={{$.Path}}&download={{.Path}}" title="Download">{{icon "download"}}</a>{{end}}
+          <button class="btn mini" onclick="fmAction('rename', this)" title="Rename">{{icon "edit"}}</button>
+          <button class="btn mini" onclick="fmAction('chmod', this)" title="Permissions">{{icon "shield"}}</button>
+          <button class="btn mini danger" onclick="fmAction('delete', this)" title="Delete">{{icon "trash"}}</button>
         </td>
       </tr>{{else}}<tr><td colspan="6" class="muted">Folder is empty.</td></tr>{{end}}
     </tbody>
@@ -1306,17 +1819,38 @@ document.addEventListener('keydown',function(e){
 <div class="modal-bg" id="m-bulkmove"><div class="modal">
   <h3>{{icon "move"}} Bulk move</h3>
   <p class="muted">Move <strong id="bmCount">0</strong> selected item(s) into a destination directory.</p>
-  <div class="field"><label>Destination directory (under /var/www)</label><input class="input mono" id="bmDest" placeholder="/site.com/htdocs/archive" required></div>
+  <div class="field">
+    <label>Destination directory (under /var/www)</label>
+    <div class="pick-row">
+      <input class="input mono" id="bmDest" placeholder="/site.com/htdocs/archive" required>
+      <button type="button" class="btn" onclick="openDirPicker('bmDest')">{{icon "folder"}} Browse</button>
+    </div>
+  </div>
   <div class="modal-foot"><button type="button" class="btn" onclick="closeModal('m-bulkmove')">Cancel</button><button type="button" class="btn primary" onclick="fmBulkSubmit('bulk-move')">{{icon "move"}} Move</button></div>
+</div></div>
+
+<div class="modal-bg" id="m-bulkcopy"><div class="modal">
+  <h3>{{icon "copy"}} Bulk copy</h3>
+  <p class="muted">Copy <strong id="bcpCount">0</strong> selected item(s) into a destination directory. Directories copy recursively; existing files in the destination are overwritten.</p>
+  <div class="field">
+    <label>Destination directory (under /var/www)</label>
+    <div class="pick-row">
+      <input class="input mono" id="bcpDest" placeholder="/site.com/htdocs/backup" required>
+      <button type="button" class="btn" onclick="openDirPicker('bcpDest')">{{icon "folder"}} Browse</button>
+    </div>
+  </div>
+  <div class="modal-foot"><button type="button" class="btn" onclick="closeModal('m-bulkcopy')">Cancel</button><button type="button" class="btn primary" onclick="fmBulkSubmit('bulk-copy')">{{icon "copy"}} Copy</button></div>
 </div></div>
 
 <!-- Context Menu -->
 <div class="ctxmenu" id="ctxmenu">
   <button onclick="fmAction('open')" data-files-hide>{{icon "folderOpen"}} Open</button>
+  <button onclick="fmAction('edit')" data-dirs-hide>{{icon "terminal"}} Edit in browser</button>
   <button onclick="fmAction('download')" data-dirs-hide>{{icon "download"}} Download</button>
   <div class="sep"></div>
   <button onclick="fmAction('rename')">{{icon "edit"}} Rename</button>
   <button onclick="fmAction('chmod')">{{icon "shield"}} Permissions (chmod)</button>
+  <button onclick="fmAction('writable')">{{icon "check"}} Make writable (www-data)</button>
   <button onclick="fmAction('copy')">{{icon "copy"}} Copy to…</button>
   <button onclick="fmAction('move')">{{icon "move"}} Move to…</button>
   <div class="sep"></div>
@@ -1358,7 +1892,7 @@ document.addEventListener('keydown',function(e){
 </div></div>
 
 <!-- Upload progress modal (driven by XHR upload event listeners) -->
-<div class="modal-bg" id="m-upload-progress"><div class="modal">
+<div class="modal-bg persistent" id="m-upload-progress"><div class="modal">
   <h3 id="upTitle">Uploading…</h3>
   <p class="muted" id="upSubtitle" style="margin:4px 0 12px">Preparing files…</p>
   <div class="upbar"><div class="upbar-fill" id="upBar"></div></div>
@@ -1405,6 +1939,18 @@ document.addEventListener('keydown',function(e){
 
 <form method="post" id="fm-delete-form" style="display:none"><input type="hidden" name="path" value="{{.Path}}"><input type="hidden" name="action" value="delete"><input type="hidden" name="target" id="del-target"></form>
 
+<!-- Folder picker modal -->
+<div class="modal-bg" id="m-dirpicker"><div class="modal" style="max-width:560px">
+  <h3>{{icon "folderOpen"}} Pick destination folder</h3>
+  <div class="dp-crumbs" id="dpCrumbs"></div>
+  <div class="dp-list" id="dpList"><div class="muted" style="padding:14px;text-align:center">Loading…</div></div>
+  <div class="muted mono" id="dpCurrent" style="margin-top:8px;font-size:12px"></div>
+  <div class="modal-foot">
+    <button type="button" class="btn" onclick="closeModal('m-dirpicker')">Cancel</button>
+    <button type="button" class="btn primary" id="dpUseBtn">{{icon "check"}} Use this folder</button>
+  </div>
+</div></div>
+
 <script>
 (function(){
   var ctx=document.getElementById('ctxmenu');
@@ -1435,12 +1981,21 @@ document.addEventListener('keydown',function(e){
     var name=tr.dataset.name, path=tr.dataset.path, kind=tr.dataset.kind, mode=tr.dataset.mode;
     var base="{{.Path}}";
     var parent=base.replace(/\/+$/,'');
-    if(action==='open'){ if(kind==='dir') window.location='/files?path='+encodeURIComponent(path); return; }
+    if(action==='open'){ if(kind==='dir') window.location='/files?path='+encodeURIComponent(path); else window.location='/file-edit?path='+encodeURIComponent(path); return; }
+    if(action==='edit'){ if(kind==='file') window.location='/file-edit?path='+encodeURIComponent(path); return; }
     if(action==='download'){ if(kind==='file') window.location='/files?path='+encodeURIComponent(base)+'&download='+encodeURIComponent(path); return; }
     if(action==='delete'){
       if(!confirm('Permanently delete '+name+'?')) return;
       document.getElementById('del-target').value=path;
       document.getElementById('fm-delete-form').submit(); return;
+    }
+    if(action==='writable'){
+      if(!confirm('Make '+name+' writable by www-data (chown + chmod 775/664 recursively)?')) return;
+      var f = document.createElement('form');
+      f.method='post'; f.style.display='none';
+      function h(n,v){ var i=document.createElement('input'); i.type='hidden'; i.name=n; i.value=v; f.appendChild(i); }
+      h('path', base); h('action','writable'); h('target', path);
+      document.body.appendChild(f); f.submit(); return;
     }
     if(action==='rename'){
       document.getElementById('rn-from').textContent=name;
@@ -1505,6 +2060,13 @@ document.addEventListener('keydown',function(e){
     document.getElementById('fmBulkAction').value='bulk-delete';
     document.getElementById('fmBulkForm').submit();
   };
+  window.fmBulkWritable = function(){
+    var n = selectedRows().length; if(!n) return;
+    if(!confirm('Make '+n+' selected item(s) writable by www-data (chown + chmod 775/664 recursively)?')) return;
+    fillTargets();
+    document.getElementById('fmBulkAction').value='bulk-writable';
+    document.getElementById('fmBulkForm').submit();
+  };
   window.fmBulkOpen = function(kind){
     var n = selectedRows().length; if(!n) return;
     if(kind==='chmod'){
@@ -1514,6 +2076,9 @@ document.addEventListener('keydown',function(e){
     } else if(kind==='move'){
       document.getElementById('bmCount').textContent = n;
       openModal('m-bulkmove');
+    } else if(kind==='copy'){
+      document.getElementById('bcpCount').textContent = n;
+      openModal('m-bulkcopy');
     }
   };
   window.fmBulkSubmit = function(action){
@@ -1527,9 +2092,96 @@ document.addEventListener('keydown',function(e){
       var d = document.getElementById('bmDest').value.trim();
       if(!d){ alert('Destination required'); return; }
       document.getElementById('fmBulkDest').value = d;
+    } else if(action==='bulk-copy'){
+      var d2 = document.getElementById('bcpDest').value.trim();
+      if(!d2){ alert('Destination required'); return; }
+      document.getElementById('fmBulkDest').value = d2;
     }
     document.getElementById('fmBulkForm').submit();
   };
+
+  // ---- Directory picker ------------------------------------------------
+  var dpTargetInput = null;
+  var dpCurrentPath = '/';
+  function escHtml(s){ return s.replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  window.openDirPicker = function(targetInputId){
+    dpTargetInput = targetInputId;
+    var startInput = document.getElementById(targetInputId);
+    var start = (startInput && startInput.value.trim()) || '/';
+    // If user typed a path that includes a filename, strip the trailing
+    // segment so we open the parent directory.
+    if(start !== '/' && !/\/$/.test(start)){
+      // Treat as directory if it looks like one; otherwise use parent.
+      // We don't know — try the literal path first, server falls back to /.
+    }
+    loadDp(start);
+    openModal('m-dirpicker');
+  };
+  function loadDp(path){
+    var list = document.getElementById('dpList');
+    list.innerHTML = '<div class="muted" style="padding:14px;text-align:center">Loading…</div>';
+    fetch('/api/dirs?path=' + encodeURIComponent(path), {credentials:'same-origin'})
+      .then(function(r){ if(!r.ok){ throw new Error('HTTP '+r.status); } return r.json(); })
+      .then(renderDp)
+      .catch(function(err){
+        list.innerHTML = '<div class="muted" style="padding:14px;text-align:center">Failed to list folder: '+escHtml(String(err.message||err))+'</div>';
+      });
+  }
+  function renderDp(data){
+    dpCurrentPath = data.path || '/';
+    document.getElementById('dpCurrent').textContent = 'Selected: ' + dpCurrentPath;
+
+    var crumbs = document.getElementById('dpCrumbs');
+    crumbs.innerHTML = '';
+    function addCrumb(label, path){
+      var a = document.createElement('a');
+      a.textContent = label;
+      a.addEventListener('click', function(){ loadDp(path); });
+      crumbs.appendChild(a);
+    }
+    addCrumb('/var/www', '/');
+    var parts = dpCurrentPath.split('/').filter(Boolean);
+    var acc = '';
+    parts.forEach(function(p){
+      acc += '/' + p;
+      var sep = document.createElement('span'); sep.className='sep'; sep.textContent='/';
+      crumbs.appendChild(sep);
+      addCrumb(p, acc);
+    });
+
+    var list = document.getElementById('dpList');
+    list.innerHTML = '';
+    if(data.up !== undefined){
+      var up = document.createElement('div');
+      up.className = 'dp-row up';
+      up.innerHTML = '<span class="ic">↑</span><span>.. (up one level)</span>';
+      up.addEventListener('click', function(){ loadDp(data.up || '/'); });
+      list.appendChild(up);
+    }
+    (data.items || []).forEach(function(it){
+      var row = document.createElement('div');
+      row.className = 'dp-row';
+      row.innerHTML = '<span class="ic">📁</span><span>'+escHtml(it.name)+'</span>';
+      row.addEventListener('click', function(){ loadDp(it.path); });
+      list.appendChild(row);
+    });
+    if((!data.items || !data.items.length) && data.up === undefined){
+      list.innerHTML = '<div class="muted" style="padding:14px;text-align:center">No sub-folders here. Use this folder or go up.</div>';
+    } else if(!data.items || !data.items.length){
+      var none = document.createElement('div');
+      none.className = 'muted';
+      none.style.cssText = 'padding:10px 12px;text-align:center;font-size:12px';
+      none.textContent = 'No sub-folders inside this folder.';
+      list.appendChild(none);
+    }
+    document.getElementById('dpUseBtn').onclick = function(){
+      if(dpTargetInput){
+        var inp = document.getElementById(dpTargetInput);
+        if(inp){ inp.value = dpCurrentPath; inp.focus(); }
+      }
+      closeModal('m-dirpicker');
+    };
+  }
 
   // ---- XHR upload with live progress -----------------------------------
   var currentXHR = null;
@@ -1581,6 +2233,11 @@ document.addEventListener('keydown',function(e){
     var xhr = new XMLHttpRequest();
     currentXHR = xhr;
     uploadStart = Date.now();
+    function fail(reason){
+      currentXHR = null;
+      closeModal('m-upload-progress');
+      toast(reason, 'bad');
+    }
     xhr.upload.addEventListener('progress', function(e){
       if(e.lengthComputable){ setUpProgress(e.loaded, e.total); }
     });
@@ -1588,19 +2245,30 @@ document.addEventListener('keydown',function(e){
       setUpProgress(1,1);
       document.getElementById('upSubtitle').textContent = 'Server is finalising the upload…';
     });
+    xhr.upload.addEventListener('error', function(){ fail('Upload failed (connection dropped mid-transfer)'); });
     xhr.addEventListener('load', function(){
+      if(xhr.status >= 400){
+        fail('Upload rejected by server (HTTP ' + xhr.status + ')');
+        return;
+      }
       currentXHR = null;
       closeModal('m-upload-progress');
       if(xhr.responseURL){ window.location = xhr.responseURL; }
       else { window.location.reload(); }
     });
     xhr.addEventListener('error', function(){
-      currentXHR = null;
-      closeModal('m-upload-progress');
-      toast('Upload failed (network error)','bad');
+      var msg = 'Upload failed';
+      if(xhr.status){ msg += ' (HTTP ' + xhr.status + ')'; }
+      else { msg += ' — server unreachable or connection blocked. If a reverse proxy sits in front, check client_max_body_size + proxy_request_buffering.'; }
+      fail(msg);
     });
+    xhr.addEventListener('timeout', function(){ fail('Upload timed out'); });
     xhr.addEventListener('abort', function(){ currentXHR = null; });
-    xhr.open('POST', form.action || window.location.pathname + window.location.search);
+    // Same-origin relative URL — avoids accidental scheme/origin drift if the
+    // form's resolved action picks up a different host.
+    var url = window.location.pathname + (window.location.search || '');
+    xhr.timeout = 0;
+    xhr.open('POST', url);
     xhr.send(fd);
     return true;
   }
@@ -1615,40 +2283,111 @@ document.addEventListener('keydown',function(e){
 
 {{define "databases"}}
 <div class="page-head">
-  <div><h1>{{icon "database"}} Databases</h1><p>MariaDB / MySQL databases managed by hostQ.</p></div>
+  <div><h1>{{icon "database"}} Databases</h1><p>Every MariaDB / MySQL database managed by hostQ.</p></div>
   <span class="badge info">MariaDB</span>
 </div>
-{{if .Created}}<div class="alert ok">
-  {{icon "check"}}
-  <div>
-    <strong>Database created:</strong> <span class="mono">{{.Created}}</span><br>
-    <strong>User:</strong> <span class="mono">{{.User}}</span> · <strong>Password:</strong> <span class="mono">{{.Password}}</span>
-    <div class="muted" style="font-weight:500">Save this password now — it is shown only once.</div>
-  </div>
+
+{{if .Created}}<div class="card credentials">{{icon "key"}}
+  <div><strong>Database ready</strong> <span class="mono pill">{{.Created}}</span> · user <span class="mono pill">{{.User}}</span> · password <span class="mono pill">{{.Password}}</span><div class="muted" style="font-weight:500;margin-top:4px">Save this password — it is shown only once.</div></div>
 </div>{{end}}
-<div class="card">
-  <h3>Create database</h3>
-  <form method="post"><div class="row">
-    <input class="input" name="name" placeholder="project_name" value="{{.Site}}" required>
-    <button class="btn primary" name="action" value="create">{{icon "plus"}} Create database</button>
-  </div>
-  <p class="muted" style="margin-top:8px">A database and matching user are created with a generated password. Database names are auto-prefixed with <span class="mono">hostq_</span>.</p>
-  </form>
+{{if .DBUser}}<div class="card credentials">{{icon "key"}}
+  <div><strong>User ready</strong> <span class="mono pill">{{.DBUser}}</span> · password <span class="mono pill">{{.DBPass}}</span>{{if .DBName}} · on <span class="mono pill">{{.DBName}}</span>{{end}}<div class="muted" style="font-weight:500;margin-top:4px">Shown only once.</div></div>
+</div>{{end}}
+
+<div class="toolbar">
+  <div class="muted">{{len .Databases}} database{{if ne (len .Databases) 1}}s{{end}} on this server</div>
+  <button class="btn primary" onclick="openModal('m-dbs-newdb')">{{icon "plus"}} New database</button>
 </div>
-<div class="card" style="padding:0">
-  <table>
-    <thead><tr><th>Database</th><th class="right-col">Actions</th></tr></thead>
+
+{{range .Databases}}
+<div class="card db-card">
+  <div class="db-head">
+    <div class="db-title">{{icon "database"}} <span class="mono">{{.Name}}</span></div>
+    <div class="actions">
+      <a class="btn mini" href="/pma-login?user={{.Name}}&db={{.Name}}" target="_blank">{{icon "terminal"}} Open in phpMyAdmin</a>
+      <button class="btn mini" onclick="dbsOpenAddUser('{{.Name}}')">{{icon "plus"}} Add user</button>
+      <form method="post" action="/databases" data-confirm="Drop database {{.Name}}? This deletes all tables and the matching user." style="display:inline">
+        <input type="hidden" name="target" value="{{.Name}}">
+        <button class="btn mini danger" name="action" value="delete">{{icon "trash"}} Drop</button>
+      </form>
+    </div>
+  </div>
+  {{if .Users}}<table class="flat">
+    <thead><tr><th>User</th><th>Host</th><th class="right-col">Actions</th></tr></thead>
     <tbody>
-      {{range .Databases}}<tr>
-        <td class="mono">{{.Name}}</td>
-        <td class="right-col"><form method="post" data-confirm="Permanently drop this database and its user?">
-          <input type="hidden" name="target" value="{{.Name}}">
-          <button class="btn mini danger" name="action" value="delete">{{icon "trash"}} Drop</button>
-        </form></td>
-      </tr>{{else}}<tr><td class="muted" colspan="2">No user databases found, or mysql CLI is not available.</td></tr>{{end}}
+      {{range .Users}}<tr>
+        <td class="mono"><strong>{{.Login}}</strong></td>
+        <td class="muted mono">{{.Host}}</td>
+        <td class="right-col"><div class="actions" style="justify-content:flex-end">
+          <a class="btn mini" href="/pma-login?user={{.Login}}" target="_blank" title="Sign in to phpMyAdmin as this user">{{icon "terminal"}}</a>
+          <button class="btn mini" onclick="dbsOpenResetUser('{{.Login}}')">{{icon "key"}} Reset password</button>
+          <form method="post" action="/databases" data-confirm="Drop user {{.Login}} and revoke access?" style="display:inline">
+            <input type="hidden" name="user" value="{{.Login}}">
+            <button class="btn mini danger" name="action" value="user-delete">{{icon "trash"}}</button>
+          </form>
+        </div></td>
+      </tr>{{end}}
     </tbody>
   </table>
+  {{else}}<p class="muted" style="margin:6px 0 0">No users yet — add one with the button above.</p>{{end}}
 </div>
+{{else}}
+  <div class="card empty">
+    <div class="empty-ic">{{icon "database"}}</div>
+    <div><h3 style="margin:0 0 4px;color:var(--ink)">No databases yet</h3><p class="muted" style="margin:0">Click <strong>New database</strong> above. Database names are auto-prefixed with <span class="mono">hostq_</span> so panel-managed ones stand out.</p></div>
+  </div>
+{{end}}
+
+<!-- New database modal -->
+<div class="modal-bg" id="m-dbs-newdb"><div class="modal" style="max-width:560px">
+  <h3>{{icon "plus"}} New database</h3>
+  <p class="muted">Creates a database, a matching user, and a grant. Anything left blank is auto-generated. Prefix <span class="mono">hostq_</span> is added so panel-managed databases stand out.</p>
+  <form method="post" action="/databases">
+    <div class="field"><label>Database name <span class="muted" style="font-weight:500">(becomes <span class="mono">hostq_&lt;name&gt;</span>)</span></label><input class="input mono" name="name" placeholder="project_name" required autofocus></div>
+    <div class="row">
+      <div class="field"><label>Username <span class="muted" style="font-weight:500">(optional)</span></label><input class="input mono" name="user" placeholder="auto"></div>
+      <div class="field"><label>Password <span class="muted" style="font-weight:500">(optional)</span></label><input class="input mono" name="password" type="text" placeholder="auto"></div>
+    </div>
+    <ul class="muted" style="font-size:11.5px;margin:4px 0 12px;padding-left:18px;line-height:1.55">
+      <li>Letters, digits, and underscore only — username max 32 chars.</li>
+      <li>If you set the password manually, make it 12+ chars with a mix of cases / digits / specials.</li>
+      <li>Full privileges on the new database are granted to the user.</li>
+    </ul>
+    <div class="modal-foot"><button type="button" class="btn" onclick="closeModal('m-dbs-newdb')">Cancel</button><button class="btn primary" name="action" value="create">{{icon "check"}} Create</button></div>
+  </form>
+</div></div>
+
+<!-- Add user modal (populated by JS) -->
+<div class="modal-bg" id="m-dbs-adduser"><div class="modal" style="max-width:520px">
+  <h3>{{icon "plus"}} Add user</h3>
+  <p class="muted">User receives full privileges on <span class="mono" id="dbs-mu-db"></span>.</p>
+  <form method="post" action="/databases">
+    <input type="hidden" name="target" id="dbs-mu-target">
+    <div class="field"><label>Username</label><input class="input mono" name="user" placeholder="app_user" required></div>
+    <div class="field"><label>Password <span class="muted" style="font-weight:500">(optional — auto-generates 20 chars)</span></label><input class="input mono" name="password" type="text" placeholder="auto"></div>
+    <ul class="muted" style="font-size:11.5px;margin:0 0 12px;padding-left:18px;line-height:1.55">
+      <li>Username: letters, digits, underscore only, max 32 chars.</li>
+      <li>If you set a password, use 12+ characters with mixed cases / digits / specials.</li>
+    </ul>
+    <div class="modal-foot"><button type="button" class="btn" onclick="closeModal('m-dbs-adduser')">Cancel</button><button class="btn primary" name="action" value="user-create">{{icon "check"}} Add user</button></div>
+  </form>
+</div></div>
+
+<!-- Reset password modal -->
+<div class="modal-bg" id="m-dbs-resetuser"><div class="modal">
+  <h3>{{icon "key"}} Reset password</h3>
+  <p class="muted">Sets a new password for user <span class="mono" id="dbs-ru-user-label"></span>.</p>
+  <form method="post" action="/databases">
+    <input type="hidden" name="user" id="dbs-ru-user">
+    <div class="field"><label>New password (8+ chars)</label><input class="input mono" name="password" type="text" minlength="8" required></div>
+    <div class="modal-foot"><button type="button" class="btn" onclick="closeModal('m-dbs-resetuser')">Cancel</button><button class="btn primary" name="action" value="user-password">{{icon "check"}} Reset</button></div>
+  </form>
+</div></div>
+
+<script>
+function dbsOpenAddUser(db){ document.getElementById('dbs-mu-db').textContent=db; document.getElementById('dbs-mu-target').value=db; openModal('m-dbs-adduser'); }
+function dbsOpenResetUser(u){ document.getElementById('dbs-ru-user-label').textContent=u; document.getElementById('dbs-ru-user').value=u; openModal('m-dbs-resetuser'); }
+</script>
 {{end}}
 
 {{define "php"}}
@@ -1794,7 +2533,7 @@ document.addEventListener('keydown',function(e){
 
 {{define "account"}}
 <div class="page-head">
-  <div><h1>{{icon "users"}} Account</h1><p>Manage your panel administrator credentials.</p></div>
+  <div><h1>{{icon "users"}} Account</h1><p>Manage your panel administrator credentials and panel access.</p></div>
 </div>
 <div class="grid-2">
   <div class="card">
@@ -1811,6 +2550,162 @@ document.addEventListener('keydown',function(e){
     </form>
   </div>
 </div>
+
+<div class="card">
+  <h2>{{icon "globe"}} Panel access hostname</h2>
+  <p class="muted" style="margin-top:4px">Bind the panel to a real domain instead of using the bare-IP <span class="mono">:8090</span> setup port. The panel writes an nginx vhost that proxies the hostname to <span class="mono">127.0.0.1:8090</span> and exposes <span class="mono">/phpmyadmin/</span> on the same origin so phpMyAdmin SSO works.</p>
+
+  {{if .PanelHost.Hostname}}
+    <div class="card credentials" style="margin:12px 0 0">{{icon "check"}}
+      <div>
+        <strong>Current:</strong> <a class="mono pill" href="{{if .PanelHost.SSL}}https{{else}}http{{end}}://{{.PanelHost.Hostname}}/" target="_blank" style="color:#fff;text-decoration:none">{{if .PanelHost.SSL}}https://{{else}}http://{{end}}{{.PanelHost.Hostname}}/</a>
+        {{if .PanelHost.SSL}}<span class="badge ok" style="margin-left:6px">{{icon "shield"}} SSL on</span>{{else}}<span class="badge" style="margin-left:6px">HTTP only</span>{{end}}
+        <div class="muted" style="font-weight:500;margin-top:4px">Configured {{.PanelHost.Updated}}{{if .PanelHost.Email}} · cert email {{.PanelHost.Email}}{{end}}.</div>
+      </div>
+    </div>
+    <hr class="sep">
+    <div class="actions">
+      <form method="post" action="/account" style="display:inline">
+        <input type="hidden" name="hostname" value="{{.PanelHost.Hostname}}">
+        <input type="hidden" name="email" value="{{.PanelHost.Email}}">
+        <input type="hidden" name="ssl" value="1">
+        <button class="btn" name="action" value="panel-host-set">{{icon "refresh"}} Re-issue SSL</button>
+      </form>
+      <form method="post" action="/account" data-confirm="Remove the {{.PanelHost.Hostname}} proxy vhost? The panel keeps working on :8090 and your Let's Encrypt cert (if any) is kept on disk." style="display:inline">
+        <button class="btn danger" name="action" value="panel-host-remove">{{icon "trash"}} Remove panel hostname</button>
+      </form>
+    </div>
+  {{else}}
+    <form method="post" action="/account" style="margin-top:10px">
+      <div class="row">
+        <div class="field"><label>Hostname</label><input class="input mono" name="hostname" placeholder="panel.example.com" required pattern="^[a-zA-Z0-9][a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"></div>
+        <div class="field"><label>Admin email <span class="muted" style="font-weight:500">(required for SSL)</span></label><input class="input" name="email" type="email" placeholder="admin@example.com"></div>
+      </div>
+      <div class="field" style="margin-bottom:6px"><label style="display:inline-flex;align-items:center;gap:6px;font-weight:600"><input type="checkbox" name="ssl" value="1" checked> Enable HTTPS via Let's Encrypt</label></div>
+      <button class="btn primary" name="action" value="panel-host-set">{{icon "shield"}} Set up panel hostname</button>
+      <ul class="muted" style="font-size:12px;margin:10px 0 0;padding-left:18px;line-height:1.6">
+        <li>DNS A record for the hostname must already point at this server — certbot validates ownership over port 80.</li>
+        <li>If certbot fails (DNS not propagated, port 80 blocked, Cloudflare proxy on) the vhost is still set up on HTTP — re-issue once DNS is right.</li>
+        <li>If you're behind Cloudflare, set the DNS record to <strong>grey-cloud (DNS only)</strong> for the cert issue, then flip back to <strong>orange (proxied)</strong> with SSL/TLS mode set to <strong>Full (strict)</strong>.</li>
+      </ul>
+    </form>
+  {{end}}
+</div>
+
+<div class="card">
+  <h2>{{icon "shield"}} Admin IP allowlist</h2>
+  <p class="muted" style="margin-top:4px">Restrict the admin scope (<span class="mono">/services</span>, <span class="mono">/account</span>, <span class="mono">/audit</span>, <span class="mono">/firewall</span>, <span class="mono">/security</span>, <span class="mono">/malfix</span>, <span class="mono">/php</span>, <span class="mono">/redis</span>) to specific IPs or CIDRs. User-side pages (sites, files) are unaffected. Loopback (<span class="mono">127.0.0.1</span>) is always allowed for last-resort recovery.</p>
+
+  <div class="row" style="align-items:center;gap:14px;margin:10px 0 0">
+    <div>
+      <strong>Status:</strong>
+      {{if .Allowlist.Enabled}}<span class="badge ok">{{icon "check"}} Enabled</span>{{else}}<span class="badge">Disabled</span>{{end}}
+      <span class="muted" style="margin-left:10px">Your current IP: <span class="mono pill">{{.ClientIP}}</span></span>
+    </div>
+    <form method="post" action="/account" style="margin-left:auto">
+      <input type="hidden" name="enabled" value="{{if .Allowlist.Enabled}}0{{else}}1{{end}}">
+      <button class="btn {{if .Allowlist.Enabled}}danger{{else}}primary{{end}}" name="action" value="allow-toggle">
+        {{if .Allowlist.Enabled}}{{icon "x"}} Disable allowlist{{else}}{{icon "shield"}} Enable allowlist{{end}}
+      </button>
+    </form>
+  </div>
+
+  <hr class="sep">
+
+  <form method="post" action="/account">
+    <div class="row">
+      <div class="field"><label>IP or CIDR</label><input class="input mono" name="cidr" placeholder="203.0.113.5  or  203.0.113.0/24" value="{{.ClientIP}}" required></div>
+      <div class="field"><label>Note <span class="muted" style="font-weight:500">(optional)</span></label><input class="input" name="note" placeholder="Home office"></div>
+    </div>
+    <button class="btn primary" name="action" value="allow-add">{{icon "plus"}} Add entry</button>
+  </form>
+
+  {{if .Allowlist.Entries}}
+  <table style="margin-top:12px">
+    <thead><tr><th>CIDR / IP</th><th>Note</th><th>Added</th><th></th></tr></thead>
+    <tbody>
+      {{range .Allowlist.Entries}}<tr>
+        <td class="mono">{{.CIDR}}</td>
+        <td>{{if .Note}}{{.Note}}{{else}}<span class="muted">—</span>{{end}}</td>
+        <td class="mono muted">{{.Added}}</td>
+        <td style="text-align:right">
+          <form method="post" action="/account" data-confirm="Remove {{.CIDR}} from the allowlist?" style="display:inline">
+            <input type="hidden" name="cidr" value="{{.CIDR}}">
+            <button class="btn danger" name="action" value="allow-remove">{{icon "trash"}} Remove</button>
+          </form>
+        </td>
+      </tr>{{end}}
+    </tbody>
+  </table>
+  {{else}}
+  <p class="muted" style="margin-top:12px">No allowlist entries yet. Add at least one before enabling the allowlist, or only <span class="mono">127.0.0.1</span> will reach the admin area.</p>
+  {{end}}
+</div>
+{{end}}
+
+{{define "firewall"}}
+<div class="page-head">
+  <div><h1>{{icon "shield"}} Firewall · fail2ban</h1><p>Live status of every fail2ban jail, with the current banned IPs and one-click unban.</p></div>
+  <div class="actions">
+    {{if .State.Installed}}
+      {{if .State.Running}}
+        <form method="post" action="/firewall" style="display:inline"><button class="btn" name="action" value="reload">{{icon "refresh"}} Reload config</button></form>
+        <form method="post" action="/firewall" style="display:inline" data-confirm="Stop fail2ban? Banned IPs will be released until it restarts."><button class="btn danger" name="action" value="stop">{{icon "x"}} Stop</button></form>
+      {{else}}
+        <form method="post" action="/firewall" style="display:inline"><button class="btn primary" name="action" value="start">{{icon "check"}} Start fail2ban</button></form>
+      {{end}}
+    {{else}}
+      <form method="post" action="/firewall" style="display:inline"><button class="btn primary" name="action" value="install">{{icon "download"}} Install fail2ban</button></form>
+    {{end}}
+  </div>
+</div>
+
+{{if .Output}}<div class="card credentials">{{icon "info"}} {{.Output}}</div>{{end}}
+
+<div class="card">
+  <h2>{{icon "info"}} Service</h2>
+  <div class="row" style="gap:12px;margin-top:4px">
+    <div>fail2ban-client: {{if .State.Installed}}<span class="badge ok">{{icon "check"}} installed</span>{{else}}<span class="badge bad">not installed</span>{{end}}</div>
+    <div>Daemon: {{if .State.Running}}<span class="badge ok">{{icon "check"}} active</span>{{else}}<span class="badge">inactive</span>{{end}}</div>
+    <div>Jails: <span class="badge">{{len .State.Jails}}</span></div>
+  </div>
+  {{if not .State.Installed}}<p class="muted" style="margin-top:8px">fail2ban isn't installed on this server. Install it to start banning attackers automatically — defaults cover SSH out of the box, with optional jails for nginx auth, recidive, and more.</p>{{end}}
+</div>
+
+{{if .State.Jails}}
+{{range .State.Jails}}
+<div class="card">
+  <h2>{{icon "shield"}} {{.Name}}</h2>
+  <div class="row" style="gap:14px;margin-top:4px">
+    <div>Currently banned: <span class="badge {{if gt .Currently 0}}bad{{else}}ok{{end}}">{{.Currently}}</span></div>
+    <div>Total banned: <span class="badge">{{.Total}}</span></div>
+  </div>
+  {{if .Error}}<p class="muted" style="margin-top:8px">Error: {{.Error}}</p>{{end}}
+  {{if .BannedIPs}}
+  <table style="margin-top:12px">
+    <thead><tr><th>IP</th><th></th></tr></thead>
+    <tbody>
+      {{$jail := .Name}}
+      {{range .BannedIPs}}<tr>
+        <td class="mono">{{.}}</td>
+        <td style="text-align:right">
+          <form method="post" action="/firewall" style="display:inline" data-confirm="Unban {{.}} from {{$jail}}?">
+            <input type="hidden" name="jail" value="{{$jail}}">
+            <input type="hidden" name="ip" value="{{.}}">
+            <button class="btn" name="action" value="unban">{{icon "check"}} Unban</button>
+          </form>
+        </td>
+      </tr>{{end}}
+    </tbody>
+  </table>
+  {{else}}
+  <p class="muted" style="margin-top:8px">No active bans on this jail.</p>
+  {{end}}
+</div>
+{{end}}
+{{else if .State.Installed}}
+<div class="card"><p class="muted">fail2ban is installed but no jails are reporting yet — start the daemon or check <span class="mono">/etc/fail2ban/jail.local</span>.</p></div>
+{{end}}
 {{end}}
 
 {{define "audit"}}
@@ -1830,6 +2725,194 @@ document.addEventListener('keydown',function(e){
     </tbody>
   </table>
 </div>
+{{end}}
+
+{{define "siteadd"}}
+<div class="page-head">
+  <div><h1>{{icon "globe"}} Add website</h1><p>Create a new vhost. Start with an empty docroot or install WordPress in one shot.</p></div>
+  <a class="btn" href="/sites">{{icon "chevronUp"}} Back</a>
+</div>
+{{if .Error}}<div class="alert bad">{{icon "alert"}} {{.Error}}</div>{{end}}
+<form method="post" action="/sites/add">
+  <div class="card">
+    <h3>How do you want to start?</h3>
+    <div class="mode-row" id="modePicker">
+      <label class="mode-card checked" data-mode="blank">
+        <input type="radio" name="mode" value="blank" checked>
+        <div class="mode-body" style="display:flex;flex-direction:column;align-items:center;gap:10px">
+          <div class="mode-ic">{{icon "folder"}}</div>
+          <div class="mode-title">Start from scratch</div>
+          <div class="mode-desc">Empty docroot with a placeholder index.html. Upload your own files or deploy via FTP / git.</div>
+        </div>
+      </label>
+      <label class="mode-card" data-mode="wordpress">
+        <input type="radio" name="mode" value="wordpress">
+        <div class="mode-body" style="display:flex;flex-direction:column;align-items:center;gap:10px">
+          <div class="mode-ic">{{icon "wordpress"}}</div>
+          <div class="mode-title">Install WordPress</div>
+          <div class="mode-desc">Download WP, create a database, run install. Ready to log in when the page reloads.</div>
+        </div>
+      </label>
+    </div>
+
+    <div class="row">
+      <div class="field"><label>Domain</label><input class="input mono" name="domain" placeholder="example.com" value="{{.Domain}}" required autofocus></div>
+      <div class="field"><label>Document root <span class="muted" style="font-weight:500">(under /var/www/&lt;domain&gt;/)</span></label><input class="input mono" name="docroot" placeholder="htdocs" value="htdocs"></div>
+    </div>
+  </div>
+
+  <div class="card" id="wpFields" style="display:none">
+    <h3>WordPress admin account</h3>
+    <p class="muted">You'll use these credentials to sign in to <span class="mono">/wp-admin</span>.</p>
+    <div class="row">
+      <div class="field"><label>Site title</label><input class="input" name="wp_title" placeholder="My WordPress site"></div>
+      <div class="field"><label>Admin email</label><input class="input" name="wp_email" type="email" placeholder="admin@example.com"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Admin username</label><input class="input mono" name="wp_user" placeholder="admin"></div>
+      <div class="field"><label>Admin password <span class="muted" style="font-weight:500">(10+ chars)</span></label><input class="input mono" name="wp_pass" type="text" minlength="10" placeholder="strong password"></div>
+    </div>
+    <ul class="muted" style="font-size:12px;margin:6px 0 0;padding-left:18px">
+      <li>At least one lowercase character</li>
+      <li>At least one uppercase character</li>
+      <li>At least one number</li>
+      <li>At least one special character</li>
+      <li>10 characters minimum</li>
+    </ul>
+  </div>
+
+  <div class="actions" style="margin-top:12px">
+    <a class="btn" href="/sites">Cancel</a>
+    <button class="btn primary" type="submit">{{icon "plus"}} Add website</button>
+  </div>
+</form>
+<script>
+(function(){
+  var cards = document.querySelectorAll('.mode-card');
+  var wpFields = document.getElementById('wpFields');
+  function refresh(){
+    cards.forEach(function(c){
+      var r = c.querySelector('input[type=radio]');
+      c.classList.toggle('checked', r.checked);
+    });
+    var picked = document.querySelector('.mode-card input[type=radio]:checked');
+    if(picked && picked.value === 'wordpress'){
+      wpFields.style.display = '';
+      ['wp_title','wp_user','wp_pass','wp_email'].forEach(function(n){
+        var i = document.querySelector('[name="'+n+'"]');
+        if(i) i.required = true;
+      });
+    } else {
+      wpFields.style.display = 'none';
+      ['wp_title','wp_user','wp_pass','wp_email'].forEach(function(n){
+        var i = document.querySelector('[name="'+n+'"]');
+        if(i) i.required = false;
+      });
+    }
+  }
+  cards.forEach(function(c){
+    c.addEventListener('click', function(){
+      var r = c.querySelector('input[type=radio]');
+      r.checked = true;
+      refresh();
+    });
+  });
+  refresh();
+})();
+</script>
+{{end}}
+
+{{define "fileedit"}}
+<div class="page-head">
+  <div>
+    <h1>{{icon "terminal"}} {{.Name}}</h1>
+    <p class="muted mono">{{.Path}}</p>
+  </div>
+  <a class="btn" href="/files?path={{.Parent}}">{{icon "chevronUp"}} Back to files</a>
+</div>
+<form method="post" action="/file-edit" id="editForm">
+  <input type="hidden" name="path" value="{{.Path}}">
+  <div class="edit-toolbar">
+    <button class="btn primary" type="submit">{{icon "check"}} Save (Ctrl+S)</button>
+    <a class="btn" href="/files?path={{.Parent}}" id="editDiscardBtn">{{icon "x"}} Discard</a>
+    <span class="grow"></span>
+    <span class="meta">size <strong>{{.Size}}</strong> · mode <strong class="mono">{{.Mode}}</strong> · modified <strong>{{.ModTime}}</strong></span>
+    <label class="meta" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer">
+      <input type="checkbox" id="editWrap" checked> wrap
+    </label>
+  </div>
+  <div class="edit-wrapper">
+    <pre class="edit-gutter" id="editGutter">1</pre>
+    <textarea class="edit-area" name="content" id="editArea" spellcheck="false" autocomplete="off" autocapitalize="off">{{.Content}}</textarea>
+  </div>
+</form>
+<script>
+(function(){
+  var area = document.getElementById('editArea');
+  var gutter = document.getElementById('editGutter');
+  var wrap = document.getElementById('editWrap');
+  var form = document.getElementById('editForm');
+  var discard = document.getElementById('editDiscardBtn');
+  var orig = area.value;
+  var dirty = false;
+
+  function renderGutter(){
+    var lines = area.value.split('\n').length;
+    var out = '';
+    for(var i=1; i<=lines; i++){ out += i + '\n'; }
+    gutter.textContent = out;
+  }
+  function syncScroll(){ gutter.scrollTop = area.scrollTop; }
+  function applyWrap(){
+    if(wrap.checked){ area.classList.remove('nowrap'); area.setAttribute('wrap','soft'); }
+    else { area.classList.add('nowrap'); area.setAttribute('wrap','off'); }
+  }
+
+  area.addEventListener('input', function(){ dirty = (area.value !== orig); renderGutter(); });
+  area.addEventListener('scroll', syncScroll);
+  area.addEventListener('keydown', function(e){
+    if(e.key === 'Tab'){
+      e.preventDefault();
+      var s = area.selectionStart, en = area.selectionEnd;
+      var before = area.value.substring(0, s);
+      var after = area.value.substring(en);
+      if(e.shiftKey){
+        // Outdent: if the cursor's line starts with 2 spaces or a tab, remove them.
+        var lineStart = before.lastIndexOf('\n') + 1;
+        var head = area.value.substring(lineStart, lineStart+2);
+        if(head === '  '){
+          area.value = area.value.substring(0, lineStart) + area.value.substring(lineStart+2);
+          area.selectionStart = area.selectionEnd = Math.max(lineStart, s-2);
+        } else if(head.charAt(0) === '\t'){
+          area.value = area.value.substring(0, lineStart) + area.value.substring(lineStart+1);
+          area.selectionStart = area.selectionEnd = Math.max(lineStart, s-1);
+        }
+      } else {
+        area.value = before + '  ' + after;
+        area.selectionStart = area.selectionEnd = s + 2;
+      }
+      dirty = (area.value !== orig);
+      renderGutter();
+    } else if((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')){
+      e.preventDefault();
+      form.submit();
+    }
+  });
+
+  wrap.addEventListener('change', applyWrap);
+  form.addEventListener('submit', function(){ dirty = false; });
+  discard.addEventListener('click', function(e){
+    if(dirty && !confirm('Discard unsaved changes?')){ e.preventDefault(); }
+  });
+  window.addEventListener('beforeunload', function(e){
+    if(dirty){ e.preventDefault(); e.returnValue = ''; }
+  });
+
+  renderGutter();
+  applyWrap();
+  area.focus();
+})();
+</script>
 {{end}}
 
 {{define "redis"}}

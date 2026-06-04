@@ -1,10 +1,15 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
+	"log"
+	"mime"
 	"net/http"
+	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -95,7 +100,14 @@ func safeName(name string) string {
 	name = strings.ReplaceAll(name, "/", "-")
 	name = strings.ReplaceAll(name, "\\", "-")
 	name = regexp.MustCompile(`[^a-zA-Z0-9._ -]+`).ReplaceAllString(name, "-")
-	return strings.Trim(name, ". ")
+	// Trim trailing dots/spaces only — leading dots are valid for hidden
+	// files (.htaccess, .gitignore, .user.ini). Reject the bare path
+	// indicators "." and ".." explicitly.
+	name = strings.TrimRight(name, ". ")
+	if name == "." || name == ".." {
+		return ""
+	}
+	return name
 }
 
 func blockedFileName(name string) bool {
@@ -118,6 +130,138 @@ func (a *App) canMutateWebPath(path string) bool {
 	return !blockedFileName(filepath.Base(clean))
 }
 
+// apiDirs lists subdirectories under the requested path so the browser-side
+// folder picker can navigate the tree without needing a separate /files
+// render. JSON shape: {path, up?, items:[{name, path}]}.
+func (a *App) apiDirs(w http.ResponseWriter, r *http.Request) {
+	reqPath := strings.TrimSpace(r.URL.Query().Get("path"))
+	if reqPath == "" {
+		reqPath = "/"
+	}
+	reqPath = filepath.ToSlash(filepath.Clean("/" + strings.TrimPrefix(reqPath, "/")))
+	full := a.safeWebPath(reqPath)
+	type item struct {
+		Name string `json:"name"`
+		Path string `json:"path"`
+	}
+	resp := struct {
+		Path  string `json:"path"`
+		Up    string `json:"up,omitempty"`
+		Items []item `json:"items"`
+	}{Path: reqPath, Items: []item{}}
+	if reqPath != "/" {
+		resp.Up = filepath.ToSlash(filepath.Dir(reqPath))
+	}
+	if entries, err := os.ReadDir(full); err == nil {
+		for _, e := range entries {
+			if !e.IsDir() || blockedFileName(e.Name()) {
+				continue
+			}
+			resp.Items = append(resp.Items, item{
+				Name: e.Name(),
+				Path: filepath.ToSlash(filepath.Join(reqPath, e.Name())),
+			})
+		}
+	}
+	sort.Slice(resp.Items, func(i, j int) bool {
+		return strings.ToLower(resp.Items[i].Name) < strings.ToLower(resp.Items[j].Name)
+	})
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	_ = json.NewEncoder(w).Encode(resp)
+}
+
+// looksTextual is a cheap heuristic: a NUL byte in the first 8 KB means binary.
+// Good enough to keep the in-browser editor from being handed an image or zip.
+func looksTextual(data []byte) bool {
+	n := len(data)
+	if n > 8000 {
+		n = 8000
+	}
+	for i := 0; i < n; i++ {
+		if data[i] == 0 {
+			return false
+		}
+	}
+	return true
+}
+
+// fileEditMaxBytes caps in-browser editing. Bigger files should be downloaded
+// and edited locally. The cap also matches Go's default form-parse budget
+// (10 MB) with a comfortable margin.
+const fileEditMaxBytes = 2 * 1024 * 1024
+
+// fileEdit renders the in-browser text editor, or saves a POSTed edit.
+// Handles dot-files like .htaccess natively — the only files it refuses are
+// the secret patterns blockedFileName() already filters everywhere.
+func (a *App) fileEdit(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+		a.fileEditSave(w, r)
+		return
+	}
+	reqPath := strings.TrimSpace(r.URL.Query().Get("path"))
+	if reqPath == "" {
+		http.Redirect(w, r, "/files?path=/", http.StatusSeeOther)
+		return
+	}
+	full := a.safeWebPath(reqPath)
+	parent := filepath.ToSlash(filepath.Dir(reqPath))
+	if !a.canMutateWebPath(full) {
+		http.Redirect(w, r, "/files?path="+url.QueryEscape(parent)+"&output="+queryEscape("Cannot edit that path"), http.StatusSeeOther)
+		return
+	}
+	info, err := os.Stat(full)
+	if err != nil || info.IsDir() {
+		http.Redirect(w, r, "/files?path="+url.QueryEscape(parent)+"&output="+queryEscape("Not a file"), http.StatusSeeOther)
+		return
+	}
+	if info.Size() > fileEditMaxBytes {
+		http.Redirect(w, r, "/files?path="+url.QueryEscape(parent)+"&output="+queryEscape("File too large to edit in browser (>2 MB) — download instead"), http.StatusSeeOther)
+		return
+	}
+	data, err := os.ReadFile(full)
+	if err != nil {
+		http.Redirect(w, r, "/files?path="+url.QueryEscape(parent)+"&output="+queryEscape("read failed: "+err.Error()), http.StatusSeeOther)
+		return
+	}
+	if !looksTextual(data) {
+		http.Redirect(w, r, "/files?path="+url.QueryEscape(parent)+"&output="+queryEscape("Looks like a binary file — download and edit locally"), http.StatusSeeOther)
+		return
+	}
+	a.render(w, "fileedit", map[string]any{
+		"Title":   "Edit " + info.Name(),
+		"Path":    reqPath,
+		"Parent":  parent,
+		"Name":    info.Name(),
+		"Content": string(data),
+		"Mode":    fmt.Sprintf("%o", info.Mode().Perm()),
+		"Size":    humanSize(info.Size()),
+		"ModTime": info.ModTime().Format("2006-01-02 15:04"),
+		"Output":  r.URL.Query().Get("output"),
+	})
+}
+
+func (a *App) fileEditSave(w http.ResponseWriter, r *http.Request) {
+	reqPath := strings.TrimSpace(r.FormValue("path"))
+	content := r.FormValue("content")
+	full := a.safeWebPath(reqPath)
+	parent := filepath.ToSlash(filepath.Dir(reqPath))
+	if !a.canMutateWebPath(full) {
+		http.Redirect(w, r, "/files?path="+url.QueryEscape(parent)+"&output="+queryEscape("Cannot save to that path"), http.StatusSeeOther)
+		return
+	}
+	var mode os.FileMode = 0644
+	if info, err := os.Stat(full); err == nil && !info.IsDir() {
+		mode = info.Mode().Perm()
+	}
+	if err := os.WriteFile(full, []byte(content), mode); err != nil {
+		http.Redirect(w, r, "/file-edit?path="+url.QueryEscape(reqPath)+"&output="+queryEscape("save failed: "+err.Error()), http.StatusSeeOther)
+		return
+	}
+	a.audit("file.edit", "success", full)
+	http.Redirect(w, r, "/files?path="+url.QueryEscape(parent)+"&output="+queryEscape("Saved "+filepath.Base(full)), http.StatusSeeOther)
+}
+
 func (a *App) fileDownload(w http.ResponseWriter, r *http.Request, reqPath string) {
 	full := a.safeWebPath(reqPath)
 	root := filepath.Clean(a.cfg.WebRoot)
@@ -137,7 +281,14 @@ func (a *App) fileDownload(w http.ResponseWriter, r *http.Request, reqPath strin
 }
 
 func (a *App) fileAction(w http.ResponseWriter, r *http.Request) {
-	// Multipart upload has its own size limit + parsing
+	// Multipart uploads need a much larger parse budget than the rest of
+	// the actions. Dispatch *before* FormValue triggers the default 32 MB
+	// ParseMultipartForm — once the body is parsed at that limit, calling
+	// ParseMultipartForm again with a larger budget is a no-op.
+	if strings.HasPrefix(strings.ToLower(r.Header.Get("Content-Type")), "multipart/form-data") {
+		a.fileUpload(w, r)
+		return
+	}
 	action := r.FormValue("action")
 	if action == "upload" {
 		a.fileUpload(w, r)
@@ -212,6 +363,39 @@ func (a *App) fileAction(w http.ResponseWriter, r *http.Request) {
 		}
 		output = "Permissions updated to " + mode
 		a.audit("file.chmod", "success", chmodPath)
+	case "writable":
+		targetPath := a.safeWebPath(r.FormValue("target"))
+		if !a.canMutateWebPath(targetPath) {
+			output = "Cannot make that path writable"
+			break
+		}
+		if err := makePathWritable(targetPath); err != nil {
+			output = "make writable failed: " + err.Error()
+			a.audit("file.writable", "failure", targetPath)
+			break
+		}
+		output = "Made writable for www-data: " + filepath.Base(targetPath)
+		a.audit("file.writable", "success", targetPath)
+	case "bulk-writable":
+		_ = r.ParseForm()
+		count, failed := 0, 0
+		for _, t := range r.PostForm["target"] {
+			p := a.safeWebPath(t)
+			if !a.canMutateWebPath(p) {
+				failed++
+				continue
+			}
+			if err := makePathWritable(p); err != nil {
+				failed++
+				continue
+			}
+			count++
+			a.audit("file.writable", "success", p)
+		}
+		output = fmt.Sprintf("Made %d item(s) writable for www-data", count)
+		if failed > 0 {
+			output += fmt.Sprintf(" · %d failed", failed)
+		}
 	case "rename":
 		from := a.safeWebPath(r.FormValue("target"))
 		newName := safeName(r.FormValue("dest"))
@@ -295,6 +479,37 @@ func (a *App) fileAction(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		output = fmt.Sprintf("Moved %d item(s) into %s", count, dest)
+	case "bulk-copy":
+		_ = r.ParseForm()
+		dest := strings.TrimSpace(r.FormValue("dest"))
+		if dest == "" {
+			output = "Destination required"
+			break
+		}
+		dp := a.safeWebPath(dest)
+		if info, err := os.Stat(dp); err != nil || !info.IsDir() {
+			output = "Destination must be an existing directory under /var/www"
+			break
+		}
+		count, failed := 0, 0
+		for _, t := range r.PostForm["target"] {
+			from := a.safeWebPath(t)
+			if !a.canMutateWebPath(from) {
+				failed++
+				continue
+			}
+			to := filepath.Join(dp, filepath.Base(from))
+			if err := copyAny(from, to); err == nil {
+				count++
+				a.audit("file.copy", "success", from+" -> "+to)
+			} else {
+				failed++
+			}
+		}
+		output = fmt.Sprintf("Copied %d item(s) into %s", count, dest)
+		if failed > 0 {
+			output += fmt.Sprintf(" · %d failed", failed)
+		}
 	case "move", "copy":
 		from := a.safeWebPath(r.FormValue("target"))
 		to := a.safeWebPath(r.FormValue("dest"))
@@ -328,18 +543,41 @@ func (a *App) fileAction(w http.ResponseWriter, r *http.Request) {
 func (a *App) fileUpload(w http.ResponseWriter, r *http.Request) {
 	basePath := r.FormValue("path")
 	full := a.safeWebPath(basePath)
+	log.Printf("upload: start path=%q content-length=%d ua=%q", basePath, r.ContentLength, r.Header.Get("User-Agent"))
 	if err := r.ParseMultipartForm(512 << 20); err != nil {
-		http.Redirect(w, r, "/files?path="+basePath+"&output="+queryEscape("upload parse failed: "+err.Error()), http.StatusSeeOther)
+		log.Printf("upload: parse failed path=%q err=%v", basePath, err)
+		http.Redirect(w, r, "/files?path="+url.QueryEscape(basePath)+"&output="+queryEscape("upload parse failed: "+err.Error()), http.StatusSeeOther)
+		return
+	}
+	if r.MultipartForm == nil {
+		log.Printf("upload: no multipart form path=%q", basePath)
+		http.Redirect(w, r, "/files?path="+url.QueryEscape(basePath)+"&output="+queryEscape("upload received no form data"), http.StatusSeeOther)
 		return
 	}
 	files := r.MultipartForm.File["upload"]
+	log.Printf("upload: received %d file part(s) for %q", len(files), basePath)
 	saved, dirs := 0, 0
 	skipped := 0
 	output := ""
 	for _, fh := range files {
-		// With <input webkitdirectory>, browsers send fh.Filename including
-		// the file's path relative to the picked folder, e.g. "site/css/app.css".
-		raw := strings.ReplaceAll(strings.TrimSpace(fh.Filename), "\\", "/")
+		// With <input webkitdirectory>, browsers send the file's full path
+		// relative to the picked folder, e.g. "site/css/app.css", in the
+		// multipart part's Content-Disposition filename parameter.
+		//
+		// Go's mime/multipart, however, runs filepath.Base() on the filename
+		// it exposes as fh.Filename, so any directory tree is stripped before
+		// our handler sees it. Parse the raw Content-Disposition header
+		// ourselves to recover the original path. Falls back to fh.Filename
+		// for clients that don't include a directory.
+		raw := fh.Filename
+		if cd := fh.Header.Get("Content-Disposition"); cd != "" {
+			if _, params, err := mime.ParseMediaType(cd); err == nil {
+				if name := params["filename"]; name != "" {
+					raw = name
+				}
+			}
+		}
+		raw = strings.ReplaceAll(strings.TrimSpace(raw), "\\", "/")
 		raw = strings.TrimPrefix(raw, "/")
 		if raw == "" {
 			skipped++
@@ -453,6 +691,34 @@ func copyDir(src, dst string) error {
 	return nil
 }
 
+// makePathWritable hands ownership of a file or directory tree to www-data and
+// sets a g+w-friendly mode so PHP-FPM (which runs as www-data) can write into
+// it. This is the standard "config/, assets/, uploads/, storage/" treatment
+// most PHP apps need before their installer wizard will let you continue.
+//
+// Files end up at 664 (owner+group rw, world r). Directories at 775 (owner+
+// group rwx, world rx) so PHP can create new files inside. The site's other
+// owner (likely the panel's root) still has full access.
+func makePathWritable(path string) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	if out, err := exec.Command("chown", "-R", "www-data:www-data", path).CombinedOutput(); err != nil {
+		return fmt.Errorf("chown: %s", strings.TrimSpace(string(out)))
+	}
+	if info.IsDir() {
+		if out, err := exec.Command("find", path, "-type", "d", "-exec", "chmod", "775", "{}", "+").CombinedOutput(); err != nil {
+			return fmt.Errorf("chmod dirs: %s", strings.TrimSpace(string(out)))
+		}
+		if out, err := exec.Command("find", path, "-type", "f", "-exec", "chmod", "664", "{}", "+").CombinedOutput(); err != nil {
+			return fmt.Errorf("chmod files: %s", strings.TrimSpace(string(out)))
+		}
+		return nil
+	}
+	return os.Chmod(path, 0664)
+}
+
 func copyFile(src, dst string) error {
 	in, err := os.Open(src)
 	if err != nil {
@@ -468,7 +734,11 @@ func copyFile(src, dst string) error {
 	return err
 }
 
+// queryEscape escapes an arbitrary string so it is safe to drop into a
+// "?output=" query parameter. The previous homebrew Replacer left "%" and
+// other special characters un-escaped, which broke browser-side URL parsing
+// (and made some XHR redirects look like "network error"). net/url does the
+// right thing for every byte.
 func queryEscape(s string) string {
-	r := strings.NewReplacer(" ", "+", "&", "%26", "?", "%3F", "#", "%23", "=", "%3D", "/", "%2F")
-	return r.Replace(s)
+	return url.QueryEscape(s)
 }

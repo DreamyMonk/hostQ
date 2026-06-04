@@ -15,7 +15,19 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 if [[ -z "$TAG" || "$TAG" == "latest" ]]; then
-  TAG="$(curl -fsSL "https://api.github.com/repos/${REPO}/tags?per_page=1" | sed -n 's/.*"name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1)"
+  # GitHub's /tags endpoint returns tags in lexicographic order, which means
+  # v0.4.0 sorts above v0.14.11 ("4" > "1"). Use /releases/latest instead,
+  # which honours the actual release publish order. Fall back to fetching
+  # the full tag list and sorting semver-aware if no GitHub Release exists.
+  TAG="$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" 2>/dev/null | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1)"
+  if [[ -z "$TAG" ]]; then
+    TAG="$(curl -fsSL "https://api.github.com/repos/${REPO}/tags?per_page=100" | sed -n 's/.*"name"[[:space:]]*:[[:space:]]*"\(v[0-9][^"]*\)".*/\1/p' | sort -V | tail -n1)"
+  fi
+  if [[ -z "$TAG" ]]; then
+    echo "Could not determine latest release tag from GitHub." >&2
+    exit 1
+  fi
+  echo "Resolved latest tag: $TAG"
 fi
 
 if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9]+)?$ ]]; then

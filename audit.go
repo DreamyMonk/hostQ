@@ -21,6 +21,17 @@ func (a *App) audit(action, status, target string) {
 
 func (a *App) render(w http.ResponseWriter, view string, data map[string]any) {
 	data["View"] = view
+	// Pages that live in the /admin scope. The sidebar template uses
+	// IsAdmin to render a different nav group set so the user-side panel
+	// stays focused on sites/files/databases and admin chores (services,
+	// security, account, audit, server-wide PHP/Redis) get their own
+	// scope without changing the overall sidebar look.
+	switch view {
+	case "services", "security", "malfix", "account", "audit", "php", "redis", "firewall", "cron":
+		data["IsAdmin"] = true
+	default:
+		data["IsAdmin"] = false
+	}
 	if _, ok := data["PaletteSites"]; !ok && view != "login" {
 		data["PaletteSites"] = a.listSites()
 	}
