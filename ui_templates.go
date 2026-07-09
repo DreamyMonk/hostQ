@@ -52,6 +52,8 @@ var lucideIcons = map[string]string{
 	"hardDrive":  svg(`<line x1="22" y1="12" x2="2" y2="12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><line x1="6" y1="16" x2="6.01" y2="16"/>`),
 	"activity":   svg(`<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>`),
 	"circle":     svg(`<circle cx="12" cy="12" r="9"/>`),
+	"code":       svg(`<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>`),
+	"layers":     svg(`<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>`),
 	"logo":       svg(`<rect x="3" y="3" width="18" height="18" rx="4"/><path d="M9 9h6v6H9z"/><path d="M12 15v3"/>`),
 }
 
@@ -838,8 +840,19 @@ document.addEventListener('keydown',function(e){
           </div>
           <a class="btn mini" href="/wordpress?manage={{.Site.Domain}}">Manage</a>
         </div>
-      {{else}}
-        <p class="muted" style="margin:0">No application detected. Install WordPress from the <a href="/site?domain={{.Site.Domain}}&tab=wordpress" style="color:#2563eb;font-weight:700">WordPress tab</a> or upload your own files into <span class="mono">{{.Site.Root}}</span>.</p>
+      {{end}}
+      {{if .LaravelOnSite}}
+        <div class="app-row">
+          <div class="app-icon" style="background:linear-gradient(135deg,#ef3b2d,#b91c1c)">L</div>
+          <div class="app-meta">
+            <strong>Laravel</strong>{{if .LaravelOnSite.Version}} <span class="badge">{{.LaravelOnSite.Version}}</span>{{end}}
+            <div class="muted mono" style="font-size:11.5px;margin-top:2px">{{.LaravelOnSite.Path}}</div>
+          </div>
+          <a class="btn mini" href="/files?path={{.LaravelOnSite.Path}}">Files</a>
+        </div>
+      {{end}}
+      {{if and (not .WPOnSite) (not .LaravelOnSite)}}
+        <p class="muted" style="margin:0">No application detected. Install WordPress from the <a href="/site?domain={{.Site.Domain}}&tab=wordpress" style="color:#2563eb;font-weight:700">WordPress tab</a>, scaffold Laravel from <a href="/sites/add" style="color:#2563eb;font-weight:700">Add website</a>, or upload your own files into <span class="mono">{{.Site.Root}}</span>.</p>
       {{end}}
     </div>
     <div class="card glance-card">
@@ -1031,6 +1044,26 @@ document.addEventListener('keydown',function(e){
       <input type="hidden" name="domain" value="{{.Site.Domain}}">
       <button class="btn" name="action" value="flush" data-confirm="Purge the shared FastCGI cache and reload Nginx?">{{icon "refresh"}} Flush cache</button>
     </form>
+  </div>
+  <div class="card">
+    <h3>{{icon "layers"}} Web server backend</h3>
+    <p class="muted">Nginx always fronts this site (TLS, FastCGI cache, the panel proxy). You can optionally hand PHP and <span class="mono">.htaccess</span> to a private Apache backend for apps that depend on Apache rewrite rules.</p>
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      {{if eq .Site.Backend "apache"}}
+        <span class="badge">{{icon "check"}} Serving via Apache backend — <span class="mono">.htaccess</span> active</span>
+        <form method="post" action="/site-action" style="display:inline">
+          <input type="hidden" name="domain" value="{{.Site.Domain}}">
+          <button class="btn" name="action" value="backend-nginx" data-confirm="Switch {{.Site.Domain}} back to the Nginx + php-fpm backend?">{{icon "server"}} Switch to Nginx (php-fpm)</button>
+        </form>
+      {{else}}
+        <span class="badge">Serving via Nginx + php-fpm</span>
+        <form method="post" action="/site-action" style="display:inline">
+          <input type="hidden" name="domain" value="{{.Site.Domain}}">
+          <button class="btn" name="action" value="backend-apache" data-confirm="Serve {{.Site.Domain}} through the Apache backend? Requires Apache installed from Services & Packages.">{{icon "layers"}} Switch to Apache (.htaccess)</button>
+        </form>
+      {{end}}
+    </div>
+    <p class="muted" style="font-size:12px;margin-top:8px">Apache must be installed from <a href="/services" style="color:#2563eb;font-weight:700">Services &amp; Packages</a> first. It listens privately on <span class="mono">127.0.0.1:8080</span> and never touches ports 80/443.</p>
   </div>
   <div class="card">
     <h3>Custom Nginx config block</h3>
@@ -2733,6 +2766,7 @@ function dbsOpenResetUser(u){ document.getElementById('dbs-ru-user-label').textC
   <a class="btn" href="/sites">{{icon "chevronUp"}} Back</a>
 </div>
 {{if .Error}}<div class="alert bad">{{icon "alert"}} {{.Error}}</div>{{end}}
+{{if .Output}}<pre class="mono" style="background:var(--surface-2);color:var(--ink);padding:14px;border-radius:8px;font-size:12px;line-height:1.55;overflow:auto;max-height:340px;border:1px solid var(--card-line);white-space:pre-wrap">{{.Output}}</pre>{{end}}
 <form method="post" action="/sites/add">
   <div class="card">
     <h3>How do you want to start?</h3>
@@ -2751,6 +2785,14 @@ function dbsOpenResetUser(u){ document.getElementById('dbs-ru-user-label').textC
           <div class="mode-ic">{{icon "wordpress"}}</div>
           <div class="mode-title">Install WordPress</div>
           <div class="mode-desc">Download WP, create a database, run install. Ready to log in when the page reloads.</div>
+        </div>
+      </label>
+      <label class="mode-card" data-mode="laravel">
+        <input type="radio" name="mode" value="laravel">
+        <div class="mode-body" style="display:flex;flex-direction:column;align-items:center;gap:10px">
+          <div class="mode-ic">{{icon "code"}}</div>
+          <div class="mode-title">Install Laravel</div>
+          <div class="mode-desc">Composer scaffold, a fresh database, .env wired up and app key generated. Docroot points at <span class="mono">public/</span>.</div>
         </div>
       </label>
     </div>

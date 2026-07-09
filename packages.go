@@ -29,6 +29,7 @@ type PackageInfo struct {
 func managedPackages() []PackageDef {
 	return []PackageDef{
 		{ID: "nginx", Name: "Nginx", Apt: "nginx", Service: "nginx", Description: "Web server that fronts every hosted site and the panel itself.", Group: "Web"},
+		{ID: "apache", Name: "Apache (hybrid backend)", Apt: "apache2 libapache2-mod-fcgid", Service: "apache2", Description: "Optional per-site backend behind Nginx. Binds to 127.0.0.1:8080 and adds .htaccess support for sites that need it.", Group: "Web"},
 		{ID: "mariadb", Name: "MariaDB", Apt: "mariadb-server", Service: "mariadb", Description: "MySQL-compatible database server. Backs every site's data store.", Group: "Database"},
 		{ID: "phpmyadmin", Name: "phpMyAdmin", Apt: "phpmyadmin", Description: "Web UI for MariaDB/MySQL. Panel single sign-on is wired through this.", Group: "Database"},
 		{ID: "php82", Name: "PHP 8.2 FPM", Apt: "php8.2-fpm php8.2-cli php8.2-mysql php8.2-xml php8.2-mbstring php8.2-curl php8.2-zip php8.2-gd php8.2-intl", Service: "php8.2-fpm", Description: "PHP 8.2 FastCGI Process Manager.", Group: "PHP"},
@@ -38,6 +39,7 @@ func managedPackages() []PackageDef {
 		{ID: "redis", Name: "Redis", Apt: "redis-server", Service: "redis-server", Description: "Optional in-memory cache for WordPress object-cache plugins.", Group: "Cache"},
 		{ID: "certbot", Name: "Certbot (Let's Encrypt)", Apt: "certbot python3-certbot-nginx", Description: "Free TLS certificates via ACME.", Group: "TLS"},
 		{ID: "pureftpd", Name: "Pure-FTPd", Apt: "pure-ftpd pure-ftpd-common", Service: "pure-ftpd", Description: "Lightweight FTP server.", Group: "Transfer"},
+		{ID: "composer", Name: "Composer", Apt: "composer", Description: "PHP dependency manager. Required to scaffold and manage Laravel apps from the panel.", Group: "Tooling"},
 		{ID: "wpcli", Name: "WP-CLI", Apt: "", Description: "Already installed by install.sh from the official phar build.", Group: "Tooling"},
 	}
 }

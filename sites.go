@@ -76,8 +76,25 @@ func (a *App) siteAdd(w http.ResponseWriter, r *http.Request) {
 	_ = os.MkdirAll(root, 0755)
 
 	mode := r.FormValue("mode")
-	if mode != "wordpress" {
+	if mode != "wordpress" && mode != "laravel" {
 		mode = "blank"
+	}
+
+	if mode == "laravel" {
+		// Laravel one-shot: composer scaffold + DB + .env + key. The web
+		// docroot becomes <root>/public, wired inside installLaravel.
+		out, err := a.installLaravel(LaravelInstallParams{
+			Domain:     domain,
+			ProjectDir: root,
+			PHPVersion: "8.4",
+		})
+		if err != nil {
+			a.render(w, "siteadd", map[string]any{"Title": "Add website", "Error": "Laravel install failed", "Domain": domain, "Output": out})
+			return
+		}
+		a.audit("site.create", "success", domain)
+		http.Redirect(w, r, "/site?domain="+domain+"&output="+queryEscape("Site created and Laravel installed."), http.StatusSeeOther)
+		return
 	}
 
 	if mode == "blank" {
@@ -150,6 +167,16 @@ func (a *App) siteManager(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		data["WPOnSite"] = siteWP
+		// Same idea for Laravel apps rooted under this site.
+		var siteLaravel *LaravelInfo
+		for _, l := range a.listLaravel() {
+			if l.Domain == site.Domain {
+				lv := l
+				siteLaravel = &lv
+				break
+			}
+		}
+		data["LaravelOnSite"] = siteLaravel
 		// Hero card visual: derive a stable hue from the domain so each site
 		// gets a recognisable colour without us needing screenshots.
 		h := 0
@@ -255,6 +282,30 @@ func (a *App) siteAction(w http.ResponseWriter, r *http.Request) {
 		a.writeNginxSite(site.Domain, site.Root, true, site.PHPVersion)
 	case "cache-off":
 		a.writeNginxSite(site.Domain, site.Root, false, site.PHPVersion)
+	case "backend-apache":
+		if !apacheInstalled() {
+			http.Redirect(w, r, "/site?domain="+domain+"&tab=nginx&output="+queryEscape("Install Apache from Services & Packages first."), http.StatusSeeOther)
+			return
+		}
+		if err := a.ensureApacheHybrid(); err != nil {
+			http.Redirect(w, r, "/site?domain="+domain+"&tab=nginx&output="+queryEscape("Apache setup failed: "+err.Error()), http.StatusSeeOther)
+			return
+		}
+		_ = a.setSiteBackend(domain, "apache")
+		// FastCGI cache is an Nginx-FastCGI concept; force it off for Apache.
+		a.writeNginxSite(site.Domain, site.Root, false, site.PHPVersion)
+		a.cache.invalidate("sites")
+		a.audit("site.backend-apache", "success", domain)
+		http.Redirect(w, r, "/site?domain="+domain+"&tab=nginx&output="+queryEscape("Switched "+domain+" to the Apache backend — .htaccess is now active."), http.StatusSeeOther)
+		return
+	case "backend-nginx":
+		_ = a.setSiteBackend(domain, "nginx")
+		a.removeApacheSite(domain)
+		a.writeNginxSite(site.Domain, site.Root, site.Cache, site.PHPVersion)
+		a.cache.invalidate("sites")
+		a.audit("site.backend-nginx", "success", domain)
+		http.Redirect(w, r, "/site?domain="+domain+"&tab=nginx&output="+queryEscape("Switched "+domain+" back to the Nginx backend."), http.StatusSeeOther)
+		return
 	case "permissions":
 		_ = exec.Command("chown", "-R", "www-data:www-data", filepath.Join(a.cfg.WebRoot, domain)).Run()
 		_ = exec.Command("find", filepath.Join(a.cfg.WebRoot, domain), "-type", "d", "-exec", "chmod", "755", "{}", ";").Run()
@@ -302,6 +353,9 @@ func (a *App) siteAction(w http.ResponseWriter, r *http.Request) {
 	case "delete":
 		_ = os.Remove(filepath.Join("/etc/nginx/sites-enabled", domain))
 		_ = os.Remove(filepath.Join(a.cfg.NginxSitesDir, domain))
+		// Tear down the Apache backend + persisted backend choice, if any.
+		a.removeApacheSite(domain)
+		_ = a.setSiteBackend(domain, "nginx")
 		siteBase := filepath.Dir(site.Root)
 		if a.canMutateWebPath(siteBase) {
 			_ = os.RemoveAll(siteBase)
@@ -542,17 +596,27 @@ func (a *App) listSites() []Site {
 		domain := firstMatch(text, `hostQ managed - ([^\n]+)`)
 		root := firstMatch(text, `root\s+([^;]+);`)
 		phpVersion := firstMatch(text, `php(\d\.\d)-fpm`)
+		if phpVersion == "" {
+			// Apache-backed vhosts proxy to Apache instead of php-fpm, so the
+			// socket line is absent — fall back to the header comment.
+			phpVersion = firstMatch(text, `hostQ php: (\d\.\d)`)
+		}
+		backend := firstMatch(text, `hostQ backend: (\w+)`)
 		if domain == "" {
 			domain = entry.Name()
 		}
 		if phpVersion == "" {
 			phpVersion = "8.4"
 		}
+		if backend == "" {
+			backend = "nginx"
+		}
 		_, enabledErr := os.Stat(filepath.Join("/etc/nginx/sites-enabled", entry.Name()))
 		sites = append(sites, Site{
 			Domain: domain, Root: root, Enabled: enabledErr == nil, PHPVersion: phpVersion,
-			SSL:   strings.Contains(text, "ssl_certificate") && a.certExists(domain),
-			Cache: strings.Contains(text, "hostQ fastcgi cache: on"),
+			Backend: backend,
+			SSL:     strings.Contains(text, "ssl_certificate") && a.certExists(domain),
+			Cache:   strings.Contains(text, "hostQ fastcgi cache: on"),
 		})
 	}
 	sort.Slice(sites, func(i, j int) bool { return sites[i].Domain < sites[j].Domain })
@@ -571,6 +635,15 @@ func firstMatch(text, expr string) string {
 func (a *App) writeNginxSite(domain, root string, cache bool, phpVersion string) {
 	if !phpVersionRe.MatchString(phpVersion) {
 		phpVersion = "8.4"
+	}
+	// Web backend: "apache" means Nginx front-proxies dynamic requests to the
+	// site's loopback Apache vhost (which handles PHP + .htaccess); "nginx"
+	// (default) means Nginx talks to php-fpm directly. Read from disk so no
+	// caller has to thread the choice through.
+	backend := a.siteBackend(domain)
+	if backend == "apache" && apacheInstalled() {
+		// Keep the Apache vhost in sync on every render (alias/PHP/root change).
+		_ = a.writeApacheSite(domain, root, phpVersion)
 	}
 	cacheBlock := ""
 	if cache {
@@ -612,6 +685,24 @@ func (a *App) writeNginxSite(domain, root string, cache bool, phpVersion string)
         include fastcgi_params;%s%s
     }
 %s%s`, accessLog, root, defaultLocationSlash, phpVersion, cacheBlock, phpValueBlock, pmaInclude, extraInclude)
+
+	// Apache backend: hand the whole site to the loopback Apache vhost so its
+	// .htaccess rules apply. Nginx proxies everything, keeping TLS and the
+	// panel front-door intact. Per-site PHP overrides, the FastCGI cache and
+	// the custom Nginx include are all Nginx-FastCGI concepts — and the
+	// include could collide with this single `location /` — so we deliberately
+	// omit them here. Rewrite rules live in .htaccess in this mode.
+	if backend == "apache" {
+		siteBody = fmt.Sprintf(`%s    root %s;
+    location / {
+        proxy_pass http://%s;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+`, accessLog, root, apacheBackendAddr)
+	}
 
 	cacheLabel := "off"
 	if cache {
@@ -661,8 +752,8 @@ func (a *App) writeNginxSite(domain, root string, cache bool, phpVersion string)
 %s%s}
 `, domain, domain, aliasSuffix, domain, domain, sslIncludes, siteBody)
 	}
-	conf := fmt.Sprintf("# hostQ managed - %s\n# hostQ fastcgi cache: %s\n# hostQ ssl: %s\n%s%s",
-		domain, cacheLabel, sslLabel, port80, port443)
+	conf := fmt.Sprintf("# hostQ managed - %s\n# hostQ backend: %s\n# hostQ php: %s\n# hostQ fastcgi cache: %s\n# hostQ ssl: %s\n%s%s",
+		domain, backend, phpVersion, cacheLabel, sslLabel, port80, port443)
 
 	_ = os.WriteFile(filepath.Join(a.cfg.NginxSitesDir, domain), []byte(conf), 0644)
 	_ = os.Remove(filepath.Join("/etc/nginx/sites-enabled", domain))

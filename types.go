@@ -26,8 +26,16 @@ type Site struct {
 	SSL        bool
 	Cache      bool
 	PHPVersion string
+	Backend    string // "nginx" (default) or "apache" (hybrid backend behind Nginx)
 	SizeBytes  int64
 	SizeHuman  string
+}
+
+type LaravelInfo struct {
+	Domain  string
+	Path    string // project root (holds artisan)
+	Public  string // web docroot (<Path>/public)
+	Version string // laravel/framework version if resolvable
 }
 
 type FileItem struct {
