@@ -60,8 +60,23 @@ func (a *App) servicesAction(w http.ResponseWriter, r *http.Request) {
 			a.audit("packages.install", "failure", id)
 			break
 		}
-		if def.Service != "" {
+		if def.Service != "" && def.ID != "apache" {
 			_ = exec.Command("systemctl", "enable", "--now", def.Service).Run()
+		}
+		// Apache is only ever a loopback backend behind Nginx. Reconfigure it
+		// to 127.0.0.1:8080 and drop its default :80 sites *before* it competes
+		// with Nginx for port 80.
+		if def.ID == "apache" {
+			if err := a.ensureApacheHybrid(); err != nil {
+				output = def.Name + " installed, but hybrid setup failed: " + err.Error()
+				a.audit("packages.install", "failure", id)
+				a.cache.invalidate("services")
+				break
+			}
+			output = def.Name + " installed and bound to " + apacheBackendAddr + " behind Nginx."
+			a.audit("packages.install", "success", id)
+			a.cache.invalidate("services")
+			break
 		}
 		// phpMyAdmin needs the snippet + default vhost to be reachable on
 		// any host. install.sh writes those on first boot; do the same now
