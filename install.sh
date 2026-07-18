@@ -243,6 +243,9 @@ cd "$PANEL_DIR"
 go mod download
 go build -trimpath -ldflags="-s -w" -o /usr/local/bin/hostq-panel .
 log "Built /usr/local/bin/hostq-panel"
+# `hostq` convenience alias so operators can run recovery commands like
+# `hostq doctor` (detect + restore zero-byte nginx vhosts, validate, reload).
+ln -sf /usr/local/bin/hostq-panel /usr/local/bin/hostq
 
 ADMIN_USER="admin"
 ADMIN_PASS="$(openssl rand -base64 24 | tr -d '/+=' | cut -c1-20)"
@@ -350,4 +353,12 @@ echo "  systemctl status hostq-panel --no-pager -l"
 echo "  journalctl -u hostq-panel -f"
 echo "  sudo hostq-update"
 echo "  sudo hostq-update v0.3.5"
+echo "  hostq status        # health snapshot (nginx, php-fpm, panel, ssl, sites)"
+echo "  hostq validate      # nginx -t + php-fpm config test (read-only)"
+echo "  sudo hostq doctor   # restore missing/zero-byte nginx configs, validate + reload"
+echo "  sudo hostq repair   # regenerate every vhost from /etc/hostq/sites/*.json"
+echo "  sudo hostq rebuild  # idempotent regenerate from metadata"
+echo "  sudo hostq backup   # snapshot all vhosts into the revision history"
+echo "  sudo hostq restore [domain] [#N]  # roll back to a saved good config"
+echo "  hostq deploy-log    # tail the configuration deployment journal"
 echo "  mysql_secure_installation"

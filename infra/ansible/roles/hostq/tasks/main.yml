@@ -82,12 +82,25 @@
   changed_when: false
   tags: [hardening, firewall]
 
-- name: Clone or update hostQ repository
+# First-install checkout ONLY. update:false means routine playbook runs never
+# fetch or advance the working copy, so a new commit on `main` (or any branch)
+# does NOT silently roll out to every host. Version changes go through a GitHub
+# release + `sudo hostq-update <tag>`, or the tagged `update` play below.
+# To re-pin the initial checkout, remove {{ hostq_dir }} and re-run.
+- name: Clone hostQ source on first install (no auto-update on re-runs)
   ansible.builtin.git:
     repo: "{{ hostq_repo }}"
     dest: "{{ hostq_dir }}"
     version: "{{ hostq_version }}"
-    force: true
+    update: false
+    force: false
+  register: hostq_src
+  tags: [install]
+
+- name: Check whether the panel binary is already built
+  ansible.builtin.stat:
+    path: /usr/local/bin/hostq-panel
+  register: hostq_bin
   tags: [install]
 
 - name: Ensure hostQ env file exists
@@ -124,11 +137,15 @@
     HOSTQ_ASSUME_YES: "true"
   register: hostq_setup
   changed_when: "'Setup complete' in hostq_setup.stdout"
+  # Only build + restart on the first install or when the source actually
+  # changed — routine converges must not rebuild/restart a healthy panel.
+  when: hostq_src.changed or not hostq_bin.stat.exists
   tags: [install]
 
 - name: Show hostQ setup output
   ansible.builtin.debug:
     var: hostq_setup.stdout_lines
+  when: not (hostq_setup.skipped | default(false))
   tags: [install]
 
 - name: Update hostQ to requested version through SSH updater

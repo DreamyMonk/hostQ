@@ -1,5 +1,11 @@
 hostq_repo: "https://github.com/DreamyMonk/hostQ.git"
 hostq_dir: "/opt/hostq"
+# Git ref used for the FIRST checkout only. The clone task sets update:false, so
+# re-running the playbook never advances this — a new commit on `main` will NOT
+# auto-deploy. To update a running host, either publish a GitHub release and run
+# `sudo hostq-update <tag>`, or run this playbook with `--tags update
+# -e hostq_version=vX.Y.Z`. Pin this to a release tag (e.g. "v1.2.3") for
+# reproducible installs; "main" only affects brand-new boxes.
 hostq_version: "main"
 hostq_panel_public_port: 8090
 hostq_web_root: "/var/www"

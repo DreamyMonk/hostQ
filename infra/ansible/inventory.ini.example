@@ -4,6 +4,9 @@ hostq ansible_host=SERVER_IP ansible_user=root
 [hostq:vars]
 hostq_repo=https://github.com/DreamyMonk/hostQ.git
 hostq_dir=/opt/hostq
+# First-checkout ref only; re-runs do NOT auto-update (update:false in the role).
+# Pin to a release tag like v1.2.3 for reproducible installs. Update a running
+# host with `sudo hostq-update <tag>` or `--tags update -e hostq_version=vX.Y.Z`.
 hostq_version=main
 hostq_panel_public_port=8090
 hostq_web_root=/var/www

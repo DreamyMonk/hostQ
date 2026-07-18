@@ -1,10 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -31,6 +33,88 @@ func main() {
 			log.Fatal(err)
 		}
 		return
+	}
+	// Maintenance / recovery CLI (from the 2026-07-18 incident report). These
+	// exit the process; the mutating ones run under a cross-process config lock.
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "doctor":
+			// Detect zero-byte/missing managed vhosts, restore from the backup
+			// store, validate, and reload/start nginx only if `nginx -t` passes.
+			var res DoctorResult
+			app.withConfigLock(func() {
+				app.cleanupStaleTemps()
+				app.seedConfBackups()
+				res = app.runDoctor()
+			})
+			printDoctorResult(res)
+			if !res.NginxOK {
+				os.Exit(1)
+			}
+			return
+		case "repair":
+			// `hostq repair` / `hostq repair nginx`: regenerate every vhost from
+			// /etc/hostq/sites/*.json metadata, restore any legacy config from
+			// backup, validate, and reload.
+			app.backfillSiteMeta()
+			var res DoctorResult
+			app.withConfigLock(func() {
+				app.seedConfBackups()
+				res = app.runRepair()
+			})
+			printDoctorResult(res)
+			if !res.NginxOK {
+				os.Exit(1)
+			}
+			return
+		case "rebuild":
+			// Regenerate every vhost from metadata (idempotent).
+			app.backfillSiteMeta()
+			var rs []RebuildResult
+			app.withConfigLock(func() { rs = app.runRebuild() })
+			printRebuildResults(rs)
+			return
+		case "validate":
+			// Read-only: nginx -t + php-fpm config test + empty-config scan.
+			v := app.runValidate()
+			printValidateResult(v)
+			if !v.AllOK {
+				os.Exit(1)
+			}
+			return
+		case "status":
+			s := app.runStatus()
+			printStatus(s)
+			if !s.Healthy {
+				os.Exit(1)
+			}
+			return
+		case "backup":
+			// Snapshot every managed vhost into the store as a fresh revision.
+			var saved []string
+			app.withConfigLock(func() { saved = app.runBackup() })
+			printBackupResult(saved)
+			return
+		case "restore":
+			app.runRestoreCLI(os.Args[2:])
+			return
+		case "deploy-log":
+			n := 50
+			if len(os.Args) >= 3 {
+				if v, err := strconv.Atoi(os.Args[2]); err == nil && v > 0 {
+					n = v
+				}
+			}
+			lines := app.tailDeployLog(n)
+			if len(lines) == 0 {
+				fmt.Println("deploy log is empty (" + app.deployLogPath() + ")")
+				return
+			}
+			for _, l := range lines {
+				fmt.Println(l)
+			}
+			return
+		}
 	}
 	app.tpl = template.Must(template.New("hostq").Funcs(template.FuncMap{
 		"now":  time.Now,
@@ -111,6 +195,17 @@ func main() {
 	} else {
 		log.Printf("pma setup verified: snippet + default vhost in place")
 	}
+
+	// Boot-time nginx safety (crash recovery + self-heal):
+	//   1. sweep stranded atomic-write temp files from a mid-write crash,
+	//   2. backfill site metadata so rebuild/repair works for existing sites,
+	//   3. snapshot any healthy managed vhosts that lack a good-config backup,
+	//   4. restore + reload any vhost that is currently zero-byte/missing.
+	// Best-effort — a wiped sites-available must not stop the panel serving.
+	app.cleanupStaleTemps()
+	app.backfillSiteMeta()
+	app.seedConfBackups()
+	app.nginxStartupHeal()
 
 	log.Printf("hostQ panel listening on http://%s", app.cfg.Addr)
 	log.Fatal(http.ListenAndServe(app.cfg.Addr, gzipMiddleware(securityHeaders(mux))))

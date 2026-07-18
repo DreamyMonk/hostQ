@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"html/template"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -353,6 +354,10 @@ func (a *App) siteAction(w http.ResponseWriter, r *http.Request) {
 	case "delete":
 		_ = os.Remove(filepath.Join("/etc/nginx/sites-enabled", domain))
 		_ = os.Remove(filepath.Join(a.cfg.NginxSitesDir, domain))
+		// Remove the source-of-truth record and the good-config backup so the
+		// site isn't resurrected by a rebuild/self-heal after deletion.
+		a.removeSiteMeta(domain)
+		_ = os.Remove(filepath.Join(a.nginxConfBackupDir(), domain))
 		// Tear down the Apache backend + persisted backend choice, if any.
 		a.removeApacheSite(domain)
 		_ = a.setSiteBackend(domain, "nginx")
@@ -539,14 +544,16 @@ func (a *App) siteNginx(w http.ResponseWriter, r *http.Request) {
 			output = "save failed: " + err.Error()
 			break
 		}
-		a.writeNginxSite(domain, site.Root, site.Cache, site.PHPVersion)
-		if out, err := exec.Command("nginx", "-t").CombinedOutput(); err != nil {
+		// writeNginxSite now validates the generated vhost with `nginx -t` and
+		// only reloads on success. If the custom snippet is bad it returns the
+		// error, so restore the previous snippet and regenerate to return both
+		// the include file and the live vhost to the last good state.
+		if err := a.writeNginxSite(domain, site.Root, site.Cache, site.PHPVersion); err != nil {
 			_ = a.saveExtraNginx(domain, prev)
-			a.writeNginxSite(domain, site.Root, site.Cache, site.PHPVersion)
-			output = "nginx -t failed; rolled back. " + strings.TrimSpace(string(out))
+			_ = a.writeNginxSite(domain, site.Root, site.Cache, site.PHPVersion)
+			output = "nginx -t failed; rolled back. " + err.Error()
 			a.audit("nginx.save", "failure", domain)
 		} else {
-			_ = exec.Command("systemctl", "reload", "nginx").Run()
 			output = "Custom Nginx config saved and reloaded."
 			a.audit("nginx.save", "success", domain)
 		}
@@ -583,6 +590,11 @@ func (a *App) listSites() []Site {
 	}
 	for _, entry := range entries {
 		if entry.IsDir() {
+			continue
+		}
+		// Skip hostQ sidecars (.prev rollback copies, temp files, hidden) so a
+		// rollback snapshot never shows up as a phantom duplicate site.
+		if isSidecarName(entry.Name()) {
 			continue
 		}
 		data, err := os.ReadFile(filepath.Join(a.cfg.NginxSitesDir, entry.Name()))
@@ -632,9 +644,15 @@ func firstMatch(text, expr string) string {
 	return ""
 }
 
-func (a *App) writeNginxSite(domain, root string, cache bool, phpVersion string) {
+func (a *App) writeNginxSite(domain, root string, cache bool, phpVersion string) error {
 	if !phpVersionRe.MatchString(phpVersion) {
 		phpVersion = "8.4"
+	}
+	// Commit the source-of-truth record first (begin transaction). The Nginx
+	// vhost below is a disposable artifact regenerated from this metadata by
+	// `hostq rebuild` / `hostq repair`.
+	if err := a.saveSiteMeta(SiteMeta{Domain: domain, Root: root, Cache: cache, PHPVersion: phpVersion, Updated: time.Now().Format(time.RFC3339)}); err != nil {
+		log.Printf("writeNginxSite %s: metadata save failed: %v", domain, err)
 	}
 	// Web backend: "apache" means Nginx front-proxies dynamic requests to the
 	// site's loopback Apache vhost (which handles PHP + .htaccess); "nginx"
@@ -755,10 +773,14 @@ func (a *App) writeNginxSite(domain, root string, cache bool, phpVersion string)
 	conf := fmt.Sprintf("# hostQ managed - %s\n# hostQ backend: %s\n# hostQ php: %s\n# hostQ fastcgi cache: %s\n# hostQ ssl: %s\n%s%s",
 		domain, backend, phpVersion, cacheLabel, sslLabel, port80, port443)
 
-	_ = os.WriteFile(filepath.Join(a.cfg.NginxSitesDir, domain), []byte(conf), 0644)
-	_ = os.Remove(filepath.Join("/etc/nginx/sites-enabled", domain))
-	_ = os.Symlink(filepath.Join(a.cfg.NginxSitesDir, domain), filepath.Join("/etc/nginx/sites-enabled", domain))
-	_ = exec.Command("nginx", "-t").Run()
-	_ = exec.Command("systemctl", "reload", "nginx").Run()
+	// Publish through the safe path: atomic write, `nginx -t` validation,
+	// automatic rollback to the last good config on failure, and reload only
+	// on success. This replaces the old truncate-then-reload-regardless write
+	// that could leave a zero-byte vhost live (see nginxsafe.go).
+	err := a.applyNginxConf(domain, []byte(conf))
+	if err != nil {
+		log.Printf("writeNginxSite %s: %v", domain, err)
+	}
 	a.cache.invalidate("sites")
+	return err
 }
